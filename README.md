@@ -14,12 +14,11 @@ sans barre d'adresse et **fonctionne hors ligne**, même quand le serveur n'est 
 (Relance le `.bat` seulement après avoir modifié le code, pour recevoir la mise à jour.)
 
 ## Sur ton cellulaire (et tous tes appareils)
-1. **App en ligne** : le dossier `app/` est publié sur GitHub Pages (adresse du genre
-   `https://tonpseudo.github.io/lifeplanner/`). Après une modification, double-clique sur
+1. **App en ligne** : le dossier `app/` est publié sur GitHub Pages (**https://kylosta.github.io/lifeplanner/**). Après une modification, double-clique sur
    **`Publier.bat`** : la nouvelle version est en ligne 1 à 2 minutes plus tard.
 2. **Google** (une fois, sur console.cloud.google.com, dans ton projet existant) :
    - active **Google Drive API** (en plus de Google Calendar API) ;
-   - dans ton ID client OAuth, ajoute l'origine `https://tonpseudo.github.io` aux
+   - dans ton ID client OAuth, ajoute l'origine `https://kylosta.github.io` aux
      *Origines JavaScript autorisées*.
 3. **Synchronisation** : Réglages → **☁️ Activer la synchronisation** (sur chaque appareil).
    Tes données vont dans un dossier caché et privé de ton Google Drive ; chaque appareil envoie
