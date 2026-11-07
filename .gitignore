@@ -1,0 +1,4 @@
+# Rien de personnel n'est dans le code : les données restent dans le navigateur et ton Google Drive.
+*.log
+Thumbs.db
+desktop.ini
