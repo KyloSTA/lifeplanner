@@ -1,0 +1,26 @@
+/* Bouton « 🧠 Cerveau » ajouté par Life Planner sous les posts Reddit */
+.lp-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 12px 6px;
+}
+.lp-save {
+  font: 600 12px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #4338ca;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.lp-save:hover:not(:disabled) { background: #e0e7ff; }
+.lp-save:disabled { cursor: default; }
+.lp-save.lp-done { color: #15803d; background: #f0fdf4; border-color: #bbf7d0; }
+/* Ancien Reddit : s'aligne sur les petits liens « comments share save » */
+.flat-list.buttons .lp-save { padding: 0 6px; font-size: inherit; border-radius: 4px; }
+@media (prefers-color-scheme: dark) {
+  .lp-save { color: #c7d2fe; background: #312e81; border-color: #4338ca; }
+  .lp-save:hover:not(:disabled) { background: #3730a3; }
+  .lp-save.lp-done { color: #86efac; background: #14532d; border-color: #166534; }
+}

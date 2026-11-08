@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Life Planner — Reddit → Cerveau",
+  "version": "1.0.0",
+  "description": "Ajoute un bouton « Cerveau » aux posts Reddit ouverts depuis le Lanceur de Life Planner, pour les enregistrer comme note.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "http://localhost:5173/*",
+    "https://kylosta.github.io/lifeplanner/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.reddit.com/*", "https://old.reddit.com/*", "https://new.reddit.com/*", "https://reddit.com/*"],
+      "js": ["reddit.js"],
+      "css": ["reddit.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost:5173/*", "https://kylosta.github.io/lifeplanner/*"],
+      "js": ["relay.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "icons": { "128": "icon128.png" }
+}

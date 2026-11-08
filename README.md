@@ -163,6 +163,22 @@ ramène la même fenêtre). **✎ Modifier** permet d'ajouter tes raccourcis (no
 de les réordonner ou de les retirer. La 1re fois, Edge peut demander d'autoriser les fenêtres
 pop-up ou l'ouverture de Spotify : accepte.
 
+### Reddit → Cerveau (bouton « 🧠 Cerveau » sous les posts)
+Quand Reddit est ouvert depuis le Lanceur, un bouton **🧠 Cerveau** apparaît sous chaque post.
+Un clic enregistre le post comme note **Ressource** dans le Cerveau : titre, lien, subreddit,
+auteur, date, texte du post et étiquettes `#reddit #nomdusubreddit`. Sauvegarder deux fois le
+même post met la note à jour (pas de doublon). Si Life Planner est fermé, le post attend et
+arrive à sa prochaine ouverture.
+
+Une page web ne peut pas modifier Reddit : le bouton vient d'une petite extension Edge, dans
+le dossier `extension-edge`. À installer une seule fois :
+1. Dans Edge, ouvre `edge://extensions`.
+2. Active **Mode développeur** (en bas à gauche).
+3. Clique **Charger l'extension décompressée** et choisis le dossier `LifePlanner\extension-edge`.
+
+Elle fonctionne avec la version locale (localhost:5173) et la version en ligne. Après une mise à
+jour de l'extension, clique **Recharger** sur sa carte dans `edge://extensions`.
+
 ## Alarmes
 Ouvre une mission (**›**) puis, dans **⏰ Alarme**, choisis une date et une heure, ou un raccourci :
 « Dans 30 min », « Dans 1 h », « Demain 9 h », « Ce soir 19 h ». La mission affiche une pastille ⏰.
