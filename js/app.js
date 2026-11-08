@@ -12,6 +12,7 @@ import * as alarms from './alarms.js';
 import * as launcher from './launcher.js';
 import * as timer from './timer.js';
 import * as sync from './sync.js';
+import * as clips from './clips.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -1164,7 +1165,8 @@ async function renderLauncher() {
         <button class="btn primary">Ajouter</button>
       </form>
       <button class="btn" id="ln-reset" type="button">Rétablir les raccourcis par défaut</button>
-    </section>` : `<p class="hint muted">Les sites s’ouvrent chacun dans leur propre fenêtre (un 2e clic ramène la même). Edge et Spotify s’ouvrent comme applications Windows ; 🌐 ouvre la version web. Si rien ne s’ouvre, autorise les fenêtres pop-up pour Life Planner dans Edge.</p>`}`;
+    </section>` : `<p class="hint muted">Les sites s’ouvrent chacun dans leur propre fenêtre (un 2e clic ramène la même). Edge et Spotify s’ouvrent comme applications Windows ; 🌐 ouvre la version web. Si rien ne s’ouvre, autorise les fenêtres pop-up pour Life Planner dans Edge.</p>
+    <p class="hint muted">🧠 Pour enregistrer des posts Reddit dans ton Cerveau, installe l’extension du dossier <b>extension-edge</b> (voir le README).</p>`}`;
 
   $('#ln-edit').onclick = () => { launcherEdit = !launcherEdit; renderLauncher(); };
   $$('[data-open]').forEach((b) => (b.onclick = () => {
@@ -2015,5 +2017,12 @@ game.init().catch(console.error).finally(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
     if (route === 'today') refreshToday();
     else if (['week', 'goals', 'note'].includes(route) && !$('#modal-root').children.length) router();
+  });
+  // Posts Reddit sauvegardés avec le bouton « 🧠 Cerveau » (extension extension-edge)
+  clips.start((note, updated) => {
+    refreshRail();
+    const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
+    if (route === 'brain' && !$('#modal-root').children.length) router();
+    toast(updated ? `🧠 Post Reddit mis à jour : « ${note.title} »` : `🧠 Post Reddit ajouté au Cerveau : « ${note.title} »`);
   });
 });
