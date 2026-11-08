@@ -1562,7 +1562,7 @@ async function renderGoals() {
       ${proj && !inProjectGroup ? `<a class="chip proj-chip" href="#/note/${proj.id}" title="Projet du Cerveau${proj.archived ? ' (archivé)' : ''}">${proj.archived ? '🗄' : '🚀'} ${esc(proj.title || 'Projet')}</a>` : ''}
       ${ms.length
         ? `<div class="bar"><i style="width:${g.progress}%"></i></div>`
-        : `<input type="range" min="0" max="100" step="5" value="${g.progress}" aria-label="Progression">`}
+        : `<input type="range" min="0" max="100" step="5" value="${g.progress}" style="--v:${g.progress}%" aria-label="Progression">`}
       <button class="goal-toggle" aria-expanded="${open}">🎯 ${ms.length ? `${md}/${ms.length} mission${ms.length > 1 ? 's accomplies' : ' accomplie'}` : 'Ajouter des missions'}<span class="exp">›</span></button>
       ${g.projectId && g.horizon ? `<span class="chip hz-chip">📅 ${esc(HZ_LABEL[g.horizon])}</span>` : ''}
       ${open ? `<div class="goal-missions">
@@ -1622,7 +1622,7 @@ async function renderGoals() {
     const id = el.dataset.id;
     const range = el.querySelector('input[type=range]');
     if (range) {
-      range.oninput = () => (el.querySelector('.pct').textContent = range.value + '%');
+      range.oninput = () => { el.querySelector('.pct').textContent = range.value + '%'; range.style.setProperty('--v', range.value + '%'); };
       range.onchange = async () => {
         const g = await db.get('goals', id);
         g.progress = Number(range.value);
