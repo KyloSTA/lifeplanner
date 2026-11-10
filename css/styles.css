@@ -1335,3 +1335,11 @@ a.assoc-chip { padding: 4px 11px; }
 .g-done:hover { background: var(--ok); color: #fff; border-color: var(--ok); }
 .g-done.on { color: var(--muted); }
 .g-done.on:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+/* Actualités : bouton « 🧠 Au Cerveau » bien visible */
+.nw-save { position: static; justify-self: start; width: auto; height: auto; opacity: 1; padding: 5px 11px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 2px; }
+.nw-save:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.nw-save.done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); cursor: default; }
+.nw-mini-row { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+.nw-mini-row:last-child { border-bottom: 0; }
+.nw-mini-row .nw-mini { flex: 1; min-width: 0; border-bottom: 0; }
+.nw-mini-row .nw-save { flex: none; padding: 4px 9px; margin: 0; }

@@ -386,7 +386,7 @@ async function renderToday() {
   const lifeCards = () => Promise.all([habits.todayCard($('#c-habits')), workout.todayCard($('#c-workout')), rbq.todayCard($('#c-rbq'))]);
   refreshToday = () => Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), goals(), heroCard(), brainCard()]);
 
-  news.todayCard($('#c-news')); // en parallèle (réseau) : ne retarde pas le reste de la page
+  news.todayCard($('#c-news'), toast); // en parallèle (réseau) : ne retarde pas le reste de la page
   await Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard(), assistCard()]);
   agenda();
 }
