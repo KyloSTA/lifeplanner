@@ -308,6 +308,7 @@ async function renderToday() {
   const refreshSummary = U.debounce(() => heroCard(), 800);
   // clic (cocher), Entrée (ajouter une mission) ou changement : le résumé suit
   for (const ev of ['click', 'submit', 'change']) $('.today-cols', view).addEventListener(ev, () => refreshSummary(), true);
+  summaryRefresher = refreshSummary; // aussi après « Annuler » (barre du bas)
 
   // Agenda
   const agenda = async () => {
@@ -396,6 +397,8 @@ async function renderToday() {
    Citation du moment (motivation, inspiration, verset)
    ========================================================= */
 let refreshToday = () => {};
+let summaryRefresher = null;
+addEventListener('lp-undo', () => { if ((location.hash || '#/today').startsWith('#/today') || location.hash === '') summaryRefresher?.(); });
 let agendaDay = 0; // carte Agenda de la page Aujourd'hui : 0 = aujourd'hui, 1 = demain
 let quoteTimer = null;
 const QUOTE_EVERY = [[1, 'Toutes les minutes'], [2, 'Toutes les 2 minutes'], [5, 'Toutes les 5 minutes'], [15, 'Toutes les 15 minutes'], [0, 'Seulement avec « Suivante »']];

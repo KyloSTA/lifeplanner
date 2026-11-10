@@ -166,10 +166,31 @@ export function taskHTML(t, ref, opts = {}) {
 }
 
 /** Branche les interactions sur une liste de missions. redraw() doit re-générer la liste. */
+/* ---------- « Annuler » pendant 3 secondes après une mission accomplie ---------- */
+let undoTimer = null;
+export function showUndo(text, onUndo, ms = 3000) {
+  let bar = document.getElementById('undo-bar');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'undo-bar'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
+  clearTimeout(undoTimer);
+  bar.innerHTML = `<span>${esc(text)}</span><button type="button">↶ Annuler</button><i style="animation-duration:${ms}ms"></i>`;
+  bar.className = 'show';
+  const hide = () => { bar.className = ''; };
+  bar.querySelector('button').onclick = async () => { clearTimeout(undoTimer); hide(); await onUndo(); dispatchEvent(new Event('lp-undo')); };
+  undoTimer = setTimeout(hide, ms);
+}
+
 export function bindTaskList(root, redraw) {
   root.querySelectorAll('.task').forEach((li) => {
     const id = li.dataset.id;
-    li.querySelector('.t-cb').onchange = async (e) => { await setTaskDone(id, e.target.checked); redraw(); };
+    li.querySelector('.t-cb').onchange = async (e) => {
+      const done = e.target.checked;
+      await setTaskDone(id, done);
+      redraw();
+      if (done) {
+        const title = li.querySelector('.t-title')?.textContent || 'Mission';
+        showUndo(`✅ « ${title} » accomplie`, async () => { await setTaskDone(id, false); redraw(); });
+      }
+    };
     li.querySelector('.t-del').onclick = async () => { await deleteTask(id); redraw(); };
     li.querySelector('.exp').onclick = () => openTaskEditor(id, redraw);
   });
