@@ -106,6 +106,29 @@ async function saveToBrain(it, feed) {
   return true;
 }
 
+/** Liens d'articles déjà gardés dans le Cerveau. */
+async function savedLinks() {
+  const out = new Set();
+  for (const n of await brain.allNotes()) for (const m of (n.body || '').matchAll(/https?:\/\/\S+/g)) out.add(m[0]);
+  return out;
+}
+const saveBtn = (x, saved, mini = false) => saved.has(x.link)
+  ? `<button class="nw-save done" disabled title="Déjà dans ton Cerveau">✓${mini ? '' : ' Dans le Cerveau'}</button>`
+  : `<button class="nw-save" data-save="${esc(x.link)}" title="Ajouter cet article au Cerveau (note Ressource, à classer)">🧠${mini ? '' : ' Au Cerveau'}</button>`;
+function bindSave(root, items, byId, toast) {
+  root.querySelectorAll('[data-save]').forEach((b) => (b.onclick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const it = items.find((x) => x.link === b.dataset.save);
+    if (!it) return;
+    b.disabled = true;
+    const ok = await saveToBrain(it, byId[it.src]);
+    b.classList.add('done');
+    b.textContent = b.textContent.includes('Cerveau') ? '✓ Dans le Cerveau' : '✓';
+    toast(ok ? '🧠 Article ajouté au Cerveau (dans « À classer »)' : 'Déjà dans ton Cerveau');
+  }));
+}
+
 let filter = 'all';
 export async function renderPage(ctx, force = false) {
   const { view, toast, modal } = ctx;
@@ -127,6 +150,7 @@ export async function renderPage(ctx, force = false) {
       + fl.filter((x) => x.on && counts[x.id]).map((x) => `<button class="chip-btn ${filter === x.id ? 'on' : ''}" data-nf="${x.id}"><i class="nw-dot" style="--c:${esc(x.color)}"></i>${esc(x.name)} <small>${counts[x.id]}</small></button>`).join('')
       + `<span class="muted nw-at">Mis à jour ${ago(data.at)}</span>`;
     const items = data.items.filter((x) => filter === 'all' || x.src === filter);
+    const saved = await savedLinks();
     const [top, ...rest] = items;
     const card = (x, big = false) => `<article class="card nw-item ${big ? 'nw-top' : ''}">
         ${x.img ? `<a class="nw-img" href="${esc(x.link)}" target="_blank" rel="noopener"><img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>` : ''}
@@ -134,7 +158,7 @@ export async function renderPage(ctx, force = false) {
           <p class="nw-meta"><i class="nw-dot" style="--c:${esc(byId[x.src]?.color || '#888')}"></i>${esc(byId[x.src]?.name || '')} · ${ago(x.date)}</p>
           <a class="nw-title" href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a>
           ${x.text && big ? `<p class="nw-text">${esc(x.text)}</p>` : ''}
-          <button class="nw-save" data-save="${esc(x.link)}" title="Garder dans le Cerveau">💾</button>
+          ${saveBtn(x, saved)}
         </div>
       </article>`;
     $('#nw-list').innerHTML = items.length
@@ -142,13 +166,7 @@ export async function renderPage(ctx, force = false) {
       : `<div class="card empty-card"><p>${data.errors.length ? 'Impossible de charger les actualités (connexion ?).' : 'Aucune source activée : choisis-en dans ⚙ Sources.'}</p></div>`;
     if (data.errors.length && items.length) $('#nw-list').insertAdjacentHTML('beforeend', `<p class="hint muted">Non chargé : ${data.errors.map(esc).join(' · ')}</p>`);
     $$('[data-nf]').forEach((b) => (b.onclick = () => { filter = b.dataset.nf; draw(false); }));
-    $$('[data-save]').forEach((b) => (b.onclick = async () => {
-      const it = data.items.find((x) => x.link === b.dataset.save);
-      const ok = await saveToBrain(it, byId[it.src]);
-      b.textContent = '✓';
-      b.disabled = true;
-      toast(ok ? '💾 Article gardé dans le Cerveau (À classer)' : 'Déjà dans ton Cerveau');
-    }));
+    bindSave(view, data.items, byId, toast);
   };
   const $ = (s) => view.querySelector(s), $$ = (s) => [...view.querySelectorAll(s)];
   $('#nw-ref').onclick = () => { $('#nw-list').innerHTML = '<div class="card empty-card"><p>Actualisation…</p></div>'; draw(true); };
@@ -180,13 +198,15 @@ function sourcesModal(modal, toast, onDone) {
 }
 
 /** Petite carte « À la une » pour la page Aujourd'hui (3 titres). */
-export async function todayCard(el) {
+export async function todayCard(el, toast = () => {}) {
   if (!el) return;
   try {
     const data = await load();
     const fl = Object.fromEntries((await feeds()).map((f) => [f.id, f]));
+    const saved = await savedLinks();
     el.innerHTML = `<div class="card-head"><h2>📰 À la une</h2><a href="#/news">Tout voir →</a></div>
-      ${data.items.slice(0, 4).map((x) => `<a class="nw-mini" href="${esc(x.link)}" target="_blank" rel="noopener"><b>${esc(x.title)}</b><small class="muted">${esc(fl[x.src]?.name || '')} · ${ago(x.date)}</small></a>`).join('')
+      ${data.items.slice(0, 4).map((x) => `<div class="nw-mini-row"><a class="nw-mini" href="${esc(x.link)}" target="_blank" rel="noopener"><b>${esc(x.title)}</b><small class="muted">${esc(fl[x.src]?.name || '')} · ${ago(x.date)}</small></a>${saveBtn(x, saved, true)}</div>`).join('')
       || '<p class="empty-sm">Actualités indisponibles pour l’instant.</p>'}`;
+    bindSave(el, data.items, fl, toast);
   } catch { el.innerHTML = '<div class="card-head"><h2>📰 À la une</h2><a href="#/news">Ouvrir →</a></div><p class="empty-sm">Actualités indisponibles hors ligne.</p>'; }
 }
