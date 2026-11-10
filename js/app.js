@@ -112,6 +112,7 @@ async function router() {
   const fn = routes[name] || renderToday;
   const navName = NAV_PARENT[name] || (routes[name] ? name : 'today');
   $$('#rail a').forEach((a) => a.classList.toggle('active', a.dataset.route === navName));
+  $('#brand-launch')?.classList.toggle('active', name === 'launcher');
   // Sur cellulaire, « Plus » s'allume quand la page ouverte est dans son menu
   $('#rail-more')?.classList.toggle('active', !!$('#rail a.active.nav-extra, #rail a.active[data-route="settings"], #rail a.active[data-route="hero"]'));
   document.body.classList.toggle('ink-mode', name === 'page');
@@ -1973,7 +1974,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'week', 'journal', 'notebook', 'brain', 'goals', 'habits', 'workout', 'rbq', 'launcher'];
+const NAV_KEYS = ['today', 'week', 'journal', 'notebook', 'brain', 'goals', 'habits', 'workout', 'rbq']; // le Lanceur est l'icône à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
@@ -1993,12 +1994,47 @@ async function applyNavOrder() {
 // Menu « Plus » (cellulaire)
 $('#rail-more').onclick = () => {
   const links = [$('#hero-mini'), ...$$('#rail a.nav-extra'), $('#rail a[data-route="settings"]')];
-  modal(`<h2>Plus</h2><nav class="more-sheet">${links.map((a) => {
+  // Sur cellulaire le logo est caché : le Lanceur est dans « Plus »
+  const launch = `<a href="#/launcher" data-close class="${location.hash.startsWith('#/launcher') ? 'active' : ''}">${$('#brand-launch svg').outerHTML}<span>Lanceur</span></a>`;
+  modal(`<h2>Plus</h2><nav class="more-sheet">${launch}${links.map((a) => {
     const route = a.dataset.route;
     const label = route === 'hero' ? 'Ton héros' : a.querySelector('span')?.textContent || '';
     const icon = route === 'hero' ? (a.querySelector('svg.avatar')?.outerHTML || '') : a.querySelector('svg')?.outerHTML || '';
     return `<a href="${a.getAttribute('href')}" data-close class="${a.classList.contains('active') ? 'active' : ''}">${icon}<span>${esc(label)}</span></a>`;
   }).join('')}</nav>`, (m, close) => $$('a', m).forEach((a) => a.addEventListener('click', close)));
+};
+
+// Lanceur rapide : petite icône à droite du logo -> menu de tes applications
+$('#brand-launch').onclick = async (e) => {
+  e.stopPropagation();
+  const btn = e.currentTarget;
+  const old = $('#launch-pop');
+  if (old) { old.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
+  const items = await launcher.list();
+  const pop = document.createElement('div');
+  pop.id = 'launch-pop';
+  pop.className = 'launch-pop';
+  pop.setAttribute('role', 'menu');
+  pop.innerHTML = `<div class="lp-grid">${items.map((it, i) => `<button class="lp-item" role="menuitem" data-i="${i}" title="${esc(it.name)}">
+      <span class="lp-ico" style="--c:${esc(it.color)}">${esc(it.icon)}</span><span class="lp-name">${esc(it.name)}</span></button>`).join('')}</div>
+    <a class="lp-manage" href="#/launcher">✎ Gérer le Lanceur</a>`;
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect();
+  pop.style.top = `${r.bottom + 8}px`;
+  pop.style.left = `${Math.min(r.left, innerWidth - pop.offsetWidth - 12)}px`;
+  btn.setAttribute('aria-expanded', 'true');
+  const close = () => { pop.remove(); btn.setAttribute('aria-expanded', 'false'); removeEventListener('pointerdown', outside, true); removeEventListener('keydown', onKey); removeEventListener('hashchange', close); };
+  const outside = (ev) => { if (!pop.contains(ev.target) && !btn.contains(ev.target)) close(); };
+  const onKey = (ev) => { if (ev.key === 'Escape') { close(); btn.focus(); } };
+  addEventListener('pointerdown', outside, true);
+  addEventListener('keydown', onKey);
+  addEventListener('hashchange', close);
+  $$('.lp-item', pop).forEach((b) => (b.onclick = () => {
+    const it = items[Number(b.dataset.i)];
+    close();
+    if (!launcher.open(it)) toast('La fenêtre a été bloquée : autorise les pop-ups pour Life Planner dans Edge', 'err');
+  }));
+  pop.querySelector('.lp-item')?.focus();
 };
 
 function applyTheme() {
