@@ -287,12 +287,21 @@ async function renderToday() {
 
   // Agenda
   const agenda = async () => {
-    const from = U.startOfDay(now), to = U.addDays(from, 1);
+    const day = agendaDay; // 0 = aujourd'hui, 1 = demain
+    const from = U.addDays(U.startOfDay(now), day), to = U.addDays(from, 1);
     const { events, source } = await getEvents(from, to);
     const el = $('#c-agenda');
-    if (!el) return;
-    el.innerHTML = `<div class="card-head"><h2>Agenda</h2>${await syncBadge(source)}</div>
-      <ul class="evs">${events.map((e) => evItem(e)).join('') || '<li class="empty-sm">Aucun événement aujourd’hui.</li>'}</ul>`;
+    if (!el || day !== agendaDay) return;
+    el.innerHTML = `<div class="card-head"><h2>Agenda</h2>
+        <div class="seg seg-sm" role="group" aria-label="Jour affiché">
+          <button class="${day ? '' : 'on'}" data-aday="0" aria-pressed="${!day}">Aujourd’hui</button>
+          <button class="${day ? 'on' : ''}" data-aday="1" aria-pressed="${!!day}">Demain</button>
+        </div></div>
+      ${day ? `<p class="ag-day muted">${cap(U.fmtLong(from))}</p>` : ''}
+      <ul class="evs">${events.map((e) => evItem(e)).join('') || `<li class="empty-sm">Aucun événement ${day ? 'demain' : 'aujourd’hui'}.</li>`}</ul>
+      <div class="ag-foot">${await syncBadge(source)}<button class="btn sm-text" id="ag-add">+ Événement ${day ? 'demain' : ''}</button></div>`;
+    $$('[data-aday]', el).forEach((b) => (b.onclick = () => { agendaDay = Number(b.dataset.aday); agenda(); }));
+    $('#ag-add', el).onclick = () => eventModal(iso(from), agenda);
     bindEvents(el, events, agenda);
   };
 
@@ -356,6 +365,7 @@ async function renderToday() {
    Citation du moment (motivation, inspiration, verset)
    ========================================================= */
 let refreshToday = () => {};
+let agendaDay = 0; // carte Agenda de la page Aujourd'hui : 0 = aujourd'hui, 1 = demain
 let quoteTimer = null;
 const QUOTE_EVERY = [[1, 'Toutes les minutes'], [2, 'Toutes les 2 minutes'], [5, 'Toutes les 5 minutes'], [15, 'Toutes les 15 minutes'], [0, 'Seulement avec « Suivante »']];
 
