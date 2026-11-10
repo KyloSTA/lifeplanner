@@ -819,10 +819,14 @@ async function renderHero() {
   await habits.renderPage({ ...pageCtx(), view: $('#hero-habits'), embedded: true });
 
   const cfg = { ...av };
+  // Héros en entier, avec l'équipement de l'Aventure
+  const gear = await rpg.equippedItems();
+  const drawBig = () => { $('#hero-big').innerHTML = AV.heroSVG(cfg, gear, 250); };
+  drawBig();
   const save = async () => {
     const { evo, ...stored } = cfg; // le stade d'évolution est calculé, pas enregistré
     await db.put('settings', stored, 'avatar');
-    $('#hero-big').innerHTML = AV.avatarSVG(cfg, 168);
+    drawBig();
     refreshRail();
   };
   const drawCustom = () => {
@@ -834,6 +838,7 @@ async function renderHero() {
         let inner;
         if (cat.type === 'color') inner = `<span class="swatch" style="--sw:${it.c}"></span>`;
         else if (cat.type === 'bg') inner = `<span class="swatch" style="--sw:${it.g ? `linear-gradient(135deg,${it.g[0]},${it.g[1]})` : it.fill}"></span>`;
+        else if (cat.body) inner = AV.heroSVG({ ...cfg, [cat.key]: val }, [], 70); // option du corps : aperçu en entier
         else inner = AV.avatarSVG({ ...cfg, [cat.key]: val }, 52);
         return `<button class="opt ${cat.type} ${on ? 'on' : ''}" data-k="${cat.key}" data-v="${val}" ${locked ? 'disabled' : ''}
           title="${locked ? `Débloqué au niveau ${it.lvl}` : esc(it.name || '')}">${inner}${locked ? `<span class="lock">🔒${it.lvl}</span>` : ''}</button>`;
