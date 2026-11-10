@@ -90,8 +90,13 @@ le personnaliser (peau, coiffure, yeux, tenue, accessoire, fond).
 - **Badges** : 13 badges à collectionner (séries, nombre de missions, journal, pages manuscrites…).
 
 ## Second cerveau (section Cerveau)
-- **Capturer** : écris une idée dans « Capture rapide » (page Cerveau ou Aujourd'hui), puis
-  Ctrl + Entrée. La 1re ligne devient le titre. L'idée va dans **📥 À classer**.
+- **Capturer** : écris une idée dans « Capture rapide » (en haut de la page Aujourd'hui, ou page
+  Cerveau), puis Ctrl + Entrée. La 1re ligne devient le titre. L'idée va dans **📥 À classer**.
+- **Photos et captures d'écran** : colle une image (Ctrl + V, même sans cliquer dans le champ),
+  glisse-la, ou touche **📷 Photo** (sur cellulaire, ça ouvre l'appareil photo). Dans une note, l'image
+  s'insère à l'endroit du curseur (ligne `![](img:…)`) et s'affiche en mode 👁 Lire ; un clic l'agrandit.
+  Les images sont réduites et compressées, puis synchronisées comme le reste. Supprimer une note
+  supprime aussi ses images.
 - **Classer** : ouvre l'idée, choisis son type (💡 Idée, 📝 Note, 🎓 Apprentissage, 📚 Ressource,
   🚀 Projet, 👤 Personne, ❝ Citation), ajoute des `#étiquettes`, puis clique **Classer**.
 - **Relier** : écris `[[` pour choisir une autre note. Un lien vers une note qui n'existe pas encore
