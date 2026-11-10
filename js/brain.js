@@ -5,6 +5,7 @@
 import { db } from './db.js';
 import * as game from './game.js';
 import { uid, iso, esc } from './util.js';
+import * as images from './images.js';
 
 export const TYPES = [
   { id: 'idee', icon: '💡', name: 'Idée' },
@@ -40,7 +41,7 @@ export function backlinks(notes, note) {
 }
 
 export function excerpt(body = '', len = 140) {
-  const s = body.replace(LINK_RE, '$1').replace(/[*>#-]+\s/g, '').replace(/\s+/g, ' ').trim();
+  const s = body.replace(images.REF_RE, '📷 ').replace(LINK_RE, '$1').replace(/[*>#-]+\s/g, '').replace(/\s+/g, ' ').trim();
   return s.length > len ? s.slice(0, len - 1) + '…' : s;
 }
 
@@ -147,7 +148,9 @@ export async function setGoalProject(goalId, projectId) {
 }
 
 export async function deleteNote(id) {
+  const old = await db.get('notes', id);
   await db.del('notes', id);
+  await images.removeUnused(images.refsIn(old?.body)); // ses images, si aucune autre note ne les utilise
   for (const g of await db.all('goals')) if (g.projectId === id) { g.projectId = null; await db.put('goals', g); }
   const keys = (await db.keys('xp')).filter((k) => k === 'note:' + id || k === 'triage:' + id || k.startsWith(`link:${id}:`) || (k.startsWith('link:') && k.endsWith(':' + id)));
   for (const k of keys) await game.revoke(k, { showPop: false });
@@ -195,6 +198,8 @@ export function renderBody(body, notes) {
     if (li) { if (!list) { out.push('<ul>'); list = true; } out.push(`<li>${inline(li[1], notes)}</li>`); continue; }
     if (list) { out.push('</ul>'); list = false; }
     if (!line.trim()) continue;
+    const im = line.trim().match(/^!\[([^\]]*)\]\(img:([a-z0-9]+)\)$/);
+    if (im) { out.push(`<figure class="n-img"><img data-img="${im[2]}" alt="${im[1]}" loading="lazy"></figure>`); continue; }
     const h = line.match(/^#{1,3}\s+(.*)/);
     if (h) out.push(`<h3>${inline(h[1], notes)}</h3>`);
     else if (line.startsWith('&gt; ')) out.push(`<blockquote>${inline(line.slice(5), notes)}</blockquote>`);

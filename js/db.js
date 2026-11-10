@@ -2,9 +2,9 @@
 // ce qui permet de synchroniser plusieurs appareils (voir sync.js) sans écraser les changements.
 
 const DB_NAME = 'lifeplanner';
-const VERSION = 5;
-export const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'settings', 'cache', 'xp', 'notes', 'habits', 'study', 'workouts'];
-const KEYPATH = { tasks: 'id', journal: 'date', pages: 'id', ink: 'id', goals: 'id', xp: 'key', notes: 'id', habits: 'id', study: 'id', workouts: 'id' }; // settings/cache : clé séparée
+const VERSION = 6;
+export const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'settings', 'cache', 'xp', 'notes', 'habits', 'study', 'workouts', 'files'];
+const KEYPATH = { tasks: 'id', journal: 'date', pages: 'id', ink: 'id', goals: 'id', xp: 'key', notes: 'id', habits: 'id', study: 'id', workouts: 'id', files: 'id' }; // settings/cache : clé séparée
 const UNTRACKED = new Set(['cache']); // jamais synchronisé
 
 let dbp = null;
@@ -31,6 +31,7 @@ function open() {
         d.createObjectStore('study', { keyPath: 'id' }); // cours RBQ : modules et cartes de révision
         d.createObjectStore('workouts', { keyPath: 'id' }); // séances (modèles) et entraînements faits
       }
+      if (e.oldVersion < 6) d.createObjectStore('files', { keyPath: 'id' }); // images des notes (photos, captures)
     };
     r.onsuccess = () => {
       const d = r.result;

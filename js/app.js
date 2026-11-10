@@ -16,6 +16,7 @@ import * as clips from './clips.js';
 import * as habits from './habits.js';
 import * as rbq from './rbq.js';
 import * as workout from './workout.js';
+import * as images from './images.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -272,6 +273,7 @@ async function renderToday() {
     </header>
     <div class="grid today-grid">
       <a class="card wide hero-card" id="c-hero" href="#/hero"></a>
+      <section class="card wide capture-card" id="c-brain"></section>
       <section class="card wide quote-card" id="c-quote"></section>
       <section class="card wide assist" id="c-assist"></section>
       <section class="card" id="c-agenda"><div class="skeleton"></div></section>
@@ -282,7 +284,6 @@ async function renderToday() {
       <section class="card" id="c-journal"></section>
       <section class="card" id="c-ink"></section>
       <section class="card" id="c-goals"></section>
-      <section class="card" id="c-brain"></section>
     </div>`;
   $('#add-ev').onclick = () => eventModal(today, renderToday);
 
@@ -348,9 +349,13 @@ async function renderToday() {
     if (!el) return;
     const all = (await brain.allNotes()).filter((n) => !n.archived);
     const inbox = all.filter((n) => n.inbox).length;
-    el.innerHTML = `<div class="card-head"><h2>💡 Second cerveau</h2><a href="#/brain">Ouvrir →</a></div>${captureForm('cap-today')}
-      <p class="hc-sub muted" style="margin-top:8px">${all.length} note${all.length > 1 ? 's' : ''}${inbox ? ` · <a href="#/brain" id="to-inbox">${inbox} à classer</a>` : ''}</p>`;
-    bindCapture($('#cap-today'), brainCard);
+    const stats = `${all.length} note${all.length > 1 ? 's' : ''}${inbox ? ` · <a href="#/brain" id="to-inbox">📥 ${inbox} à classer</a>` : ''} · <a href="#/brain">Ouvrir le Cerveau →</a>`;
+    // Déjà affichée : on ne met à jour que les chiffres (pour ne pas effacer un texte ou une image en cours)
+    if ($('#cap-today', el)) { $('.cap-stats', el).innerHTML = stats; }
+    else {
+      el.innerHTML = `<div class="card-head"><h2>💡 Capture rapide</h2><span class="muted cap-stats">${stats}</span></div>${captureForm('cap-today')}`;
+      bindCapture($('#cap-today'), brainCard);
+    }
     $('#to-inbox')?.addEventListener('click', () => { brainState.f = 'inbox'; });
   };
 
@@ -767,23 +772,86 @@ async function evoCard() {
 
 function captureForm(id) {
   return `<form class="capture" id="${id}">
-    <textarea name="t" rows="3" placeholder="Une idée, une citation, un truc appris… (la 1re ligne devient le titre)"></textarea>
-    <div class="capture-foot"><span class="muted">Ctrl + Entrée</span><button class="btn primary">💡 Capturer</button></div>
+    <textarea name="t" rows="3" placeholder="Une idée, une citation, un truc appris… (la 1re ligne devient le titre). Colle aussi une photo ou une capture d’écran (Ctrl + V)."></textarea>
+    <div class="cap-imgs" hidden></div>
+    <div class="capture-foot">
+      <label class="btn cap-photo" title="Ajouter une photo ou une capture"><input type="file" accept="image/*" multiple hidden>📷 Photo</label>
+      <span class="muted cap-hint">Ctrl + Entrée</span>
+      <button class="btn primary">💡 Capturer</button>
+    </div>
   </form>`;
 }
 
 function bindCapture(form, after) {
+  let files = []; // images en attente : { blob, url }
+  const box = form.querySelector('.cap-imgs');
+  const drawImgs = () => {
+    box.hidden = !files.length;
+    box.innerHTML = files.map((f, i) => `<span class="cap-img"><img src="${f.url}" alt="Image ${i + 1}"><button type="button" data-rm="${i}" aria-label="Retirer l’image">×</button></span>`).join('');
+    $$('[data-rm]', box).forEach((b) => (b.onclick = () => { URL.revokeObjectURL(files[b.dataset.rm].url); files.splice(Number(b.dataset.rm), 1); drawImgs(); }));
+  };
+  const add = (list) => {
+    for (const blob of list) files.push({ blob, url: URL.createObjectURL(blob) });
+    if (list.length) { drawImgs(); form.t.focus(); }
+  };
+  form._addImages = add; // utilisé par le « coller » global de la page
+  let busy = false;
   const submit = async () => {
     const v = form.t.value.trim();
-    if (!v) return;
-    const n = await brain.capture(v);
-    form.t.value = '';
-    toast('💡 Idée capturée — elle t’attend dans « À classer »');
-    after?.(n);
+    if ((!v && !files.length) || busy) return;
+    busy = true;
+    const btn = form.querySelector('button.primary');
+    btn.disabled = true;
+    try {
+      const ids = [];
+      for (const f of files) ids.push(await images.save(f.blob));
+      const lines = v.split('\n');
+      let title = v ? lines.shift().trim() : `📷 Image du ${U.fmtShort(new Date())} à ${U.fmtTime(new Date())}`;
+      let body = lines.join('\n').trim();
+      if (title.length > 80) { body = (title + '\n' + body).trim(); title = title.slice(0, 60).trim() + '…'; }
+      body = [body, ...ids.map(images.refLine)].filter(Boolean).join('\n');
+      const n = await brain.createNote({ title, body, type: 'idee', inbox: true });
+      n.captured = true;
+      await brain.saveNote(n, { touch: false });
+      files.forEach((f) => URL.revokeObjectURL(f.url));
+      files = [];
+      form.t.value = '';
+      drawImgs();
+      toast(ids.length ? `💡 Capturé avec ${ids.length} image${ids.length > 1 ? 's' : ''} — dans « À classer »` : '💡 Idée capturée — elle t’attend dans « À classer »');
+      after?.(n);
+    } catch (err) {
+      console.error(err);
+      toast('Impossible d’enregistrer l’image : ' + err.message, 'err');
+    } finally { busy = false; btn.disabled = false; }
   };
   form.onsubmit = (e) => { e.preventDefault(); submit(); };
   form.t.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); } };
+  form.addEventListener('paste', (e) => { const imgs = images.imageFiles(e.clipboardData); if (imgs.length) { e.preventDefault(); add(imgs); } });
+  form.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); form.classList.add('drop'); } });
+  form.addEventListener('dragleave', () => form.classList.remove('drop'));
+  form.addEventListener('drop', (e) => { form.classList.remove('drop'); const imgs = images.imageFiles(e.dataTransfer); if (imgs.length) { e.preventDefault(); add(imgs); } });
+  const pick = form.querySelector('input[type=file]');
+  pick.onchange = () => { add([...pick.files]); pick.value = ''; };
 }
+
+// Coller une image n'importe où sur la page (hors champ de texte) : elle va dans la capture rapide visible
+document.addEventListener('paste', (e) => {
+  if (e.defaultPrevented || e.target.closest?.('input, textarea, [contenteditable]')) return;
+  const imgs = images.imageFiles(e.clipboardData);
+  const form = $('#view form.capture');
+  if (!imgs.length || !form?._addImages) return;
+  e.preventDefault();
+  form._addImages(imgs);
+  form.scrollIntoView({ block: 'center', behavior: 'smooth' });
+});
+
+// Les images des notes se chargent à la demande, et un clic les agrandit
+new MutationObserver(() => { if (document.querySelector('img[data-img]:not([src])')) images.hydrate(); })
+  .observe(document.body, { childList: true, subtree: true });
+document.addEventListener('click', (e) => {
+  const img = e.target.closest?.('.n-img img');
+  if (img?.src) images.zoom(img.src);
+});
 
 function noteCard(n, proj) {
   const t = brain.typeOf(n.type);
@@ -792,6 +860,7 @@ function noteCard(n, proj) {
     ${n.inbox ? '<span class="chip warn">📥 À classer</span>' : ''}
     ${proj?.goals.length ? `<div class="nc-proj"><span class="muted">🎯 ${proj.goals.length} objectif${proj.goals.length > 1 ? 's' : ''}${proj.missions ? ` · ${proj.done}/${proj.missions} missions` : ''}</span><b>${proj.pct} %</b>
       <div class="bar"><i style="width:${proj.pct}%"></i></div></div>` : ''}
+    ${(() => { const im = images.refsIn(n.body); return im.length ? `<div class="nc-img"><img data-img="${im[0]}" alt="" loading="lazy">${im.length > 1 ? `<span>+${im.length - 1}</span>` : ''}</div>` : ''; })()}
     <p>${esc(brain.excerpt(n.body)) || (n.title ? '' : '<span class="muted">Vide</span>')}</p>
     <div class="nc-foot">${(n.tags || []).slice(0, 3).map((tg) => `<span class="tag">#${esc(tg)}</span>`).join('')}
       <span class="grow"></span>${(n.links || []).length ? `<span class="muted" title="Liens">🔗 ${n.links.length}</span>` : ''}<span class="muted">${U.fmtShort(new Date(n.updatedAt))}</span></div>
@@ -916,7 +985,8 @@ async function renderNote(id) {
       <div class="note-left">
       <section class="card project-panel" id="n-proj" hidden></section>
       <section class="card note-main">
-        <div class="seg"><button data-mode="write">✎ Écrire</button><button data-mode="read">👁 Lire</button></div>
+        <div class="note-tools"><div class="seg"><button data-mode="write">✎ Écrire</button><button data-mode="read">👁 Lire</button></div>
+          <label class="btn" id="n-photo" title="Ajouter une photo ou une capture (tu peux aussi la coller avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden>📷 Photo</label></div>
         <div id="n-write">
           <textarea id="n-body" placeholder="Écris librement…&#10;&#10;[[Titre]] relie une autre note · #étiquette classe la note · « - » fait une liste · « # » fait un titre">${esc(n.body)}</textarea>
           <div class="suggest" id="n-sug" hidden></div>
@@ -1078,6 +1148,28 @@ async function renderNote(id) {
 
   ta.oninput = () => { n.body = ta.value; save(); suggest(); };
   ta.onclick = suggest;
+  // Images : coller, glisser ou 📷 -> une ligne « ![](img:…) » à l'endroit du curseur
+  const insertImages = async (list) => {
+    if (!list.length) return;
+    toast(`📷 Ajout de ${list.length > 1 ? list.length + ' images' : 'l’image'}…`);
+    try {
+      const ids = [];
+      for (const f of list) ids.push(await images.save(f));
+      const at = ta.selectionStart ?? ta.value.length;
+      const before = ta.value.slice(0, at), after = ta.value.slice(at);
+      const ins = (before && !before.endsWith('\n') ? '\n' : '') + ids.map(images.refLine).join('\n') + '\n';
+      ta.value = before + ins + after;
+      ta.selectionStart = ta.selectionEnd = (before + ins).length;
+      n.body = ta.value;
+      save();
+      toast(`📷 Image${ids.length > 1 ? 's' : ''} ajoutée${ids.length > 1 ? 's' : ''} — passe en mode Lire pour la voir`);
+    } catch (err) { toast('Impossible d’ajouter l’image : ' + err.message, 'err'); }
+  };
+  ta.addEventListener('paste', (e) => { const f = images.imageFiles(e.clipboardData); if (f.length) { e.preventDefault(); insertImages(f); } });
+  ta.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
+  ta.addEventListener('drop', (e) => { const f = images.imageFiles(e.dataTransfer); if (f.length) { e.preventDefault(); insertImages(f); } });
+  const pickN = $('#n-photo input');
+  pickN.onchange = () => { insertImages([...pickN.files]); pickN.value = ''; };
   ta.onblur = () => setTimeout(() => (sug.hidden = true), 150);
   $('#n-title').oninput = (e) => { n.title = e.target.value; save(); };
   $('#n-title').onchange = async () => {
