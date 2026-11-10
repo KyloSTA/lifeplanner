@@ -5,7 +5,7 @@
 import { db } from './db.js';
 import { iso, addDays, parseISO } from './util.js';
 
-export const XP = { task: 10, sub: 3, journal: 15, mood: 5, ink: 10, goal: 10, goalDone: 50, note: 5, link: 2, review: 3, triage: 2, pomo: 5 };
+export const XP = { task: 10, sub: 3, journal: 15, mood: 5, ink: 10, goal: 10, goalDone: 50, note: 5, link: 2, review: 3, triage: 2, pomo: 5, habit: 3, study: 1, workout: 25 };
 
 /* ---------- Évolution de l'avatar (second cerveau) ---------- */
 // Les points gagnés dans le Cerveau forment ton « Savoir », qui fait évoluer l'avatar.
@@ -40,6 +40,9 @@ export const RULES = [
   ['🔁', 'Revoir une ancienne note (Redécouvrir)', XP.review],
   ['🗂️', 'Classer une idée capturée', XP.triage],
   ['🍅', 'Terminer une session de focus (minuteur d’une mission)', XP.pomo],
+  ['🔁', 'Compléter une habitude du jour', XP.habit],
+  ['📘', 'Réviser une carte du cours RBQ (par carte, par jour)', XP.study],
+  ['💪', 'Terminer un entraînement', XP.workout],
   ['🔥', 'Bonus de série : 2 XP par jour consécutif (max. 20)', '2–20'],
 ];
 

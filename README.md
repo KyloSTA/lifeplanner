@@ -48,6 +48,9 @@ supprimer des missions. Les changements apparaissent instantanément dans l'app,
 | **Carnet** | Pages libres à écrire au Surface Pen (lignes, carreaux, points ou vierge) |
 | **Cerveau** | Ton second cerveau : idées, apprentissages, ressources, personnes, projets, citations, reliés entre eux |
 | **Objectifs** | Objectifs par horizon (semaine, mois, année, long terme), avec leurs missions et leur progression |
+| **Habitudes** | Habitudes récurrentes avec rappels à l'heure, suivi quotidien et séries 🔥 |
+| **Workout** | Séance du jour, programme de la semaine, séances modèles et progrès |
+| **Cours RBQ** | Préparation de l'examen : modules, notes de cours, points clés, cartes de révision, compte à rebours |
 | **Réglages** | Connexion Google Agenda, assistant, sauvegarde/restauration, **ordre des onglets du menu**, thème |
 
 Pour réorganiser le menu : **Réglages → Menu**, puis les flèches ↑ ↓ (Réglages reste en bas).
@@ -155,6 +158,37 @@ Ouvre une mission (**›**) et, dans **⏱ Minuteur de focus**, choisis **🍅 2
 À la fin d'un focus : un carillon, une notification, **+5 XP**, puis la pause démarre (une grande pause
 de 15 min toutes les 4 sessions). À la fin de la pause, touche ▶ pour relancer un focus.
 Le temps de focus et le nombre de 🍅 sont enregistrés sur la mission.
+
+## Habitudes
+Des « missions spéciales » qui reviennent : choisis les jours, le nombre de fois par jour (ex. 💧 3 fois)
+et les heures de rappel. Elles apparaissent sur la page **Aujourd'hui** (carte « Habitudes du jour ») :
+touche une habitude pour la cocher (+1 si elle se fait plusieurs fois, − pour corriger).
+- **Rappels** : à l'heure prévue, une notification Windows et un petit carillon, plus un bandeau en haut de
+  l'écran avec **✓ Fait**, **+10 min** et **×**. Un rappel manqué pendant que l'app était fermée s'affiche à sa
+  réouverture le même jour. Comme les alarmes, les rappels ne sonnent que si Life Planner (ou le widget) est ouvert.
+- **Suivi** : série 🔥 (jours prévus réussis d'affilée), record, taux de réussite sur 30 jours et les 14 derniers
+  jours en cases (touche une case pour rattraper un oubli).
+- **⏸ Mettre en pause** arrête les rappels sans perdre l'historique. Chaque habitude complétée donne 3 XP.
+
+## Workout
+Trois onglets :
+- **Aujourd'hui** : la séance prévue dans ton programme (ou « Jour de repos »). **▶ Commencer** ouvre la séance
+  en cours : chronomètre, chaque série avec reps et charge (préremplies avec ta dernière charge), case **Fait**
+  qui lance le minuteur de repos, ajout de séries ou d'exercices, note. **🏁 Terminer** l'enregistre (+25 XP).
+- **Programme** : ta semaine (une séance ou repos pour chaque jour), tes séances modèles (exercices, séries,
+  reps, charge), l'unité lb/kg et la durée du repos. Les 3 séances de départ sont un exemple à remplacer.
+- **Progrès** : séances cette semaine par rapport au programme, semaines d'affilée, graphique des 8 dernières
+  semaines, progression de chaque exercice (record, dernière charge, évolution) et historique.
+
+## Cours RBQ
+Ta place pour préparer l'examen. **⚙ Examen et cours** : nom, date de l'examen (compte à rebours sur la page et
+sur Aujourd'hui) et adresse du cours en ligne (bouton **📖 Ouvrir le cours**, dans sa propre fenêtre).
+- **Modules** : quatre modules de départ suivent les grands volets des examens de licence d'entrepreneur
+  (administration, sécurité des chantiers, gestion de projets, exécution des travaux) ; renomme-les, supprime-les
+  ou ajoute ceux de ton cours. Statut : À commencer, En cours, À réviser, Maîtrisé.
+- Dans un module : **📝 notes de cours** (Écrire / Lire), **⭐ points clés** et **🃏 cartes de révision** (question/réponse).
+- **🃏 Réviser** : les cartes du jour, en répétition espacée. Une carte ratée revient dans la séance puis le
+  lendemain ; une carte connue revient après 1, 3, 7, 14 puis 30 jours.
 
 ## Lanceur
 L'onglet **Lanceur** ouvre tes applications : **Edge** et **Spotify** comme applications Windows

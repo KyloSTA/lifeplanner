@@ -1,9 +1,9 @@
 // Service worker : permet à l'app installée de fonctionner hors ligne
 // (même quand le petit serveur local n'est pas lancé).
-const CACHE = 'lifeplanner-v21';
+const CACHE = 'lifeplanner-v22';
 const ASSETS = [
   './', 'index.html', 'widget.html', 'css/styles.css', 'manifest.webmanifest',
-  'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js',
+  'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js', 'js/habits.js', 'js/rbq.js', 'js/workout.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
 
@@ -26,7 +26,7 @@ self.addEventListener('notificationclick', (e) => {
   e.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const app = wins.find((w) => !w.url.includes('widget')) || wins[0];
-    if (e.action && id && app) app.postMessage({ type: 'alarm-action', action: e.action, id });
+    if (e.action && id && app) app.postMessage({ type: e.notification.data?.kind === 'habit' ? 'habit-action' : 'alarm-action', action: e.action, id });
     if (app) { try { await app.focus(); } catch { /* ignore */ } } else await self.clients.openWindow('./#/today');
   })());
 });

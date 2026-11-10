@@ -13,6 +13,9 @@ import * as launcher from './launcher.js';
 import * as timer from './timer.js';
 import * as sync from './sync.js';
 import * as clips from './clips.js';
+import * as habits from './habits.js';
+import * as rbq from './rbq.js';
+import * as workout from './workout.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -95,8 +98,13 @@ const routes = {
   today: renderToday, week: renderWeek, journal: renderJournal, notebook: renderNotebook,
   page: renderPage, goals: renderGoals, settings: renderSettings, hero: renderHero,
   brain: renderBrain, note: renderNote, launcher: renderLauncher, setup: renderSetup,
+  habits: () => habits.renderPage(pageCtx()),
+  rbq: (id) => rbq.renderPage(pageCtx(), id),
+  workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
 const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings' };
+// Outils d'interface passés aux modules des onglets Habitudes, Cours RBQ et Workout
+const pageCtx = () => ({ view, modal, toast, confirmBox, setCleanup: (fn) => { cleanup = fn; } });
 
 async function router() {
   if (cleanup) { try { await cleanup(); } catch (e) { console.error(e); } cleanup = null; }
@@ -267,6 +275,9 @@ async function renderToday() {
       <section class="card wide assist" id="c-assist"></section>
       <section class="card" id="c-agenda"><div class="skeleton"></div></section>
       <section class="card" id="c-tasks"></section>
+      <section class="card" id="c-habits"></section>
+      <section class="card" id="c-workout"></section>
+      <section class="card" id="c-rbq" hidden></section>
       <section class="card" id="c-journal"></section>
       <section class="card" id="c-ink"></section>
       <section class="card" id="c-goals"></section>
@@ -334,9 +345,10 @@ async function renderToday() {
   };
 
   // Après une action de l'assistant : on rafraîchit les cartes concernées (sans toucher à la conversation)
-  refreshToday = () => Promise.all([taskCard($('#c-tasks'), today), journal(), goals(), heroCard(), brainCard()]);
+  const lifeCards = () => Promise.all([habits.todayCard($('#c-habits')), workout.todayCard($('#c-workout')), rbq.todayCard($('#c-rbq'))]);
+  refreshToday = () => Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), goals(), heroCard(), brainCard()]);
 
-  await Promise.all([taskCard($('#c-tasks'), today), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard(), assistCard()]);
+  await Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard(), assistCard()]);
   agenda();
 }
 
@@ -1951,7 +1963,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'week', 'journal', 'notebook', 'brain', 'goals', 'launcher'];
+const NAV_KEYS = ['today', 'week', 'journal', 'notebook', 'brain', 'goals', 'habits', 'workout', 'rbq', 'launcher'];
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
@@ -2017,6 +2029,12 @@ game.init().catch(console.error).finally(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
     if (route === 'today') refreshToday();
     else if (['week', 'goals', 'note'].includes(route) && !$('#modal-root').children.length) router();
+  });
+  // Rappels d'habitudes : après « Fait » depuis un rappel, on rafraîchit la vue concernée
+  habits.start(() => {
+    const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
+    if (route === 'today') refreshToday();
+    else if (route === 'habits' && !$('#modal-root').children.length) router();
   });
   // Posts Reddit sauvegardés avec le bouton « 🧠 Cerveau » (extension extension-edge)
   clips.start((note, updated) => {
