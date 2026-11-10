@@ -54,6 +54,8 @@ supprimer des missions. Les changements apparaissent instantanément dans l'app,
 | **Réglages** | Connexion Google Agenda, assistant, sauvegarde/restauration, **ordre des onglets du menu**, thème |
 
 Pour réorganiser le menu : **Réglages → Menu**, puis les flèches ↑ ↓ (Réglages reste en bas).
+**Semaine**, **Carnet** et le **Lanceur** sont les petites icônes à droite du logo (sur cellulaire :
+dans le menu **Plus**).
 
 ## Assistant (page Aujourd'hui)
 Écris ce que tu veux changer dans la barre discrète de l'assistant (sous la citation), comme si tu
