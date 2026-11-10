@@ -1197,11 +1197,13 @@ async function renderNote(id) {
     el.innerHTML = `<div class="card-head"><h2>🎯 Objectifs et missions du projet</h2>
         <span class="muted">${st.goals.length || st.direct.length ? `${st.pct} %${st.missions ? ` · ${st.done}/${st.missions} missions` : ''}` : ''}</span></div>
       ${st.goals.length || st.direct.length ? `<div class="xp-bar proj-bar"><i style="width:${st.pct}%"></i></div>` : '<p class="empty-sm">Ajoute des objectifs ou des missions à ce projet : son avancement les suivra.</p>'}
-      ${st.goals.map((g) => {
+      ${[...st.goals].sort((a, b) => isGoalDone(a) - isGoalDone(b) || (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0)).map((g) => {
         const ms = tasks.filter((t) => t.goalId === g.id).sort(sortM);
-        return `<div class="pgoal" data-gid="${g.id}">
-          <div class="pg-head"><a href="#/goals" data-opengoal="${g.id}" title="Ouvrir dans Objectifs">${esc(g.title)}</a>
+        const done = isGoalDone(g);
+        return `<div class="pgoal ${done ? 'is-done' : ''}" data-gid="${g.id}">
+          <div class="pg-head"><a href="#/goals" data-opengoal="${g.id}" title="Ouvrir dans Objectifs">${done ? '✅ ' : ''}${esc(g.title)}</a>
             <select class="pg-hz" data-hz="${g.id}" aria-label="Échéance" title="Échéance">${hzOptions(g.horizon || '')}</select><span class="pct">${g.progress}%</span>
+            <button class="g-done ${g.done ? 'on' : ''}" type="button" data-gdone="${g.id}" title="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}">${g.done ? '↺' : '✓'}</button>
             <button class="btn icon sm pg-plus" type="button" aria-label="Ajouter une mission à cet objectif" title="Ajouter une mission">+</button>
             <button class="x pg-unlink" data-unlink="${g.id}" title="Retirer du projet" aria-label="Retirer l’objectif du projet">×</button></div>
           <div class="bar"><i style="width:${g.progress}%"></i></div>
@@ -1238,6 +1240,16 @@ async function renderNote(id) {
       // La boîte reste ouverte pour enchaîner plusieurs missions
       const nf = $(`.pgoal[data-gid="${gid}"] .pg-add`);
       if (nf) { nf.hidden = false; nf.t.focus(); }
+    }));
+    // ✓ Terminer / ↺ Rouvrir un objectif du projet (vert, en bas de la liste)
+    $$('[data-gdone]', el).forEach((b) => (b.onclick = async () => {
+      const g = await db.get('goals', b.dataset.gdone);
+      g.done = !g.done;
+      g.doneAt = g.done ? Date.now() : null;
+      await db.put('goals', g);
+      await game.syncGoal(g);
+      toast(g.done ? `🏁 Objectif terminé : « ${g.title} »` : `↺ « ${g.title} » est rouvert`);
+      drawProject();
     }));
     // « + » d'un objectif : affiche (ou cache) la boîte d'ajout de mission
     $$('.pg-plus', el).forEach((b) => (b.onclick = () => {
