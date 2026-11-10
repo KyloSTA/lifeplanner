@@ -359,7 +359,7 @@ async function renderToday() {
 
   // Objectifs
   const goals = async () => {
-    const list = (await db.all('goals')).filter((g) => (g.horizon === 'semaine' || g.horizon === 'mois') && g.progress < 100)
+    const list = (await db.all('goals')).filter((g) => (g.horizon === 'semaine' || g.horizon === 'mois') && !isGoalDone(g))
       .sort((a, b) => (a.horizon === 'semaine' ? 0 : 1) - (b.horizon === 'semaine' ? 0 : 1) || b.progress - a.progress).slice(0, 5);
     $('#c-goals').innerHTML = `<div class="card-head"><h2>🎯 Objectifs en cours</h2><a href="#/goals">Tout voir →</a></div>
       ${list.map((g) => `<div class="goal mini"><span class="title">${esc(g.title)} <small class="muted">· ${esc(HZ_LABEL[g.horizon])}</small></span><span class="pct">${g.progress}%</span><div class="bar"><i style="width:${g.progress}%"></i></div></div>`).join('')
@@ -1539,7 +1539,7 @@ const MONTH_SHORT = new Intl.DateTimeFormat('fr-CA', { month: 'long' });
 async function visionCard(title, horizons, empty) {
   const goals = (await db.all('goals')).filter((g) => horizons.includes(g.horizon)).sort((a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0));
   return `<section class="card vision-card"><div class="card-head"><h2>${title}</h2><a href="#/goals">Objectifs →</a></div>
-    ${goals.map((g) => `<div class="goal mini"><span class="title">${g.progress >= 100 ? '🏁 ' : ''}${esc(g.title)}</span><span class="pct">${g.progress}%</span><div class="bar"><i style="width:${g.progress}%"></i></div></div>`).join('')
+    ${goals.map((g) => `<div class="goal mini"><span class="title">${isGoalDone(g) ? '🏁 ' : ''}${esc(g.title)}</span><span class="pct">${g.progress}%</span><div class="bar"><i style="width:${g.progress}%"></i></div></div>`).join('')
     || `<p class="empty-sm">${empty} <a href="#/goals">En ajouter</a></p>`}</section>`;
 }
 
@@ -2117,6 +2117,7 @@ async function renderPage(id) {
    Vue : Objectifs
    ========================================================= */
 const openGoals = new Set(); // objectifs dont la liste de missions est dépliée
+const isGoalDone = (g) => !!g.done || (g.progress || 0) >= 100; // terminé à la main, ou atteint à 100 %
 let goalsView = 'hz'; // page Objectifs : 'hz' (par échéance) ou 'proj' (par projet)
 
 async function renderGoals() {
@@ -2142,9 +2143,11 @@ async function renderGoals() {
     const md = ms.filter((t) => t.done).length;
     const open = openGoals.has(g.id);
     const proj = g.projectId && allProjects.find((p) => p.id === g.projectId);
-    return `<div class="goal ${open ? 'open' : ''}" data-id="${g.id}">
-      <span class="title">${esc(g.title)}</span>
+    const done = isGoalDone(g);
+    return `<div class="goal ${open ? 'open' : ''} ${done ? 'is-done' : ''}" data-id="${g.id}">
+      <span class="title">${done ? '✅ ' : ''}${esc(g.title)}</span>
       <span class="g-tools"><span class="pct">${g.progress}%</span>
+        <button class="g-done ${g.done ? 'on' : ''}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}" title="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}">${g.done ? '↺' : '✓'}</button>
         <button class="g-mv" data-swap="${prev || ''}" ${prev ? '' : 'disabled'} aria-label="Monter l’objectif" title="Monter">↑</button><button class="g-mv" data-swap="${next || ''}" ${next ? '' : 'disabled'} aria-label="Descendre l’objectif" title="Descendre">↓</button>
         <button class="x g-del" aria-label="Supprimer l’objectif">×</button></span>
       ${proj && !inProjectGroup ? `<a class="chip proj-chip" href="#/note/${proj.id}" title="Projet du Cerveau${proj.archived ? ' (archivé)' : ''}">${proj.archived ? '🗄' : '🚀'} ${esc(proj.title || 'Projet')}</a>` : ''}
@@ -2175,14 +2178,14 @@ async function renderGoals() {
   };
 
   // Chiffres clés
-  const active = goals.filter((g) => g.progress < 100);
-  const reached = goals.filter((g) => g.progress >= 100);
+  const active = goals.filter((g) => !isGoalDone(g));
+  const reached = goals.filter(isGoalDone);
   const linked = tasks.filter((t) => t.goalId && goals.some((g) => g.id === t.goalId));
   const avg = active.length ? Math.round(active.reduce((n, g) => n + (g.progress || 0), 0) / active.length) : 0;
-  // Ordre choisi avec ↑ ↓ (sinon ordre de création)
-  const byOrder = (a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0);
+  // Objectifs terminés en bas (en vert), puis l'ordre choisi avec ↑ ↓ (sinon ordre de création)
+  const byOrder = (a, b) => isGoalDone(a) - isGoalDone(b) || (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0);
   const column = (title, list, extra = '') => {
-    const open = list.filter((g) => g.progress < 100);
+    const open = list.filter((g) => !isGoalDone(g));
     const cAvg = open.length ? Math.round(open.reduce((n, g) => n + g.progress, 0) / open.length) : (list.length ? 100 : 0);
     return `<section class="card goal-col">
       <div class="card-head"><h2>${title}</h2><span class="muted">${list.length ? `${list.length - open.length}/${list.length} atteint${list.length - open.length > 1 ? 's' : ''}` : ''}</span></div>
@@ -2247,6 +2250,17 @@ async function renderGoals() {
       };
     }
     el.querySelector('.goal-toggle').onclick = () => { openGoals.has(id) ? openGoals.delete(id) : openGoals.add(id); renderGoals(); };
+    // ✓ Terminer (ou ↺ Rouvrir) : l'objectif passe en vert et va au bas de sa colonne
+    el.querySelector('.g-done').onclick = async () => {
+      const g = await db.get('goals', id);
+      g.done = !g.done;
+      g.doneAt = g.done ? Date.now() : null;
+      await db.put('goals', g);
+      await game.syncGoal(g);
+      if (g.done) { openGoals.delete(id); toast(`🏁 Objectif terminé : « ${g.title} »`); }
+      else toast(`↺ « ${g.title} » est rouvert`);
+      renderGoals();
+    };
     // ↑ ↓ : échange la place avec l'objectif voisin de la même colonne
     el.querySelectorAll('.g-mv').forEach((b) => (b.onclick = async () => {
       const other = b.dataset.swap;
