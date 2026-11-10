@@ -2,10 +2,10 @@
 // ce qui permet de synchroniser plusieurs appareils (voir sync.js) sans écraser les changements.
 
 const DB_NAME = 'lifeplanner';
-const VERSION = 6;
+const VERSION = 7;
 export const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'settings', 'cache', 'xp', 'notes', 'habits', 'study', 'workouts', 'files'];
 const KEYPATH = { tasks: 'id', journal: 'date', pages: 'id', ink: 'id', goals: 'id', xp: 'key', notes: 'id', habits: 'id', study: 'id', workouts: 'id', files: 'id' }; // settings/cache : clé séparée
-const UNTRACKED = new Set(['cache']); // jamais synchronisé
+const UNTRACKED = new Set(['cache', 'blobs']); // jamais synchronisé ici (les documents ont leur propre envoi, voir docs.js)
 
 let dbp = null;
 function open() {
@@ -32,6 +32,7 @@ function open() {
         d.createObjectStore('workouts', { keyPath: 'id' }); // séances (modèles) et entraînements faits
       }
       if (e.oldVersion < 6) d.createObjectStore('files', { keyPath: 'id' }); // images des notes (photos, captures)
+      if (e.oldVersion < 7) d.createObjectStore('blobs'); // contenu des documents joints (PDF, Word, EPUB…), clé = id du document
     };
     r.onsuccess = () => {
       const d = r.result;

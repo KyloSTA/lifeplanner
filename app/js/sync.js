@@ -53,7 +53,8 @@ async function drive(url, opts = {}) {
 }
 
 async function listFiles() {
-  const q = new URLSearchParams({ spaces: 'appDataFolder', fields: 'files(id,name,modifiedTime)', pageSize: '100' });
+  // Seulement les fichiers de données (pas les documents joints « lp-blob-… », envoyés à part)
+  const q = new URLSearchParams({ spaces: 'appDataFolder', q: "not name contains 'lp-blob-'", fields: 'files(id,name,modifiedTime)', pageSize: '100' });
   const d = await (await drive(`${DRIVE}/files?${q}`)).json();
   return Object.fromEntries((d.files || []).map((f) => [f.name, f]));
 }
@@ -132,6 +133,30 @@ async function syncStore(s, files, started) {
   return toApply.length;
 }
 
+/* ---------- Documents joints (PDF, Word, EPUB…) : un fichier Drive par document ---------- */
+async function syncDocs() {
+  for (const m of await db.all('files')) {
+    if (m.kind !== 'doc' || m.driveId) continue;
+    const blob = await db.get('blobs', m.id);
+    if (!blob) continue; // document ajouté sur un autre appareil, pas encore envoyé
+    const b = 'lp' + Math.random().toString(36).slice(2);
+    const meta = JSON.stringify({ name: 'lp-blob-' + m.id, parents: ['appDataFolder'] });
+    const body = new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${b}\r\nContent-Type: ${m.mime || 'application/octet-stream'}\r\n\r\n`, blob, `\r\n--${b}--`]);
+    const f = await (await drive(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
+      method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${b}` }, body,
+    })).json();
+    if (!f?.id) continue;
+    const cur = await db.get('files', m.id);
+    if (cur) { cur.driveId = f.id; await db.put('files', cur); } // la fiche (synchronisée) dit où le trouver
+  }
+}
+
+/** Télécharge un document depuis Drive (pour docs.js). */
+export async function fetchDoc(driveId) {
+  if (!gcal.token()) return null;
+  return (await drive(`${DRIVE}/files/${driveId}?alt=media`)).blob();
+}
+
 /* ---------- Synchronisation complète ---------- */
 let running = null;
 let onApplied = () => {};
@@ -153,6 +178,7 @@ export function syncNow() {
         const n = await syncStore(s, files, started);
         if (n) { applied += n; changed.push(s); }
       }
+      await syncDocs();
       st.last = Date.now();
       st.status = 'ok';
       st.error = '';

@@ -4,7 +4,7 @@ import * as gcal from './gcal.js';
 import { InkEditor, INK_COLORS, HL_COLORS } from './ink.js';
 import * as game from './game.js';
 import * as AV from './avatar.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal } from './tasks.js';
+import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, openTaskEditor } from './tasks.js';
 import * as brain from './brain.js';
 import * as quotes from './quotes.js';
 import * as assistant from './assistant.js';
@@ -18,6 +18,8 @@ import * as rbq from './rbq.js';
 import * as workout from './workout.js';
 import * as images from './images.js';
 import * as missions from './missions.js';
+import * as docs from './docs.js';
+import * as assoc from './assoc.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -643,12 +645,62 @@ async function heroCard() {
     </div>`;
 }
 
+/* ---------- Logo personnel (menu + onglet du navigateur) ---------- */
+const LOGO_COLORS = ['#4f46e5', '#0ea5e9', '#0c8484', '#16a34a', '#ca8a04', '#f97316', '#e11d48', '#a855f7', '#1d1d1f'];
+async function getLogo() {
+  return { mode: 'avatar', text: '', color: '#4f46e5', emoji: '🦁', title: 'Life Planner', ...((await db.get('settings', 'logo')) || {}) };
+}
+const initialsOf = (name) => (name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'LP';
+function shade(hex, k) { // assombrit une couleur #rrggbb (k < 0) ou l'éclaircit (k > 0)
+  const n = parseInt(hex.slice(1), 16);
+  const f = (c) => Math.max(0, Math.min(255, Math.round(c + (k < 0 ? c * k : (255 - c) * k))));
+  return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map((c) => c.toString(16).padStart(2, '0')).join('');
+}
+function logoSVG(cfg, av, size = 34) {
+  const uidg = 'lg' + Math.random().toString(36).slice(2, 7);
+  const c = /^#[0-9a-f]{6}$/i.test(cfg.color) ? cfg.color : '#4f46e5';
+  const head = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">`;
+  if (cfg.mode === 'mono') {
+    const t = esc((cfg.text || initialsOf(av?.name)).slice(0, 3).toUpperCase());
+    return `${head}<defs><linearGradient id="${uidg}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(c, 0.25)}"/><stop offset="1" stop-color="${shade(c, -0.35)}"/></linearGradient></defs>
+      <path d="M32 2 58 11v21c0 15-11 25-26 30C17 57 6 47 6 32V11z" fill="url(#${uidg})"/>
+      <path d="M32 7 53 14.5V32c0 12-9 20.5-21 25C20 52.5 11 44 11 32V14.5z" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
+      <text x="32" y="${t.length > 2 ? 38 : 40}" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-weight="800" font-size="${t.length > 2 ? 17 : 22}" fill="#fff" letter-spacing="1">${t}</text></svg>`;
+  }
+  if (cfg.mode === 'emoji') {
+    return `${head}<defs><linearGradient id="${uidg}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(c, 0.3)}"/><stop offset="1" stop-color="${shade(c, -0.25)}"/></linearGradient></defs>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#${uidg})"/><text x="32" y="44" text-anchor="middle" font-size="34">${esc(cfg.emoji || '🦁')}</text></svg>`;
+  }
+  if (cfg.mode === 'app') return `<img src="icons/icon.svg" alt="" width="${size}" height="${size}">`;
+  // Avatar (par défaut) : ton héros, dans un cadre à ta couleur
+  const inner = AV.avatarSVG(av, size - 4).replace('<svg ', '<svg x="2" y="2" ');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true"><rect x=".75" y=".75" width="${size - 1.5}" height="${size - 1.5}" rx="${size * 0.28}" fill="none" stroke="${c}" stroke-width="1.5"/>${inner}</svg>`;
+}
+async function applyLogo(s) {
+  const cfg = await getLogo();
+  const av = await getAvatar(s);
+  const el = $('#brand-logo');
+  if (el) el.innerHTML = logoSVG(cfg, av, 34);
+  const name = $('.brand-main > span');
+  if (name) name.textContent = cfg.title || 'Life Planner';
+  document.title = cfg.title || 'Life Planner';
+  // Icône de l'onglet du navigateur
+  if (cfg.mode !== 'app') {
+    const svg = logoSVG(cfg, av, 64);
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.type = 'image/svg+xml';
+    link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+}
+
 async function refreshRail() {
   const s = await game.stats();
   const av = await getAvatar(s);
   $('#hero-mini').innerHTML = `${AV.avatarSVG(av, 40)}
     <div class="hm-text"><span><b>Niv. ${s.level}</b>${s.streak ? ` · 🔥${s.streak}` : ''}</span>${xpBar(s)}</div>`;
   $('#hero-mini').title = `${s.title} — ${s.xp} XP au total`;
+  applyLogo(s); // le logo suit ton avatar (s'il est en mode avatar)
 }
 
 function xpPop(amount, reason) {
@@ -805,6 +857,7 @@ function captureForm(id) {
     <div class="cap-imgs" hidden></div>
     <div class="capture-foot">
       <label class="btn cap-photo" title="Ajouter une photo ou une capture"><input type="file" accept="image/*" multiple hidden>📷 Photo</label>
+      <label class="btn cap-photo cap-doc" title="Joindre un document (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎 Fichier</label>
       <span class="muted cap-hint">Ctrl + Entrée</span>
       <button class="btn primary">💡 Capturer</button>
     </div>
@@ -812,15 +865,24 @@ function captureForm(id) {
 }
 
 function bindCapture(form, after) {
-  let files = []; // images en attente : { blob, url }
+  let files = []; // en attente : images { blob, url } et documents { blob, doc: true }
   const box = form.querySelector('.cap-imgs');
   const drawImgs = () => {
     box.hidden = !files.length;
-    box.innerHTML = files.map((f, i) => `<span class="cap-img"><img src="${f.url}" alt="Image ${i + 1}"><button type="button" data-rm="${i}" aria-label="Retirer l’image">×</button></span>`).join('');
-    $$('[data-rm]', box).forEach((b) => (b.onclick = () => { URL.revokeObjectURL(files[b.dataset.rm].url); files.splice(Number(b.dataset.rm), 1); drawImgs(); }));
+    box.innerHTML = files.map((f, i) => f.doc
+      ? `<span class="doc-chip"><span class="doc-open"><span class="doc-ico">${docs.icon({ name: f.blob.name })}</span><span class="doc-name">${esc(f.blob.name)}</span><small>${docs.fmtSize(f.blob.size)}</small></span><button type="button" class="doc-rm" data-rm="${i}" aria-label="Retirer le document">×</button></span>`
+      : `<span class="cap-img"><img src="${f.url}" alt="Image ${i + 1}"><button type="button" data-rm="${i}" aria-label="Retirer l’image">×</button></span>`).join('');
+    $$('[data-rm]', box).forEach((b) => (b.onclick = () => { const f = files[b.dataset.rm]; if (f.url) URL.revokeObjectURL(f.url); files.splice(Number(b.dataset.rm), 1); drawImgs(); }));
   };
   const add = (list) => {
     for (const blob of list) files.push({ blob, url: URL.createObjectURL(blob) });
+    if (list.length) { drawImgs(); form.t.focus(); }
+  };
+  const addDocs = (list) => {
+    for (const blob of list) {
+      if (blob.size > docs.MAX_MB * 1024 * 1024) { toast(`« ${blob.name} » dépasse ${docs.MAX_MB} Mo`, 'err'); continue; }
+      files.push({ blob, doc: true });
+    }
     if (list.length) { drawImgs(); form.t.focus(); }
   };
   form._addImages = add; // utilisé par le « coller » global de la page
@@ -832,13 +894,17 @@ function bindCapture(form, after) {
     const btn = form.querySelector('button.primary');
     btn.disabled = true;
     try {
-      const ids = [];
-      for (const f of files) ids.push(await images.save(f.blob));
+      const ids = [], dms = [];
+      for (const f of files) {
+        if (f.doc) dms.push(await docs.save(f.blob));
+        else ids.push(await images.save(f.blob));
+      }
       const lines = v.split('\n');
-      let title = v ? lines.shift().trim() : `📷 Image du ${U.fmtShort(new Date())} à ${U.fmtTime(new Date())}`;
+      let title = v ? lines.shift().trim()
+        : ids.length ? `📷 Image du ${U.fmtShort(new Date())} à ${U.fmtTime(new Date())}` : `📎 ${dms[0].name.replace(/\.[^.]+$/, '')}`;
       let body = lines.join('\n').trim();
       if (title.length > 80) { body = (title + '\n' + body).trim(); title = title.slice(0, 60).trim() + '…'; }
-      body = [body, ...ids.map(images.refLine)].filter(Boolean).join('\n');
+      body = [body, ...ids.map(images.refLine), ...dms.map(docs.refLine)].filter(Boolean).join('\n');
       const n = await brain.createNote({ title, body, type: 'idee', inbox: true });
       n.captured = true;
       await brain.saveNote(n, { touch: false });
@@ -846,7 +912,8 @@ function bindCapture(form, after) {
       files = [];
       form.t.value = '';
       drawImgs();
-      toast(ids.length ? `💡 Capturé avec ${ids.length} image${ids.length > 1 ? 's' : ''} — dans « À classer »` : '💡 Idée capturée — elle t’attend dans « À classer »');
+      const att = [ids.length && `${ids.length} image${ids.length > 1 ? 's' : ''}`, dms.length && `${dms.length} document${dms.length > 1 ? 's' : ''}`].filter(Boolean).join(' et ');
+      toast(att ? `💡 Capturé avec ${att} — dans « À classer »` : '💡 Idée capturée — elle t’attend dans « À classer »');
       after?.(n);
     } catch (err) {
       console.error(err);
@@ -855,12 +922,21 @@ function bindCapture(form, after) {
   };
   form.onsubmit = (e) => { e.preventDefault(); submit(); };
   form.t.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); } };
-  form.addEventListener('paste', (e) => { const imgs = images.imageFiles(e.clipboardData); if (imgs.length) { e.preventDefault(); add(imgs); } });
+  form.addEventListener('paste', (e) => {
+    const imgs = images.imageFiles(e.clipboardData), ds = docs.docFiles(e.clipboardData?.files);
+    if (imgs.length || ds.length) { e.preventDefault(); add(imgs); addDocs(ds); }
+  });
   form.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); form.classList.add('drop'); } });
   form.addEventListener('dragleave', () => form.classList.remove('drop'));
-  form.addEventListener('drop', (e) => { form.classList.remove('drop'); const imgs = images.imageFiles(e.dataTransfer); if (imgs.length) { e.preventDefault(); add(imgs); } });
-  const pick = form.querySelector('input[type=file]');
+  form.addEventListener('drop', (e) => {
+    form.classList.remove('drop');
+    const imgs = images.imageFiles(e.dataTransfer), ds = docs.docFiles(e.dataTransfer?.files);
+    if (imgs.length || ds.length) { e.preventDefault(); add(imgs); addDocs(ds); }
+  });
+  const pick = form.querySelector('.cap-photo:not(.cap-doc) input');
   pick.onchange = () => { add([...pick.files]); pick.value = ''; };
+  const pickD = form.querySelector('.cap-doc input');
+  pickD.onchange = () => { addDocs([...pickD.files]); pickD.value = ''; };
 }
 
 // Coller une image n'importe où sur la page (hors champ de texte) : elle va dans la capture rapide visible
@@ -880,7 +956,11 @@ new MutationObserver(() => { if (document.querySelector('img[data-img]:not([src]
 document.addEventListener('click', (e) => {
   const img = e.target.closest?.('.n-img img');
   if (img?.src) images.zoom(img.src);
+  // Documents joints : un clic ouvre le PDF (ou télécharge le fichier Word, EPUB…)
+  const d = e.target.closest?.('[data-doc-open]');
+  if (d) { e.preventDefault(); e.stopPropagation(); docs.open(d.dataset.docOpen).catch((err) => toast(err.message, 'err')); }
 });
+docs.setRemoteFetcher(sync.fetchDoc);
 
 function noteCard(n, proj) {
   const t = brain.typeOf(n.type);
@@ -904,6 +984,7 @@ async function renderBrain() {
   const notes = everything.filter((n) => !!n.archived === !!brainState.arch);
   const [allGoals, allTasks] = await Promise.all([db.all('goals'), db.all('tasks')]);
   const projStats = (n) => (n.type === 'projet' ? brain.projectStats(n.id, allGoals, allTasks) : null);
+  const projects = notes.filter((n) => n.type === 'projet').sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
   const inbox = notes.filter((n) => n.inbox).length;
   const tagCount = {};
   notes.forEach((n) => (n.tags || []).forEach((t) => (tagCount[t] = (tagCount[t] || 0) + 1)));
@@ -924,6 +1005,18 @@ async function renderBrain() {
         <section class="card" id="c-redisc"></section>
       </div>
     </div>
+    ${!brainState.arch && projects.length ? `<section class="brain-projects">
+      <div class="bp-head"><h2>🚀 Projets</h2><span class="muted">${projects.length} actif${projects.length > 1 ? 's' : ''}</span></div>
+      <div class="bp-grid">${projects.map((p) => {
+        const st = projStats(p);
+        const rel = notes.filter((x) => (x.rel?.projects || []).includes(p.id)).length;
+        return `<a class="card bp-card" href="#/note/${p.id}">
+          <div class="bp-top"><b>${esc(p.title || 'Projet sans titre')}</b><span class="bp-pct">${st.pct}%</span></div>
+          <div class="bar"><i style="width:${st.pct}%"></i></div>
+          <small class="muted">🎯 ${st.goals.length} objectif${st.goals.length > 1 ? 's' : ''} · ✅ ${st.done}/${st.missions} missions${rel ? ` · 🧠 ${rel} élément${rel > 1 ? 's' : ''}` : ''}</small>
+        </a>`;
+      }).join('')}</div>
+    </section>` : ''}
     <div class="brain-bar">
       <label class="brain-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input type="search" id="bq" placeholder="Rechercher dans tes notes…" value="${esc(brainState.q)}" autocomplete="off" aria-label="Rechercher dans tes notes"></label>
@@ -1018,7 +1111,8 @@ async function renderNote(id) {
       <section class="card project-panel" id="n-proj" hidden></section>
       <section class="card note-main">
         <div class="note-tools"><div class="seg"><button data-mode="write">✎ Écrire</button><button data-mode="read">👁 Lire</button></div>
-          <label class="btn" id="n-photo" title="Ajouter une photo ou une capture (tu peux aussi la coller avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden>📷 Photo</label></div>
+          <span class="note-add"><label class="btn" id="n-photo" title="Ajouter une photo ou une capture (tu peux aussi la coller avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden>📷 Photo</label>
+          <label class="btn" id="n-doc" title="Joindre un document (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎 Fichier</label></span></div>
         <div id="n-write">
           <textarea id="n-body" placeholder="Écris librement…&#10;&#10;[[Titre]] relie une autre note · #étiquette classe la note · « - » fait une liste · « # » fait un titre">${esc(n.body)}</textarea>
           <div class="suggest" id="n-sug" hidden></div>
@@ -1057,7 +1151,14 @@ async function renderNote(id) {
     const linked = new Set([...out.filter((o) => o.t).map((o) => o.t.id), ...back.map((b) => b.id)]);
     const related = (me.tags || []).length
       ? all.filter((x) => x.id !== me.id && !x.archived && !linked.has(x.id) && x.title && (x.tags || []).some((t) => me.tags.includes(t))).slice(0, 5) : [];
+    const links = await assoc.linksOf(n);
+    const relNotes = me.type === 'projet' ? await assoc.notesFor('projects', me.id) : [];
     el.innerHTML = `
+      <section class="card assoc-card"><div class="card-head"><h3>🧷 Associé à</h3><button class="btn sm-text" id="n-assoc">+ Associer</button></div>
+        ${links.length ? `<div class="assoc-list">${links.map((l) => `<span class="assoc-chip"><a href="${l.href}" ${l.task ? `data-open-task="${l.task}"` : ''}>${esc(l.label)}</a><button data-unassoc="${l.kind}|${l.id}" aria-label="Retirer l’association">×</button></span>`).join('')}</div>`
+          : '<p class="empty-sm">Relie cette note à un projet, un module du cours RBQ, un objectif ou une mission.</p>'}</section>
+      ${me.type === 'projet' ? `<section class="card"><h3>🧠 Éléments associés (${relNotes.length})</h3>
+        ${relNotes.length ? `<div class="assoc-list">${assoc.noteChips(relNotes)}</div>` : '<p class="empty-sm">Depuis n’importe quelle note : « 🧷 Associé à » → 🚀 Projet.</p>'}</section>` : ''}
       <section class="card"><h3>🔗 Liens (${out.length})</h3>
         ${out.map(({ l, t }) => t
           ? `<a class="side-link" href="#/note/${t.id}">${brain.typeOf(t.type).icon} ${esc(t.title)}</a>`
@@ -1199,9 +1300,29 @@ async function renderNote(id) {
   };
   ta.addEventListener('paste', (e) => { const f = images.imageFiles(e.clipboardData); if (f.length) { e.preventDefault(); insertImages(f); } });
   ta.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
-  ta.addEventListener('drop', (e) => { const f = images.imageFiles(e.dataTransfer); if (f.length) { e.preventDefault(); insertImages(f); } });
+  ta.addEventListener('drop', (e) => {
+    const f = images.imageFiles(e.dataTransfer), d = docs.docFiles(e.dataTransfer?.files);
+    if (f.length || d.length) { e.preventDefault(); insertImages(f); insertDocs(d); }
+  });
   const pickN = $('#n-photo input');
   pickN.onchange = () => { insertImages([...pickN.files]); pickN.value = ''; };
+  // Documents : une ligne « [📎 nom](file:…) », cliquable en mode Lire
+  const insertDocs = async (list) => {
+    if (!list.length) return;
+    try {
+      const ms = [];
+      for (const f of list) ms.push(await docs.save(f));
+      const at = ta.selectionStart ?? ta.value.length;
+      const before = ta.value.slice(0, at), after = ta.value.slice(at);
+      const ins = (before && !before.endsWith('\n') ? '\n' : '') + ms.map(docs.refLine).join('\n') + '\n';
+      ta.value = before + ins + after;
+      n.body = ta.value;
+      save();
+      toast(`📎 ${ms.length > 1 ? ms.length + ' documents joints' : 'Document joint'} — clique-le en mode Lire pour l’ouvrir`);
+    } catch (err) { toast(err.message, 'err'); }
+  };
+  const pickD = $('#n-doc input');
+  pickD.onchange = () => { insertDocs([...pickD.files]); pickD.value = ''; };
   ta.onblur = () => setTimeout(() => (sug.hidden = true), 150);
   $('#n-title').oninput = (e) => { n.title = e.target.value; save(); };
   $('#n-title').onchange = async () => {
@@ -1247,6 +1368,12 @@ async function renderNote(id) {
     location.hash = '#/note/' + t.id;
   };
   view.onclick = async (e) => {
+    // Associations (projet, cours RBQ, objectif, mission)
+    if (e.target.closest('#n-assoc')) { await flush(); assoc.picker(modal, n, () => drawSide()); return; }
+    const ua = e.target.closest('[data-unassoc]');
+    if (ua) { const [k, tid] = ua.dataset.unassoc.split('|'); await flush(); await assoc.toggle(n, k, tid, false); drawSide(); return; }
+    const ot = e.target.closest('[data-open-task]');
+    if (ot) { e.preventDefault(); openTaskEditor(ot.dataset.openTask, () => drawSide()); return; }
     const og = e.target.closest('[data-opengoal]');
     if (og) { openGoals.add(og.dataset.opengoal); return; } // le lien mène à #/goals, objectif déplié
     const ul = e.target.closest('[data-unlink]');
@@ -1567,6 +1694,7 @@ async function renderPage(id) {
     meta = { id, day, title: 'Journal — ' + U.fmtLong(U.parseISO(day)), bg: 'lines', createdAt: Date.now(), updatedAt: Date.now(), thumb: null };
   }
   const ink = (await db.get('ink', id)) || { id, strokes: [], height: 1414 };
+  let pageDocs = [...(ink.docs || [])];
   const back = meta.day ? `#/journal/${meta.day}` : '#/notebook';
 
   view.innerHTML = `
@@ -1581,6 +1709,7 @@ async function renderPage(id) {
           <button data-tool="select" title="Sélection : déplacer, agrandir ou retirer une image"><svg viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6z"/></svg></button>
         </div>
         <label class="btn" id="ink-img" title="Ajouter une image (tu peux aussi la coller avec Ctrl + V ou la glisser sur la page)"><input type="file" accept="image/*" multiple hidden>🖼 Image</label>
+        <label class="btn" id="ink-doc" title="Joindre un document à cette page (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎</label>
         <div class="seg" id="colors"></div>
         <div class="seg" id="sizes">${[6, 9, 13].map((s, i) => `<button data-size="${i}" class="${i === 1 ? 'on' : ''}" title="Épaisseur"><span class="dot" style="width:${s}px;height:${s}px"></span></button>`).join('')}</div>
         <div class="seg">
@@ -1595,6 +1724,7 @@ async function renderPage(id) {
         <button class="btn danger" id="clear">Effacer</button>
         <span class="saved muted" id="saved"></span>
       </div>
+      <div class="ink-docs" id="ink-docs" hidden></div>
       <div class="ink-scroll" id="ink-scroll"></div>
     </div>`;
 
@@ -1604,7 +1734,7 @@ async function renderPage(id) {
       meta.updatedAt = Date.now();
       meta.thumb = ed.thumbnail();
       meta.bg = ed.bg;
-      await db.put('ink', { id, strokes: ed.strokes, height: ed.H, images: ed.imgs });
+      await db.put('ink', { id, strokes: ed.strokes, height: ed.H, images: ed.imgs, docs: pageDocs });
       await db.put('pages', meta);
       const s = $('#saved');
       if (s) s.textContent = 'Enregistré ✓';
@@ -1621,6 +1751,34 @@ async function renderPage(id) {
 
   // Images sur la page (comme OneNote) : coller, glisser ou 🖼 ; elles restent sous l'encre
   const seenImgs = new Set((ink.images || []).map((m) => m.id)); // pour effacer en sortant les images retirées
+
+  // Documents joints à la page (bandeau au-dessus de la feuille)
+  const drawDocs = async () => {
+    const el = $('#ink-docs');
+    if (!el) return;
+    const ms = await docs.metas(pageDocs);
+    el.hidden = !ms.length;
+    el.innerHTML = `<span class="muted">📎 Joints :</span>${ms.map((m) => docs.chip(m, { remove: true })).join('')}`;
+    $$('[data-doc-rm]', el).forEach((b) => (b.onclick = async () => {
+      pageDocs = pageDocs.filter((x) => x !== b.dataset.docRm);
+      $('#saved').textContent = '…';
+      await save();
+      await docs.removeUnused([b.dataset.docRm]);
+      drawDocs();
+    }));
+  };
+  const addDocsToPage = async (list) => {
+    try {
+      for (const f of list) pageDocs.push((await docs.save(f)).id);
+      $('#saved').textContent = '…';
+      save();
+      drawDocs();
+      toast(`📎 ${list.length > 1 ? list.length + ' documents joints' : 'Document joint'} à la page`);
+    } catch (err) { toast(err.message, 'err'); }
+  };
+  const pickDoc = $('#ink-doc input');
+  pickDoc.onchange = () => { addDocsToPage([...pickDoc.files]); pickDoc.value = ''; };
+  drawDocs();
   const setTool = (t) => {
     ed.setTool(t);
     $$('[data-tool]').forEach((x) => x.classList.toggle('on', x.dataset.tool === t));
@@ -1642,13 +1800,20 @@ async function renderPage(id) {
   };
   const onPaste = (e) => {
     if (e.target.closest?.('input, textarea')) return;
-    const list = images.imageFiles(e.clipboardData);
-    if (list.length) { e.preventDefault(); addImages(list); }
+    const list = images.imageFiles(e.clipboardData), ds = docs.docFiles(e.clipboardData?.files);
+    if (list.length || ds.length) e.preventDefault();
+    if (list.length) addImages(list);
+    if (ds.length) addDocsToPage(ds);
   };
   document.addEventListener('paste', onPaste);
   const sc = $('#ink-scroll');
   sc.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
-  sc.addEventListener('drop', (e) => { const list = images.imageFiles(e.dataTransfer); if (list.length) { e.preventDefault(); addImages(list); } });
+  sc.addEventListener('drop', (e) => {
+    const list = images.imageFiles(e.dataTransfer), ds = docs.docFiles(e.dataTransfer?.files);
+    if (list.length || ds.length) e.preventDefault();
+    if (list.length) addImages(list, ed.pos(e));
+    if (ds.length) addDocsToPage(ds);
+  });
   const pickImg = $('#ink-img input');
   let pickAt = null; // « Ajouter une image… » du clic droit : l'image va à l'endroit cliqué
   pickImg.onchange = () => { addImages([...pickImg.files], pickAt); pickAt = null; pickImg.value = ''; };
@@ -1776,7 +1941,9 @@ async function renderGoals() {
   const today = iso(new Date());
   const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || a.createdAt - b.createdAt;
   const free = tasks.filter((t) => !t.goalId && !t.done).sort(sortM);
-  const allProjects = brain.projectsOf(await brain.allNotes(), { withArchived: true }).sort((a, b) => a.title.localeCompare(b.title));
+  const everyNote = await brain.allNotes();
+  const relNotes = everyNote.filter((x) => !x.archived && (x.rel?.goals || []).length); // notes associées à des objectifs
+  const allProjects = brain.projectsOf(everyNote, { withArchived: true }).sort((a, b) => a.title.localeCompare(b.title));
   const projects = allProjects.filter((p) => !p.archived);
   // Un projet archivé n'est plus proposé, sauf pour l'objectif qui y est déjà lié
   const projOptions = (current) => `<option value="">Aucun projet</option>`
@@ -1806,6 +1973,7 @@ async function renderGoals() {
           <label class="goal-proj" title="Projet">🚀 <select class="g-proj" aria-label="Projet du Cerveau">${projOptions(g.projectId)}</select></label>
         </div>
         ${allProjects.length ? '' : '<p class="empty-sm" style="padding:0">Pour regrouper des objectifs, crée une note de type 🚀 Projet dans le Cerveau.</p>'}
+        ${(() => { const ln = relNotes.filter((x) => (x.rel?.goals || []).includes(g.id)); return ln.length ? `<div class="assoc-list"><span class="muted">🧠 Notes :</span>${assoc.noteChips(ln)}</div>` : ''; })()}
         ${ms.length ? `<ul class="tasks">${ms.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>`
           : '<p class="empty-sm">Découpe cet objectif en missions : sa progression avancera toute seule à chaque mission accomplie.</p>'}
         <form class="add-mission">
@@ -1986,6 +2154,8 @@ async function renderSettings() {
         </div>
       </section>
 
+      <section class="card logo-card" id="logo-card"></section>
+
       <section class="card">
         <div class="card-head"><h2>Menu</h2><button class="btn as-reset" id="nav-reset" type="button">Ordre par défaut</button></div>
         <p class="muted" style="margin-top:0">Change l’ordre des onglets avec les flèches. Réglages reste toujours en bas.</p>
@@ -2046,6 +2216,38 @@ async function renderSettings() {
   };
   drawNav();
   $('#nav-reset').onclick = async () => { await db.del('settings', 'navOrder'); await applyNavOrder(); drawNav(); toast('Ordre du menu rétabli'); };
+
+  // Logo et nom de l'app : ce qui te représente
+  const drawLogo = async () => {
+    const el = $('#logo-card');
+    if (!el) return;
+    const cfg = await getLogo();
+    const av = await getAvatar();
+    const modes = [['avatar', 'Mon avatar'], ['mono', 'Mes initiales'], ['emoji', 'Un emoji'], ['app', 'Logo d’origine']];
+    el.innerHTML = `<div class="card-head"><h2>🎨 Mon logo</h2><span class="muted">Menu et onglet du navigateur · un clic sur le logo ouvre Aujourd’hui</span></div>
+      <div class="logo-modes">${modes.map(([m, l]) => `<button type="button" class="logo-opt ${cfg.mode === m ? 'on' : ''}" data-lmode="${m}">${logoSVG({ ...cfg, mode: m }, av, 52)}<span>${l}</span></button>`).join('')}</div>
+      <div class="logo-fields">
+        <label>Nom affiché<input id="lg-title" value="${esc(cfg.title)}" maxlength="24" placeholder="Life Planner" autocomplete="off"></label>
+        ${cfg.mode === 'mono' ? `<label>Initiales<input id="lg-text" value="${esc(cfg.text || initialsOf(av.name))}" maxlength="3" autocomplete="off" style="text-transform:uppercase"></label>` : ''}
+        ${cfg.mode === 'emoji' ? `<label>Emoji<input id="lg-emoji" value="${esc(cfg.emoji)}" maxlength="4" autocomplete="off"></label>` : ''}
+      </div>
+      ${cfg.mode !== 'app' ? `<div class="logo-colors"><span class="muted">Couleur</span>${LOGO_COLORS.map((c) => `<button type="button" class="logo-col ${cfg.color === c ? 'on' : ''}" data-lcol="${c}" style="--sw:${c}" aria-label="Couleur ${c}"></button>`).join('')}
+        <input type="color" id="lg-color" value="${esc(cfg.color)}" aria-label="Autre couleur"></div>` : ''}
+      ${cfg.mode === 'avatar' ? '<p class="hint muted">Ton logo suit ton héros : change son apparence dans la page Ton héros, il évolue avec toi.</p>' : ''}`;
+    const set = async (patch, redraw = true) => {
+      await db.put('settings', { ...(await getLogo()), ...patch }, 'logo');
+      await applyLogo();
+      if (redraw) drawLogo();
+    };
+    $$('[data-lmode]', el).forEach((b) => (b.onclick = () => set({ mode: b.dataset.lmode })));
+    $$('[data-lcol]', el).forEach((b) => (b.onclick = () => set({ color: b.dataset.lcol })));
+    $('#lg-color', el)?.addEventListener('change', (e) => set({ color: e.target.value }));
+    const deb = U.debounce((patch) => set(patch, false), 400);
+    $('#lg-title', el).oninput = (e) => deb({ title: e.target.value.trim() || 'Life Planner' });
+    $('#lg-text', el)?.addEventListener('input', (e) => deb({ text: e.target.value.trim().toUpperCase() }));
+    $('#lg-emoji', el)?.addEventListener('input', (e) => { if (e.target.value.trim()) deb({ emoji: e.target.value.trim() }); });
+  };
+  drawLogo();
 
   $('#ak-del')?.addEventListener('click', async () => { await db.del('settings', 'anthropicKey'); toast('Clé retirée'); renderSettings(); });
   $('#g-off')?.addEventListener('click', async () => { await gcal.disconnect(); toast('Déconnecté'); renderSettings(); });

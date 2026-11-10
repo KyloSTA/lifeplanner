@@ -41,7 +41,7 @@ export function backlinks(notes, note) {
 }
 
 export function excerpt(body = '', len = 140) {
-  const s = body.replace(images.REF_RE, '📷 ').replace(LINK_RE, '$1').replace(/[*>#-]+\s/g, '').replace(/\s+/g, ' ').trim();
+  const s = body.replace(images.REF_RE, '📷 ').replace(/\[(📎 [^\]\n]*)\]\(file:[a-z0-9]+\)/g, '$1 ').replace(LINK_RE, '$1').replace(/[*>#-]+\s/g, '').replace(/\s+/g, ' ').trim();
   return s.length > len ? s.slice(0, len - 1) + '…' : s;
 }
 
@@ -151,6 +151,8 @@ export async function deleteNote(id) {
   const old = await db.get('notes', id);
   await db.del('notes', id);
   await images.removeUnused(images.refsIn(old?.body)); // ses images, si aucune autre note ne les utilise
+  const docRefs = [...(old?.body || '').matchAll(/\]\(file:([a-z0-9]+)\)/g)].map((m) => m[1]);
+  if (docRefs.length) await (await import('./docs.js')).removeUnused(docRefs); // et ses documents joints
   for (const g of await db.all('goals')) if (g.projectId === id) { g.projectId = null; await db.put('goals', g); }
   const keys = (await db.keys('xp')).filter((k) => k === 'note:' + id || k === 'triage:' + id || k.startsWith(`link:${id}:`) || (k.startsWith('link:') && k.endsWith(':' + id)));
   for (const k of keys) await game.revoke(k, { showPop: false });
@@ -200,6 +202,8 @@ export function renderBody(body, notes) {
     if (!line.trim()) continue;
     const im = line.trim().match(/^!\[([^\]]*)\]\(img:([a-z0-9]+)\)$/);
     if (im) { out.push(`<figure class="n-img"><img data-img="${im[2]}" alt="${im[1]}" loading="lazy"></figure>`); continue; }
+    const doc = line.trim().match(/^\[📎 ([^\]]*)\]\(file:([a-z0-9]+)\)$/);
+    if (doc) { out.push(`<p class="n-doc"><button type="button" class="doc-open" data-doc-open="${doc[2]}" title="Ouvrir"><span class="doc-ico">📎</span><span class="doc-name">${doc[1]}</span></button></p>`); continue; }
     const h = line.match(/^#{1,3}\s+(.*)/);
     if (h) out.push(`<h3>${inline(h[1], notes)}</h3>`);
     else if (line.startsWith('&gt; ')) out.push(`<blockquote>${inline(line.slice(5), notes)}</blockquote>`);

@@ -101,6 +101,14 @@ le personnaliser (peau, coiffure, yeux, tenue, accessoire, fond).
   s'insère à l'endroit du curseur (ligne `![](img:…)`) et s'affiche en mode 👁 Lire ; un clic l'agrandit.
   Les images sont réduites et compressées, puis synchronisées comme le reste. Supprimer une note
   supprime aussi ses images.
+- **Documents (PDF, Word, EPUB, Excel, PowerPoint, texte)** : **📎 Fichier** dans la capture rapide ou dans une
+  note (ou glisse le fichier). Un clic ouvre le PDF dans un onglet ; les autres sont téléchargés et ouverts par
+  Windows. 25 Mo maximum par document. Avec la synchro, chaque document est envoyé une fois dans ton Drive
+  (dossier privé de l'app) et un autre appareil le récupère quand tu l'ouvres.
+- **🧷 Associé à** (panneau de droite d'une note) : relie la note à un **projet**, un **module du cours RBQ**, un
+  **objectif** ou une **mission**. Elle apparaît ensuite dans le projet (« Éléments associés »), dans le module
+  (« Du Cerveau »), dans l'objectif déplié et dans la fenêtre de la mission.
+- **🚀 Projets** : tes projets actifs sont en vedette en haut du Cerveau, avec leur avancement.
 - **Classer** : ouvre l'idée, choisis son type (💡 Idée, 📝 Note, 🎓 Apprentissage, 📚 Ressource,
   🚀 Projet, 👤 Personne, ❝ Citation), ajoute des `#étiquettes`, puis clique **Classer**.
 - **Relier** : écris `[[` pour choisir une autre note. Un lien vers une note qui n'existe pas encore
@@ -179,6 +187,8 @@ touche une habitude pour la cocher (+1 si elle se fait plusieurs fois, − pour 
 - **Suivi** : série 🔥 (jours prévus réussis d'affilée), record, taux de réussite sur 30 jours et les 14 derniers
   jours en cases (touche une case pour rattraper un oubli).
 - **⏸ Mettre en pause** arrête les rappels sans perdre l'historique. Chaque habitude complétée donne 3 XP.
+- Déjà ajoutées pour toi : 🦷 dents matin et soir (5 h 45, 21 h 30), ⛪ Église le dimanche (9 h), et du lundi au
+  vendredi : ⏰ réveil 5 h 30, 🥪 lunch (5 h 45), 🚗 partir travailler à 6 h 15 (rappel à 6 h 05). Modifie-les avec ✎.
 
 ## Workout
 Trois onglets :
@@ -197,7 +207,11 @@ sur Aujourd'hui) et adresse du cours en ligne (bouton **📖 Ouvrir le cours**, 
   (administration, sécurité des chantiers, gestion de projets, exécution des travaux) ; renomme-les, supprime-les
   ou ajoute ceux de ton cours. Statut : À commencer, En cours, À réviser, Maîtrisé.
 - Dans un module : **📝 notes de cours** (Écrire / Lire), **⭐ points clés**, **🃏 cartes de révision** (question/réponse)
-  et **🧠 Du Cerveau** : « + Ajouter depuis le Cerveau » rattache des notes capturées (idées, photos, captures d'écran).
+  et **🧠 Du Cerveau** : « + Ajouter depuis le Cerveau » rattache des notes capturées (idées, photos, captures d'écran),
+  et **📎 Documents du cours** (PDF, Word, EPUB… ; bouton ou glisser-déposer).
+- **Module en cours** : le module « En cours » (sinon « À réviser », sinon le prochain à commencer) est mis en
+  vedette en haut de la page et sur Aujourd'hui, avec **Continuer →** et ses cartes à réviser.
+- Les pages manuscrites ont aussi un bouton **📎** : les documents joints s'affichent au-dessus de la feuille.
 - **🃏 Réviser** : les cartes du jour, en répétition espacée. Une carte ratée revient dans la séance puis le
   lendemain ; une carte connue revient après 1, 3, 7, 14 puis 30 jours.
 
