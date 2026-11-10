@@ -2,9 +2,9 @@
 // ce qui permet de synchroniser plusieurs appareils (voir sync.js) sans écraser les changements.
 
 const DB_NAME = 'lifeplanner';
-const VERSION = 4;
-export const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'settings', 'cache', 'xp', 'notes'];
-const KEYPATH = { tasks: 'id', journal: 'date', pages: 'id', ink: 'id', goals: 'id', xp: 'key', notes: 'id' }; // settings/cache : clé séparée
+const VERSION = 5;
+export const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'settings', 'cache', 'xp', 'notes', 'habits', 'study', 'workouts'];
+const KEYPATH = { tasks: 'id', journal: 'date', pages: 'id', ink: 'id', goals: 'id', xp: 'key', notes: 'id', habits: 'id', study: 'id', workouts: 'id' }; // settings/cache : clé séparée
 const UNTRACKED = new Set(['cache']); // jamais synchronisé
 
 let dbp = null;
@@ -26,6 +26,11 @@ function open() {
       if (e.oldVersion < 2) d.createObjectStore('xp', { keyPath: 'key' }); // journal des points gagnés
       if (e.oldVersion < 3) d.createObjectStore('notes', { keyPath: 'id' }); // second cerveau
       if (e.oldVersion < 4) d.createObjectStore('meta'); // « store|clé » -> { at, del } (synchronisation)
+      if (e.oldVersion < 5) {
+        d.createObjectStore('habits', { keyPath: 'id' }); // habitudes et leur suivi quotidien
+        d.createObjectStore('study', { keyPath: 'id' }); // cours RBQ : modules et cartes de révision
+        d.createObjectStore('workouts', { keyPath: 'id' }); // séances (modèles) et entraînements faits
+      }
     };
     r.onsuccess = () => {
       const d = r.result;
