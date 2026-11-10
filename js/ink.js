@@ -117,13 +117,14 @@ export class InkEditor {
     this.page.classList.toggle('selecting', t === 'select');
   }
 
-  /** Ajoute une image (dimensions en pixels) au centre de la zone visible. */
-  addImage(id, pw, ph) {
+  /** Ajoute une image (dimensions en pixels) au centre de la zone visible, ou à l'endroit at = [x, y] (clic droit). */
+  addImage(id, pw, ph, at = null) {
     const w = Math.min(PAGE_W - 160, pw || 600);
     const h = Math.round((w * (ph || 400)) / (pw || 600));
-    const cy = (this.sc.scrollTop + this.sc.clientHeight / 2) / this.scale;
+    const cy = at ? at[1] + h / 2 : (this.sc.scrollTop + this.sc.clientHeight / 2) / this.scale;
     const y = Math.max(20, Math.round(cy - h / 2));
-    const img = { id, x: Math.round((PAGE_W - w) / 2), y, w: Math.round(w), h };
+    const x = at ? Math.round(Math.max(0, Math.min(PAGE_W - w, at[0]))) : Math.round((PAGE_W - w) / 2);
+    const img = { id, x, y, w: Math.round(w), h };
     if (y + h + 60 > this.H) { this.H = Math.min(MAX_H, y + h + 120); this.resize(true); }
     this.imgs.push(img);
     this.loadImages();
@@ -414,6 +415,7 @@ export class InkEditor {
 
   down(e) {
     const now = performance.now();
+    this.lastPointer = e.pointerType; // pour savoir si un clic droit vient de la souris (menu) ou du stylet (gomme)
     if (e.pointerType === 'pen') {
       // Le stylet touche l'écran : on arrête tout défilement en cours (la paume a pu le lancer)
       this.pan = null;
