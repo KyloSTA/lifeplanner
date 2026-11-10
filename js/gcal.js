@@ -133,8 +133,12 @@ function normalize(e, cal) {
     location: e.location || '',
     description: e.description || '',
     link: e.htmlLink || '',
+    lp: e.extendedProperties?.private?.lpkey || '', // rappel créé par Life Planner (caché dans l'agenda de l'app)
   };
 }
+
+/** Accès brut à l'API Agenda (pour les rappels, voir reminders.js). */
+export const calApi = (path, opts) => api(path, opts);
 
 const byStart = (a, b) => (b.allDay - a.allDay) || a.start - b.start;
 

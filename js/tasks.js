@@ -214,6 +214,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
     const sd = subs.filter((s) => s.done).length;
     // Notes du Cerveau associées à cette mission (« 🧷 Associé à » dans une note)
     const linked = (await db.all('notes')).filter((x) => (x.rel?.tasks || []).includes(t.id)); // y compris la note archivée devenue mission
+    const remOn = !!(await db.get('settings', 'gcalReminders')); // rappels copiés dans Google Agenda
     box.innerHTML = `
       <div class="tm-head">
         <input type="checkbox" class="tm-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie" title="Mission accomplie">
@@ -246,6 +247,8 @@ export async function openTaskEditor(id, onChange = () => {}) {
           <button type="button" class="chip-btn" data-at="${t.date || ''}|09:00">${t.date && t.date > U.iso(new Date()) ? 'Ce jour-là' : 'Demain'} 9 h</button>
           <button type="button" class="chip-btn" data-at="${U.iso(new Date())}|19:00">Ce soir 19 h</button>
         </div>
+        ${remOn ? (t.alarmAt ? '<p class="tm-rem muted">📱 Aussi dans ton Google Agenda : ton cellulaire sonnera même si l’app est fermée.</p>' : '')
+          : '<p class="tm-rem muted">💡 Pour que l’alarme sonne même app fermée : Réglages → 🔔 Rappels fiables.</p>'}
       </section>
       <section class="tm-sec">
         <h3>Étapes ${subs.length ? `<span class="muted">${sd}/${subs.length}</span>` : ''}</h3>

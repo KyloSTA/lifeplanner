@@ -21,6 +21,7 @@ import * as missions from './missions.js';
 import * as docs from './docs.js';
 import * as assoc from './assoc.js';
 import * as news from './news.js';
+import * as reminders from './reminders.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -141,10 +142,12 @@ window.addEventListener('hashchange', router);
    Événements Google
    ========================================================= */
 async function getEvents(from, to) {
+  // Les rappels créés par Life Planner (alarmes, habitudes) sont déjà dans l'app : on ne les montre pas en double
+  const own = (list) => list.filter((e) => !e.lp);
   try {
-    return { events: await gcal.listEvents(from, to), source: 'live' };
+    return { events: own(await gcal.listEvents(from, to)), source: 'live' };
   } catch (err) {
-    const events = await gcal.cachedEvents(from, to);
+    const events = own(await gcal.cachedEvents(from, to));
     if (err.message !== 'NOT_CONNECTED') console.warn(err);
     return { events, source: err.message === 'NOT_CONNECTED' ? 'off' : 'cache', error: err };
   }
@@ -2359,6 +2362,8 @@ async function renderSettings() {
         </div>
       </section>
 
+      <section class="card rem-card" id="rem-card"></section>
+
       <section class="card logo-card" id="logo-card"></section>
 
       <section class="card">
@@ -2421,6 +2426,44 @@ async function renderSettings() {
   };
   drawNav();
   $('#nav-reset').onclick = async () => { await db.del('settings', 'navOrder'); await applyNavOrder(); drawNav(); toast('Ordre du menu rétabli'); };
+
+  // Rappels fiables (Google Agenda)
+  const drawRem = async () => {
+    const el = $('#rem-card');
+    if (!el) return;
+    const on = await reminders.isOn();
+    const connected = gcal.isConnected();
+    const hasClient = !!(await db.get('settings', 'clientId'));
+    const st = reminders.getStatus();
+    const map = (await db.get('settings', 'remMap')) || {};
+    const n = Object.keys(map).length;
+    el.innerHTML = `<div class="card-head"><h2>🔔 Rappels fiables</h2><span class="chip ${on ? 'ok' : ''}">${on ? 'Activés' : 'Désactivés'}</span></div>
+      <p class="muted" style="margin-top:0">Une page web ne peut sonner que si elle est ouverte. Avec cette option, chaque <b>alarme de mission</b> et chaque <b>rappel d’habitude</b> est aussi créé dans ton <b>Google Agenda</b>, avec une notification à l’heure : ton cellulaire et ta montre sonnent même quand Life Planner est fermé.</p>
+      ${on ? `<p class="rem-state">${n} rappel${n > 1 ? 's' : ''} dans Google Agenda${st.last ? ` · vérifié ${U.fmtTime(new Date(st.last))}` : ''}${st.error ? ` · <span class="warn-text">⚠ ${esc(st.error)}</span>` : ''}</p>` : ''}
+      <div class="rem-actions">
+        ${!hasClient ? '<a class="btn" href="#/settings" id="rem-setup">Configure d’abord Google Agenda (plus bas)</a>'
+          : !connected ? '<button class="btn" data-gconnect>Connecter Google</button>' : ''}
+        ${on ? '<button class="btn" id="rem-now">↻ Vérifier maintenant</button><button class="btn danger" id="rem-off">Désactiver et retirer les rappels</button>'
+          : `<button class="btn primary" id="rem-on" ${connected ? '' : 'disabled'}>Activer les rappels fiables</button>`}
+      </div>
+      <p class="hint muted">Sur ton cellulaire, installe l’app <b>Google Agenda</b> et autorise ses notifications. Les rappels apparaissent dans ton agenda avec ⏰ (missions) ou 🔁 (habitudes) ; Life Planner les cache de son propre agenda pour éviter les doublons. Une alarme retirée ou une mission faite est retirée de Google Agenda.</p>`;
+    $('#rem-on', el)?.addEventListener('click', async (e) => {
+      e.target.disabled = true; e.target.textContent = 'Création des rappels…';
+      await reminders.setOn(true);
+      const s2 = reminders.getStatus();
+      toast(s2.error ? '⚠ ' + s2.error : `🔔 ${s2.count} rappel${s2.count > 1 ? 's' : ''} ajouté${s2.count > 1 ? 's' : ''} à Google Agenda`, s2.error ? 'err' : '');
+      drawRem();
+    });
+    $('#rem-now', el)?.addEventListener('click', async () => { await reminders.reconcile(true); drawRem(); toast('Rappels vérifiés'); });
+    $('#rem-off', el)?.addEventListener('click', async () => {
+      if (!(await confirmBox('Retirer de Google Agenda tous les rappels créés par Life Planner ? (Tes alarmes et habitudes restent dans l’app.)', 'Désactiver'))) return;
+      await reminders.setOn(false);
+      toast('Rappels retirés de Google Agenda');
+      drawRem();
+    });
+  };
+  drawRem();
+  addEventListener('lp-google', drawRem, { once: true });
 
   // Logo et nom de l'app : ce qui te représente
   const drawLogo = async () => {
@@ -2724,6 +2767,8 @@ game.init().catch(console.error).finally(() => {
     if (route === 'today') refreshToday();
     else if (['week', 'goals', 'note'].includes(route) && !$('#modal-root').children.length) router();
   });
+  // Rappels fiables : copie des alarmes et des habitudes dans Google Agenda (si activé dans Réglages)
+  reminders.start();
   // Rappels d'habitudes : après « Fait » depuis un rappel, on rafraîchit la vue concernée
   habits.start(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
