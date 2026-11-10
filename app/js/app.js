@@ -1616,18 +1616,21 @@ async function renderPage(id) {
   }, { imageUrl: images.url });
 
   // Images sur la page (comme OneNote) : coller, glisser ou 🖼 ; elles restent sous l'encre
+  const seenImgs = new Set((ink.images || []).map((m) => m.id)); // pour effacer en sortant les images retirées
   const setTool = (t) => {
     ed.setTool(t);
     $$('[data-tool]').forEach((x) => x.classList.toggle('on', x.dataset.tool === t));
     drawColors();
   };
-  const addImages = async (list) => {
+  const addImages = async (list, at = null) => {
     if (!list.length) return;
     try {
       for (const f of list) {
         const fid = await images.save(f);
+        seenImgs.add(fid);
         const rec = await db.get('files', fid);
-        ed.addImage(fid, rec?.w, rec?.h);
+        ed.addImage(fid, rec?.w, rec?.h, at);
+        if (at) at = [at[0] + 30, at[1] + 30]; // plusieurs images : légèrement décalées
       }
       setTool('select');
       toast('🖼 Image ajoutée : glisse-la pour la placer, tire le coin pour la redimensionner, puis reprends le stylo');
@@ -1643,7 +1646,58 @@ async function renderPage(id) {
   sc.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
   sc.addEventListener('drop', (e) => { const list = images.imageFiles(e.dataTransfer); if (list.length) { e.preventDefault(); addImages(list); } });
   const pickImg = $('#ink-img input');
-  pickImg.onchange = () => { addImages([...pickImg.files]); pickImg.value = ''; };
+  let pickAt = null; // « Ajouter une image… » du clic droit : l'image va à l'endroit cliqué
+  pickImg.onchange = () => { addImages([...pickImg.files], pickAt); pickAt = null; pickImg.value = ''; };
+
+  // Clic droit (souris) : menu Coller / Ajouter une image / Retirer. Le bouton du stylet garde la gomme.
+  const closeCtx = () => { $('#ink-ctx')?.remove(); removeEventListener('pointerdown', ctxOutside, true); removeEventListener('keydown', ctxKey); };
+  const ctxOutside = (ev) => { if (!ev.target.closest('#ink-ctx')) closeCtx(); };
+  const ctxKey = (ev) => { if (ev.key === 'Escape') closeCtx(); };
+  const pasteFromClipboard = async (at) => {
+    try {
+      if (!navigator.clipboard?.read) throw new Error('unsupported');
+      const blobs = [];
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith('image/'));
+        if (type) blobs.push(await item.getType(type));
+      }
+      if (!blobs.length) { toast('Le presse-papiers ne contient pas d’image (copie une image ou fais une capture avec Win + Maj + S)'); return; }
+      await addImages(blobs, at);
+    } catch (err) {
+      toast(err.message === 'unsupported' ? 'Ton navigateur ne permet pas de lire le presse-papiers : utilise Ctrl + V' : 'Accès au presse-papiers refusé : autorise-le quand Edge le demande, ou utilise Ctrl + V', 'err');
+    }
+  };
+  ed.page.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if ((e.pointerType || ed.lastPointer) !== 'mouse') return;
+    closeCtx();
+    const at = ed.pos(e);
+    const hit = ed.imageAt(...at);
+    const menu = document.createElement('div');
+    menu.id = 'ink-ctx';
+    menu.className = 'ctx-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = `
+      <button role="menuitem" data-act="paste">📋 Coller <kbd>Ctrl+V</kbd></button>
+      <button role="menuitem" data-act="pick">🖼 Ajouter une image…</button>
+      ${hit ? '<hr><button role="menuitem" data-act="select">↔ Déplacer / redimensionner</button><button role="menuitem" data-act="del" class="danger">🗑 Retirer l’image</button>' : ''}
+      <hr><button role="menuitem" data-act="undo" ${ed.undoStack.length ? '' : 'disabled'}>↶ Annuler <kbd>Ctrl+Z</kbd></button>`;
+    document.body.appendChild(menu);
+    menu.style.left = Math.min(e.clientX, innerWidth - menu.offsetWidth - 8) + 'px';
+    menu.style.top = Math.min(e.clientY, innerHeight - menu.offsetHeight - 8) + 'px';
+    menu.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => {
+      closeCtx();
+      const act = b.dataset.act;
+      if (act === 'paste') pasteFromClipboard(at);
+      else if (act === 'pick') { pickAt = at; pickImg.click(); }
+      else if (act === 'select') { setTool('select'); ed.select(hit); }
+      else if (act === 'del') { ed.select(hit); ed.deleteSelected(); }
+      else if (act === 'undo') ed.undo();
+    }));
+    menu.querySelector('button')?.focus();
+    addEventListener('pointerdown', ctxOutside, true);
+    addEventListener('keydown', ctxKey);
+  });
 
   const syncUndo = () => {
     $('#undo').disabled = !ed.undoStack.length;
@@ -1696,10 +1750,12 @@ async function renderPage(id) {
   cleanup = async () => {
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('paste', onPaste);
+    closeCtx();
     document.removeEventListener('visibilitychange', onHide);
     window.removeEventListener('pagehide', onHide);
     save.flush();
     await saving;
+    images.removeUnused([...seenImgs].filter((fid) => !ed.imgs.some((m) => m.id === fid))).catch(() => {});
     ed.destroy();
   };
 }

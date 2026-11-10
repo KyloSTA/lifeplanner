@@ -262,6 +262,9 @@ Cela fonctionne partout : sur la page Aujourd'hui, dans la Semaine et dans le wi
   touche **🖼 Image**. Elle se place sous l'encre : tu peux écrire et surligner par-dessus. Avec l'outil
   **Sélection** (flèche), glisse l'image pour la déplacer, tire le coin pour la redimensionner,
   × ou Suppr pour la retirer. Ctrl+Z annule aussi ces changements.
+- **Clic droit** (souris) sur la page : **📋 Coller** (l'image va à l'endroit cliqué), **🖼 Ajouter une image…**,
+  et sur une image : déplacer/redimensionner ou retirer. La 1re fois, Edge demande l'accès au presse-papiers.
+  Le bouton latéral du stylet reste la gomme.
 - Enregistrement automatique.
 
 ## Connecter Google Agenda (une seule fois, environ 5 min)
