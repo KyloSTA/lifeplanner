@@ -879,3 +879,9 @@ body.ink-mode #focus-timer { bottom: 12px; right: 12px; }
   .tp-tools { grid-column: 1 / -1; justify-content: flex-end; }
   .wk-day { grid-template-columns: 80px 1fr; }
 }
+
+/* Agenda d'Aujourd'hui : Aujourd'hui / Demain */
+.seg.seg-sm button { height: 30px; min-width: 0; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 600; }
+.ag-day { margin: -4px 0 8px; font-size: 13px; }
+.ag-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ag-foot .btn { margin: 0; }
