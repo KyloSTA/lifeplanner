@@ -1343,3 +1343,11 @@ a.assoc-chip { padding: 4px 11px; }
 .nw-mini-row:last-child { border-bottom: 0; }
 .nw-mini-row .nw-mini { flex: 1; min-width: 0; border-bottom: 0; }
 .nw-mini-row .nw-save { flex: none; padding: 4px 9px; margin: 0; }
+/* Aujourd'hui : humeur et intention dans la carte Agenda */
+.ag-journal { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: grid; gap: 10px; }
+.ag-j-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ag-j-head h3 { font-size: 14px; margin: 0; }
+.ag-j-head a { font-size: 13px; }
+.ag-journal .moods { display: flex; gap: 6px; flex-wrap: wrap; }
+.ag-intent { width: 100%; min-height: 64px; border-color: transparent; background: var(--surface-2); }.ag-journal .moods { flex-wrap: nowrap; }
+.ag-journal .mood { flex: 1 1 0; min-width: 0; }

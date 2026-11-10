@@ -290,14 +290,13 @@ async function renderToday() {
       <div class="today-cols">
         <div class="today-col col-main">
           <section class="card t-tasks" id="c-tasks"></section>
-          <section class="card t-agenda" id="c-agenda"><div class="skeleton"></div></section>
+          <section class="card t-agenda"><div id="c-agenda"><div class="skeleton"></div></div><div class="ag-journal" id="c-journal"></div></section>
           <section class="card t-goals" id="c-goals"></section>
         </div>
         <div class="today-col col-side">
           <section class="card t-habits" id="c-habits"></section>
           <section class="card t-workout" id="c-workout"></section>
           <section class="card t-rbq" id="c-rbq" hidden></section>
-          <section class="card t-journal" id="c-journal"></section>
           <section class="card t-news" id="c-news"></section>
           <section class="card t-ink" id="c-ink"></section>
           <section class="card quote-card t-quote" id="c-quote"></section>
@@ -333,9 +332,10 @@ async function renderToday() {
   const journal = async () => {
     const e = (await db.get('journal', today)) || { date: today };
     const el = $('#c-journal');
-    el.innerHTML = `<div class="card-head"><h2>🙂 Humeur et intention</h2><a href="#/journal/${today}">Journal →</a></div>
-      <div class="moods" style="margin-bottom:14px">${MOODS.map((m) => `<button class="mood ${e.mood === m.v ? 'on' : ''}" data-mood="${m.v}" title="${m.l}">${m.e}</button>`).join('')}</div>
-      <div class="field"><h3>Intention du jour</h3><textarea data-f="intention" placeholder="Qu’est-ce qui rendrait cette journée réussie ?">${esc(e.intention || '')}</textarea></div>`;
+    // Dans la carte Agenda : humeur et intention du jour (le journal complet est dans le Planificateur)
+    el.innerHTML = `<div class="ag-j-head"><h3>🙂 Humeur et intention du jour</h3><a href="#/journal/${today}">Journal →</a></div>
+      <div class="moods">${MOODS.map((m) => `<button class="mood ${e.mood === m.v ? 'on' : ''}" data-mood="${m.v}" title="${m.l}">${m.e}</button>`).join('')}</div>
+      <textarea data-f="intention" class="ag-intent" aria-label="Intention du jour" placeholder="Intention du jour : qu’est-ce qui rendrait cette journée réussie ?">${esc(e.intention || '')}</textarea>`;
     const save = U.debounce(async () => { e.updatedAt = Date.now(); await db.put('journal', e); game.checkJournal(e); }, 500);
     $$('[data-mood]', el).forEach((b) => (b.onclick = () => {
       e.mood = Number(b.dataset.mood);
