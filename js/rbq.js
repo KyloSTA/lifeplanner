@@ -10,6 +10,8 @@ import { db } from './db.js';
 import * as U from './util.js';
 import * as game from './game.js';
 import { renderBody } from './brain.js';
+import * as brain from './brain.js';
+import * as images from './images.js';
 import { openWindow } from './launcher.js';
 
 const { esc, iso } = U;
@@ -159,7 +161,7 @@ export async function renderPage(ctx, moduleId) {
       return `<a class="card rbq-mod st-${m.status}" href="#/rbq/${m.id}">
         <div class="rbq-mod-head"><h3>${esc(m.title)}</h3><span class="chip">${ST[m.status]?.i || ''} ${ST[m.status]?.l || ''}</span></div>
         ${m.desc ? `<p class="muted rbq-desc">${esc(m.desc)}</p>` : ''}
-        <p class="rbq-meta"><span>📝 ${(m.notes || '').trim() ? 'notes' : 'pas de notes'}</span><span>⭐ ${(m.keys || []).length} point${(m.keys || []).length > 1 ? 's' : ''} clé${(m.keys || []).length > 1 ? 's' : ''}</span><span>🃏 ${mc.length} carte${mc.length > 1 ? 's' : ''}${md ? ` · <b>${md} à revoir</b>` : ''}</span></p>
+        <p class="rbq-meta"><span>📝 ${(m.notes || '').trim() ? 'notes' : 'pas de notes'}</span><span>⭐ ${(m.keys || []).length} point${(m.keys || []).length > 1 ? 's' : ''} clé${(m.keys || []).length > 1 ? 's' : ''}</span><span>🃏 ${mc.length} carte${mc.length > 1 ? 's' : ''}${md ? ` · <b>${md} à revoir</b>` : ''}</span>${(m.noteIds || []).length ? `<span>🧠 ${m.noteIds.length} du Cerveau</span>` : ''}</p>
       </a>`;
     }).join('')}
       <button class="card rbq-add" id="rbq-addmod">+ Ajouter un module</button>
@@ -204,6 +206,41 @@ export async function renderPage(ctx, moduleId) {
   });
 }
 
+/** Choisir des notes du Cerveau (recherche, plusieurs à la fois). onPick(ids). */
+async function pickNotes(ctx, already, onPick) {
+  const all = (await brain.allNotes()).filter((n) => !n.archived && !already.includes(n.id))
+    .sort((a, b) => (b.inbox - a.inbox) || (b.updatedAt || 0) - (a.updatedAt || 0));
+  const chosen = new Set();
+  ctx.modal(`<h2>Ajouter depuis le Cerveau</h2>
+    <input class="pick-search" placeholder="🔍 Chercher une note…" autocomplete="off" autofocus>
+    <div class="pick-list"></div>
+    <div class="modal-actions"><button class="btn" data-close>Annuler</button><button class="btn primary" id="pk-ok" disabled>Ajouter</button></div>`, (m, close) => {
+    m.classList.add('pick-modal');
+    const list = m.querySelector('.pick-list'), ok = m.querySelector('#pk-ok');
+    const draw = () => {
+      const q = brain.norm(m.querySelector('.pick-search').value);
+      const rows = all.filter((n) => !q || brain.norm(`${n.title} ${n.body}`).includes(q)).slice(0, 60);
+      list.innerHTML = rows.map((n) => {
+        const im = images.refsIn(n.body);
+        return `<label class="pick-row ${chosen.has(n.id) ? 'on' : ''}">
+          <input type="checkbox" value="${n.id}" ${chosen.has(n.id) ? 'checked' : ''}>
+          ${im.length ? `<img data-img="${im[0]}" alt="">` : `<span class="pick-ico">${brain.typeOf(n.type).icon}</span>`}
+          <span class="pick-txt"><b>${esc(n.title || 'Sans titre')}</b><small class="muted">${n.inbox ? '📥 À classer · ' : ''}${esc(brain.excerpt(n.body, 80))}</small></span>
+        </label>`;
+      }).join('') || `<p class="empty-sm">${all.length ? 'Aucune note ne correspond.' : 'Toutes tes notes sont déjà dans ce module (ou ton Cerveau est vide).'}</p>`;
+      list.querySelectorAll('input').forEach((cb) => (cb.onchange = () => {
+        cb.checked ? chosen.add(cb.value) : chosen.delete(cb.value);
+        cb.closest('.pick-row').classList.toggle('on', cb.checked);
+        ok.disabled = !chosen.size;
+        ok.textContent = chosen.size ? `Ajouter (${chosen.size})` : 'Ajouter';
+      }));
+    };
+    m.querySelector('.pick-search').oninput = draw;
+    ok.onclick = () => { close(); onPick([...chosen]); };
+    draw();
+  });
+}
+
 /* =========================================================
    Page d'un module : #/rbq/<id>
    ========================================================= */
@@ -224,12 +261,15 @@ async function renderModule(ctx, id) {
     </header>
     <div class="filters rbq-status">${STATUS.map(([v, l, i]) => `<button class="chip-btn ${m.status === v ? 'on' : ''}" data-st="${v}">${i} ${l}</button>`).join('')}</div>
     <div class="rbq-cols">
+      <div class="rbq-main">
       <section class="card">
         <div class="card-head"><h2>📝 Notes de cours</h2>
           <div class="seg"><button class="${reading ? '' : 'on'}" data-mode="write">✎ Écrire</button><button class="${reading ? 'on' : ''}" data-mode="read">👁 Lire</button></div></div>
         <div id="md-notes"></div>
         <p class="hint muted">Astuce : « # Titre », « - liste », « > citation », **gras**. Les liens web sont cliquables en mode Lire.</p>
       </section>
+      <section class="card rbq-brain" id="md-brain"></section>
+      </div>
       <div class="rbq-side">
         <section class="card">
           <div class="card-head"><h2>⭐ Points clés</h2><span class="muted">${(m.keys || []).length}</span></div>
@@ -304,6 +344,38 @@ async function renderModule(ctx, id) {
   };
   view.querySelectorAll('[data-cdel]').forEach((b) => (b.onclick = async () => { await saveNotes.flush(); await db.del('study', b.dataset.cdel); redraw(); }));
   view.querySelector('#md-practice').onclick = async () => { await saveNotes.flush(); review(ctx, cards, m.title, redraw); };
+
+  // Éléments du Cerveau (idées, photos, captures…) rattachés au module
+  const drawBrain = async () => {
+    const el = view.querySelector('#md-brain');
+    if (!el) return;
+    const cur = await db.get('study', id);
+    const all = await brain.allNotes();
+    const linked = (cur.noteIds || []).map((nid) => all.find((n) => n.id === nid)).filter(Boolean);
+    el.innerHTML = `<div class="card-head"><h2>🧠 Du Cerveau</h2><button class="btn" id="md-addnote">+ Ajouter depuis le Cerveau</button></div>
+      ${linked.length ? `<div class="rbq-notes-grid">${linked.map((n) => {
+        const im = images.refsIn(n.body);
+        return `<div class="rbq-note">
+          <a href="#/note/${n.id}" class="rbq-note-link">
+            ${im.length ? `<img data-img="${im[0]}" alt="" loading="lazy">` : ''}
+            <b>${brain.typeOf(n.type).icon} ${esc(n.title || 'Sans titre')}</b>
+            <small class="muted">${esc(brain.excerpt(n.body, 110))}</small>
+          </a>
+          <button class="btn sm" data-unlink="${n.id}" aria-label="Retirer du module" title="Retirer du module (la note reste dans le Cerveau)">×</button>
+        </div>`;
+      }).join('')}</div>`
+        : '<p class="empty-sm">Rattache ici ce que tu as capturé dans le Cerveau pour ce module : idées, photos du cours, captures d’écran, ressources.</p>'}`;
+    el.querySelector('#md-addnote').onclick = () => pickNotes(ctx, cur.noteIds || [], async (ids) => {
+      await edit((x) => { x.noteIds = [...new Set([...(x.noteIds || []), ...ids])]; });
+      toast(`🧠 ${ids.length} élément${ids.length > 1 ? 's' : ''} ajouté${ids.length > 1 ? 's' : ''} au module`);
+      drawBrain();
+    });
+    el.querySelectorAll('[data-unlink]').forEach((b) => (b.onclick = async () => {
+      await edit((x) => { x.noteIds = (x.noteIds || []).filter((nid) => nid !== b.dataset.unlink); });
+      drawBrain();
+    }));
+  };
+  await drawBrain();
   view.querySelector('#md-del').onclick = async () => {
     if (!(await confirmBox(`Supprimer le module « ${m.title} », ses notes et ses ${cards.length} carte(s) ?`))) return;
     for (const c of cards) await db.del('study', c.id);

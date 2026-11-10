@@ -441,6 +441,21 @@ async function renderProgress(ctx, body) {
     </section>`;
 }
 
+/** État du jour pour le résumé : { icon, label, done }. */
+export async function todayStatus() {
+  await ensureSeed();
+  const { tpls, logs } = await load();
+  const plan = await getPlan();
+  const today = iso(new Date());
+  const active = logs.find((l) => !l.done);
+  const doneToday = logs.find((l) => l.done && l.date === today);
+  const planned = tpls.find((t) => t.id === plan.days[new Date().getDay()]);
+  if (active) return { icon: '⏱', label: `${active.name} en cours`, done: false };
+  if (doneToday) return { icon: '✅', label: `${doneToday.name} fait`, done: true };
+  if (planned) return { icon: planned.emoji || '💪', label: planned.name, done: false };
+  return { icon: '😌', label: 'Jour de repos', done: false };
+}
+
 /** Carte « Workout du jour » pour la page Aujourd'hui. */
 export async function todayCard(el) {
   if (!el) return;

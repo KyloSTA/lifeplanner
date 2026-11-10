@@ -28,9 +28,16 @@ function segDist(px, py, a, b) {
 }
 
 export class InkEditor {
-  constructor(scroller, data, onChange) {
+  /** opts.imageUrl(id) -> Promise<data URL> : charge une image collée (store « files »). */
+  constructor(scroller, data, onChange, opts = {}) {
     this.sc = scroller;
     this.strokes = data.strokes || [];
+    // Images collées (comme OneNote) : { id, x, y, w, h } en unités de page, dessinées sous l'encre
+    this.imgs = (data.images || []).map((o) => ({ ...o }));
+    this.imgEls = new Map();
+    this.imageUrl = opts.imageUrl || (async () => null);
+    this.sel = null; // image sélectionnée (outil « Sélection »)
+    this.drag = null;
     this.H = data.height || 1414;
     this.bg = data.bg || 'lines';
     this.onChange = onChange || (() => {});
@@ -74,7 +81,130 @@ export class InkEditor {
     window.addEventListener('pointercancel', this._endPan);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(this.sc);
+
+    // Cadre de sélection d'une image : glisser pour déplacer, coin pour redimensionner, × pour retirer
+    this.box = document.createElement('div');
+    this.box.className = 'ink-sel';
+    this.box.hidden = true;
+    this.box.innerHTML = '<button type="button" class="ink-sel-del" aria-label="Retirer l’image" title="Retirer l’image (Suppr)">×</button><span class="ink-sel-h" aria-hidden="true"></span>';
+    this.page.appendChild(this.box);
+    this.box.addEventListener('pointerdown', (e) => this.boxDown(e));
+    this.box.addEventListener('pointermove', (e) => this.boxMove(e));
+    this.box.addEventListener('pointerup', (e) => this.boxUp(e));
+    this.box.addEventListener('pointercancel', (e) => this.boxUp(e));
+    this.box.querySelector('.ink-sel-del').addEventListener('click', (e) => { e.stopPropagation(); this.deleteSelected(); });
+
     this.resize();
+    this.loadImages();
+  }
+
+  /* ---------- Images ---------- */
+  async loadImages() {
+    for (const im of this.imgs) {
+      if (this.imgEls.has(im.id)) continue;
+      const el = new Image();
+      this.imgEls.set(im.id, el);
+      const src = await this.imageUrl(im.id);
+      if (!src) continue;
+      el.onload = () => this.rebuild();
+      el.src = src;
+    }
+  }
+
+  setTool(t) {
+    this.tool = t;
+    if (t !== 'select') this.select(null);
+    this.page.classList.toggle('selecting', t === 'select');
+  }
+
+  /** Ajoute une image (dimensions en pixels) au centre de la zone visible. */
+  addImage(id, pw, ph) {
+    const w = Math.min(PAGE_W - 160, pw || 600);
+    const h = Math.round((w * (ph || 400)) / (pw || 600));
+    const cy = (this.sc.scrollTop + this.sc.clientHeight / 2) / this.scale;
+    const y = Math.max(20, Math.round(cy - h / 2));
+    const img = { id, x: Math.round((PAGE_W - w) / 2), y, w: Math.round(w), h };
+    if (y + h + 60 > this.H) { this.H = Math.min(MAX_H, y + h + 120); this.resize(true); }
+    this.imgs.push(img);
+    this.loadImages();
+    this.rebuild();
+    this.push({ type: 'img-add', img });
+    this.select(img);
+    return img;
+  }
+
+  imageAt(x, y) {
+    for (let i = this.imgs.length - 1; i >= 0; i--) {
+      const m = this.imgs[i];
+      if (x >= m.x && x <= m.x + m.w && y >= m.y && y <= m.y + m.h) return m;
+    }
+    return null;
+  }
+
+  select(img) {
+    this.sel = img;
+    this.drawSel();
+  }
+
+  drawSel() {
+    const m = this.sel;
+    this.box.hidden = !m;
+    if (!m) return;
+    const k = this.scale;
+    Object.assign(this.box.style, { left: m.x * k + 'px', top: m.y * k + 'px', width: m.w * k + 'px', height: m.h * k + 'px' });
+  }
+
+  deleteSelected() {
+    const m = this.sel;
+    if (!m) return false;
+    const i = this.imgs.indexOf(m);
+    if (i < 0) return false;
+    this.imgs.splice(i, 1);
+    this.select(null);
+    this.rebuild();
+    this.push({ type: 'img-del', img: m, i });
+    return true;
+  }
+
+  boxDown(e) {
+    if (!this.sel || e.target.closest('.ink-sel-del')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try { this.box.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    this.startDrag(e, !!e.target.closest('.ink-sel-h'));
+  }
+
+  startDrag(e, resize) {
+    const m = this.sel;
+    this.drag = { id: e.pointerId, resize, x: e.clientX, y: e.clientY, from: { x: m.x, y: m.y, w: m.w, h: m.h } };
+  }
+
+  boxMove(e) {
+    const d = this.drag;
+    if (!d || e.pointerId !== d.id) return;
+    const m = this.sel, k = this.scale;
+    const dx = (e.clientX - d.x) / k, dy = (e.clientY - d.y) / k;
+    if (d.resize) {
+      const ratio = d.from.h / d.from.w;
+      m.w = Math.round(Math.max(60, Math.min(PAGE_W - m.x, d.from.w + dx)));
+      m.h = Math.round(m.w * ratio);
+    } else {
+      m.x = Math.round(Math.max(-m.w + 40, Math.min(PAGE_W - 40, d.from.x + dx)));
+      m.y = Math.round(Math.max(0, Math.min(this.H - 40, d.from.y + dy)));
+    }
+    this.drawSel();
+    if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; this.rebuild(); });
+  }
+
+  boxUp(e) {
+    const d = this.drag;
+    if (!d || e.pointerId !== d.id) return;
+    this.drag = null;
+    const m = this.sel, f = d.from;
+    if (m.x !== f.x || m.y !== f.y || m.w !== f.w || m.h !== f.h) {
+      if (m.y + m.h + 60 > this.H && this.H < MAX_H) { this.H = Math.min(MAX_H, m.y + m.h + 120); this.resize(true); }
+      this.push({ type: 'img-edit', img: m, from: f, to: { x: m.x, y: m.y, w: m.w, h: m.h } });
+    }
   }
 
   destroy() {
@@ -142,6 +272,7 @@ export class InkEditor {
     this.canvas.style.width = w + 'px';
     this.canvas.style.height = h + 'px';
     this.rebuild();
+    this.drawSel?.();
   }
 
   get k() { return this.scale * this.dpr; }
@@ -153,6 +284,11 @@ export class InkEditor {
     c.fillRect(0, 0, cv.width, cv.height);
     c.setTransform(k, 0, 0, k, 0, 0);
     this.drawBg(c);
+    for (const m of this.imgs || []) {
+      const el = this.imgEls?.get(m.id);
+      if (el?.complete && el.naturalWidth) c.drawImage(el, m.x, m.y, m.w, m.h);
+      else { c.fillStyle = '#eef0f4'; c.fillRect(m.x, m.y, m.w, m.h); }
+    }
     for (const s of this.strokes) this.drawStroke(c, s);
   }
 
@@ -292,7 +428,8 @@ export class InkEditor {
       const hovering = now - this.lastPenHover < 600;
       const palm = Math.max(e.width || 0, e.height || 0) > 40;
       if (penBusy || (hovering && palm)) { e.preventDefault(); return; }
-      if (!this.fingerDraws) {
+      const onImage = this.tool === 'select' && this.imageAt(...this.pos(e));
+      if (!this.fingerDraws && !onImage) {
         e.preventDefault();
         this.startPan(e); // un nouveau doigt reprend le défilement (jamais bloqué par un ancien)
         return;
@@ -300,6 +437,13 @@ export class InkEditor {
     }
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (this.active || this.erasing) return;
+    if (this.tool === 'select') {
+      // Outil Sélection : toucher une image la sélectionne et la déplace ; ailleurs, on désélectionne
+      const hit = this.imageAt(...this.pos(e));
+      this.select(hit);
+      if (hit) { e.preventDefault(); this.capture(e); this.startDrag(e, false); }
+      return;
+    }
     e.preventDefault();
     this.capture(e);
     const [x, y] = this.pos(e);
@@ -327,6 +471,7 @@ export class InkEditor {
       this.movePan(e);
       return;
     }
+    if (this.drag && e.pointerId === this.drag.id) { this.boxMove(e); return; }
     const co = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
     const evs = co.length ? co : [e];
     if (this.erasing && e.pointerId === this.erasing.id) {
@@ -350,6 +495,7 @@ export class InkEditor {
   up(e) {
     if (e.pointerType === 'pen') this.lastPenUp = performance.now();
     if (this.pan && e.pointerId === this.pan.id) { this.endPan(); return; }
+    if (this.drag && e.pointerId === this.drag.id) { this.boxUp(e); return; }
     if (this.erasing && e.pointerId === this.erasing.id) {
       const removed = this.erasing.removed;
       this.erasing = null;
@@ -403,6 +549,16 @@ export class InkEditor {
       for (const it of [...op.items].reverse()) this.strokes.splice(it.i, 0, it.s);
     } else if (op.type === 'clear') {
       this.strokes = op.prev;
+      if (op.prevImgs) this.imgs = op.prevImgs;
+    } else if (op.type === 'img-add') {
+      const i = this.imgs.indexOf(op.img);
+      if (i > -1) this.imgs.splice(i, 1);
+      if (this.sel === op.img) this.select(null);
+    } else if (op.type === 'img-del') {
+      this.imgs.splice(op.i, 0, op.img);
+    } else if (op.type === 'img-edit') {
+      Object.assign(op.img, op.from);
+      this.drawSel();
     }
     this.redoStack.push(op);
     this.rebuild();
@@ -418,18 +574,29 @@ export class InkEditor {
         const i = this.strokes.indexOf(it.s);
         if (i > -1) this.strokes.splice(i, 1);
       }
-    } else if (op.type === 'clear') this.strokes = [];
+    } else if (op.type === 'clear') { this.strokes = []; if (op.prevImgs) { this.imgs = []; this.select(null); } }
+    else if (op.type === 'img-add') this.imgs.push(op.img);
+    else if (op.type === 'img-del') {
+      const i = this.imgs.indexOf(op.img);
+      if (i > -1) this.imgs.splice(i, 1);
+      if (this.sel === op.img) this.select(null);
+    } else if (op.type === 'img-edit') {
+      Object.assign(op.img, op.to);
+      this.drawSel();
+    }
     this.undoStack.push(op);
     this.rebuild();
     this.onChange();
   }
 
   clear() {
-    if (!this.strokes.length) return;
-    const prev = this.strokes;
+    if (!this.strokes.length && !this.imgs.length) return;
+    const prev = this.strokes, prevImgs = this.imgs;
     this.strokes = [];
+    this.imgs = [];
+    this.select(null);
     this.rebuild();
-    this.push({ type: 'clear', prev });
+    this.push({ type: 'clear', prev, prevImgs });
   }
 
   /* ---------- Page ---------- */

@@ -288,11 +288,14 @@ export async function renderPage(ctx) {
       <div class="hb-strip">${strip(h)}</div>
     </section>`;
   };
+  // ctx.embedded : affiché dans la page du héros (section « Habitudes ») plutôt que comme page à part
   view.innerHTML = `
-    <header class="page-head">
+    ${ctx.embedded
+      ? `<div class="hb-embed-head"><div><h2>🔁 Habitudes</h2><p class="muted">Chaque habitude complétée donne +${game.XP.habit} XP à ton héros.</p></div><button class="btn primary" id="hb-new">+ Nouvelle habitude</button></div>`
+      : `<header class="page-head">
       <div><p class="eyebrow">Suivi quotidien</p><h1>Habitudes</h1></div>
       <div class="head-actions"><button class="btn primary" id="hb-new">+ Nouvelle habitude</button></div>
-    </header>
+    </header>`}
     ${perm === 'default' ? `<div class="card hb-perm"><span>🔔 Autorise les notifications pour recevoir tes rappels d’habitudes, même quand Life Planner est en arrière-plan.</span><button class="btn primary" id="hb-perm">Autoriser</button></div>` : ''}
     ${perm === 'denied' ? `<p class="hint muted">🔕 Les notifications sont bloquées : les rappels s’affichent seulement dans l’app. Pour les activer, clique le cadenas à côté de l’adresse → Notifications → Autoriser.</p>` : ''}
     <section class="card hb-todaycard" id="hb-today"></section>
