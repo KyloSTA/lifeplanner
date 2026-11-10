@@ -283,6 +283,7 @@ function bindChips(el, day, redraw) {
 }
 
 /** Page « Habitudes ». ctx : { view, modal, toast, confirmBox } */
+let detailsOpen = false; // section « Détails » (page du héros) : fermée par défaut, reste ouverte si tu l'ouvres
 export async function renderPage(ctx) {
   const { view, toast } = ctx;
   const all = await list({ withArchived: true });
@@ -324,13 +325,17 @@ export async function renderPage(ctx) {
     ${perm === 'default' ? `<div class="card hb-perm"><span>🔔 Autorise les notifications pour recevoir tes rappels d’habitudes, même quand Life Planner est en arrière-plan.</span><button class="btn primary" id="hb-perm">Autoriser</button></div>` : ''}
     ${perm === 'denied' ? `<p class="hint muted">🔕 Les notifications sont bloquées : les rappels s’affichent seulement dans l’app. Pour les activer, clique le cadenas à côté de l’adresse → Notifications → Autoriser.</p>` : ''}
     <section class="card hb-todaycard" id="hb-today"></section>
-    <div class="hb-grid">${active.map(card).join('')}</div>
+    ${ctx.embedded && active.length
+      ? `<details class="hb-details" ${detailsOpen ? 'open' : ''}><summary><span>📊 Détails et réglages des habitudes</span><small class="muted">${active.length} habitude${active.length > 1 ? 's' : ''} · séries, 14 derniers jours, ✎ modifier</small></summary>
+          <div class="hb-grid">${active.map(card).join('')}</div></details>`
+      : `<div class="hb-grid">${active.map(card).join('')}</div>`}
     ${!active.length ? `<section class="card"><h2>Commence par une habitude</h2><p class="muted">Choisis une suggestion (tu pourras la modifier) ou crée la tienne.</p>
       <div class="filters">${SUGGESTIONS.map(([e, n], i) => `<button class="chip-btn" data-sugg="${i}">${e} ${esc(n)}</button>`).join('')}</div></section>` : ''}
     ${archived.length ? `<details class="hb-arch"><summary>🗄 Habitudes en pause (${archived.length})</summary><div class="hb-grid">${archived.map(card).join('')}</div></details>` : ''}
     <p class="hint muted">Touche une habitude pour la cocher. Les cases des 14 derniers jours se cochent aussi (pour rattraper un oubli). Les rappels sonnent quand Life Planner ou le widget est ouvert.</p>`;
 
   const redraw = () => renderPage(ctx);
+  view.querySelector('.hb-details')?.addEventListener('toggle', (e) => { detailsOpen = e.target.open; });
   const todayEl = view.querySelector('#hb-today');
   todayEl.innerHTML = `<div class="card-head"><h2>Aujourd’hui</h2><span class="muted">${due.filter((h) => doneOn(h, day)).length}/${due.length}</span></div>
     ${due.length ? `<div class="hb-list">${due.map((h) => chip(h, day)).join('')}</div>` : '<p class="empty-sm">Rien de prévu aujourd’hui.</p>'}`;

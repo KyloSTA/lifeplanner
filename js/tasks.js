@@ -10,10 +10,22 @@ const { esc } = U;
 
 /* ---------- Objectifs liés ---------- */
 let goalsCache = [];
-/** À appeler avant d'afficher des missions (pour le choix de l'objectif). */
+let projectsCache = []; // notes « 🚀 Projet » du Cerveau (une mission peut y être rattachée directement)
+/** À appeler avant d'afficher des missions (pour le choix de l'objectif et du projet). */
 export async function loadGoals() {
-  goalsCache = (await db.all('goals')).sort((a, b) => a.createdAt - b.createdAt);
+  goalsCache = (await db.all('goals')).sort((a, b) => (a.order ?? a.createdAt) - (b.order ?? b.createdAt));
+  projectsCache = (await db.all('notes')).filter((n) => n.type === 'projet').sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   return goalsCache;
+}
+
+/** Rattache une mission à un projet (null = aucun). */
+export async function setTaskProject(id, projectId) {
+  await editTask(id, (t) => { t.projectId = projectId || null; });
+}
+
+function projectOptions(current) {
+  return `<option value="">Aucun projet</option>` + projectsCache.filter((p) => !p.archived || p.id === current)
+    .map((p) => `<option value="${p.id}" ${p.id === current ? 'selected' : ''}>🚀 ${esc(p.title || 'Projet sans titre')}</option>`).join('');
 }
 const HORIZON_NAMES = { semaine: 'Cette semaine', mois: 'Ce mois-ci', annee: 'Cette année', vie: 'Long terme' };
 
@@ -37,8 +49,8 @@ export async function syncGoalProgress(goalId) {
   await game.syncGoal(g);
 }
 
-export async function addTask(title, date, goalId = null) {
-  const t = { id: U.uid(), title, date, goalId, done: false, createdAt: Date.now(), subtasks: [], notes: '' };
+export async function addTask(title, date, goalId = null, projectId = null) {
+  const t = { id: U.uid(), title, date, goalId, projectId, done: false, createdAt: Date.now(), subtasks: [], notes: '' };
   await db.put('tasks', t);
   if (goalId) await syncGoalProgress(goalId);
   return t;
@@ -136,6 +148,7 @@ export function taskHTML(t, ref, opts = {}) {
     focusChip,
     alarmChip,
     goal && !opts.hideGoal ? `<span class="chip goal-chip" title="Objectif : ${esc(goal.title)}">🎯 ${esc(goal.title)}</span>` : '',
+    (() => { const p = t.projectId && !opts.hideProject && projectsCache.find((x) => x.id === t.projectId); return p ? `<span class="chip goal-chip" title="Projet : ${esc(p.title)}">🚀 ${esc(p.title || 'Projet')}</span>` : ''; })(),
     dateChip,
     subs.length ? `<span class="chip ${sd === subs.length ? 'ok' : ''}" title="Étapes faites">✓ ${sd}/${subs.length}</span>` : '',
     t.notes ? '<span class="chip" title="Contient des notes">✎</span>' : '',
@@ -200,7 +213,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
     const subs = t.subtasks || [];
     const sd = subs.filter((s) => s.done).length;
     // Notes du Cerveau associées à cette mission (« 🧷 Associé à » dans une note)
-    const linked = (await db.all('notes')).filter((x) => !x.archived && (x.rel?.tasks || []).includes(t.id));
+    const linked = (await db.all('notes')).filter((x) => (x.rel?.tasks || []).includes(t.id)); // y compris la note archivée devenue mission
     box.innerHTML = `
       <div class="tm-head">
         <input type="checkbox" class="tm-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie" title="Mission accomplie">
@@ -210,6 +223,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
       <div class="tm-meta">
         <label><span>📅 Date</span><input type="date" class="tm-date" value="${t.date || ''}"></label>
         <label><span>🎯 Objectif</span><select class="tm-goal">${goalOptions(t.goalId)}</select></label>
+        <label><span>🚀 Projet</span><select class="tm-proj">${projectOptions(t.projectId)}</select></label>
       </div>
       <section class="tm-sec tm-focus">
         <h3>⏱ Minuteur de focus ${t.focusMin ? `<span class="muted">${t.pomodoros ? `🍅 ${t.pomodoros} · ` : ''}${t.focusMin} min de focus</span>` : ''}</h3>
@@ -262,6 +276,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
     box.querySelector('.tm-cb').onchange = async (e) => { await flush(); await setTaskDone(id, e.target.checked); changed(); draw(); };
     box.querySelector('.tm-date').onchange = async (e) => { await editTask(id, (x) => { x.date = e.target.value || null; }); changed(); };
     box.querySelector('.tm-goal').onchange = async (e) => { await setTaskGoal(id, e.target.value || null); changed(); };
+    box.querySelector('.tm-proj').onchange = async (e) => { await setTaskProject(id, e.target.value || null); changed(); };
 
     // Minuteur de focus : démarre et ferme la fenêtre
     const startFocus = async (w, b) => {
