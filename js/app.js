@@ -117,6 +117,7 @@ async function router() {
   const navName = NAV_PARENT[name] || (routes[name] ? name : 'today');
   $$('#rail a').forEach((a) => a.classList.toggle('active', a.dataset.route === navName));
   $('#brand-launch')?.classList.toggle('active', name === 'launcher');
+  $('#brand-logo')?.classList.toggle('active', navName === 'today');
   // Sur cellulaire, « Plus » s'allume quand la page ouverte est dans son menu
   $('#rail-more')?.classList.toggle('active', !!$('#rail a.active.nav-extra, #rail a.active[data-route="settings"], #rail a.active[data-route="hero"], #rail .brand-ico.active'));
   document.body.classList.toggle('ink-mode', name === 'page');
@@ -917,16 +918,19 @@ async function renderBrain() {
     <header class="page-head"><div><p class="eyebrow">Second cerveau</p><h1>Cerveau</h1></div>
       <div class="head-actions"><button class="btn primary" id="new-note">+ Nouvelle note</button></div></header>
     <div class="brain-top">
-      <a class="card hero-card evo-card" id="c-evo" href="#/hero"></a>
-      <section class="card"><div class="card-head"><h2>Capture rapide</h2></div>${captureForm('cap')}</section>
-      <section class="card" id="c-redisc"></section>
+      <section class="card capture-card brain-cap"><div class="card-head"><h2>💡 Capture rapide</h2><span class="muted cap-stats">${inbox ? `📥 ${inbox} à classer` : ''}</span></div>${captureForm('cap')}</section>
+      <div class="brain-aside">
+        <a class="card hero-card evo-card" id="c-evo" href="#/hero"></a>
+        <section class="card" id="c-redisc"></section>
+      </div>
     </div>
     <div class="brain-bar">
-      <input type="search" id="bq" placeholder="🔍 Rechercher dans tes notes…" value="${esc(brainState.q)}" autocomplete="off">
+      <label class="brain-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="search" id="bq" placeholder="Rechercher dans tes notes…" value="${esc(brainState.q)}" autocomplete="off" aria-label="Rechercher dans tes notes"></label>
       ${brainState.arch ? `<div class="arch-banner">🗄 <b>Archives</b> · ${archivedCount} note${archivedCount > 1 ? 's' : ''} archivée${archivedCount > 1 ? 's' : ''}, rangée${archivedCount > 1 ? 's' : ''} par catégorie d’origine. <button class="btn" id="arch-exit">← Retour aux notes</button></div>` : ''}
-      <div class="filters">${filters.map(([id, l, c]) => `<button class="chip-btn ${brainState.f === id ? 'on' : ''}" data-f="${id}">${l} <small>${c}</small></button>`).join('')}
+      <div class="brain-filters">${filters.map(([id, l, c]) => `<button class="chip-btn ${brainState.f === id ? 'on' : ''}" data-f="${id}">${l} <small>${c}</small></button>`).join('')}
         ${archivedCount && !brainState.arch ? `<button class="chip-btn arch-chip" id="arch-open" title="Notes archivées">🗄 Archives <small>${archivedCount}</small></button>` : ''}</div>
-      ${topTags.length ? `<div class="filters">${topTags.map(([t, c]) => `<button class="chip-btn tagf ${brainState.tag === t ? 'on' : ''}" data-tag="${esc(t)}">#${esc(t)} <small>${c}</small></button>`).join('')}</div>` : ''}
+      ${topTags.length ? `<div class="brain-tags"><span>Étiquettes</span>${topTags.map(([t, c]) => `<button class="chip-btn tagf ${brainState.tag === t ? 'on' : ''}" data-tag="${esc(t)}">#${esc(t)} <small>${c}</small></button>`).join('')}</div>` : ''}
     </div>
     <div class="note-grid" id="ng"></div>`;
 
@@ -977,8 +981,8 @@ async function renderBrain() {
     const n = brain.rediscover(await brain.allNotes(), skipRediscover);
     el.innerHTML = `<div class="card-head"><h2>🔁 Redécouvrir</h2>${n ? '<button class="btn sm" id="rd-next" title="Une autre note" aria-label="Une autre note">↻</button>' : ''}</div>
       ${n ? `<a class="redisc" href="#/note/${n.id}"><b>${brain.typeOf(n.type).icon} ${esc(n.title || 'Sans titre')}</b>
-          <p>${esc(brain.excerpt(n.body, 200)) || '<span class="muted">Note vide</span>'}</p></a>
-        <button class="btn primary" id="rd-ok">✓ Je l’ai relue (+${game.XP.review} XP)</button>`
+          <p>${esc(brain.excerpt(n.body, 160)) || '<span class="muted">Note vide</span>'}</p></a>
+        <div class="rd-actions"><button class="btn primary" id="rd-ok">✓ Je l’ai relue (+${game.XP.review} XP)</button></div>`
       : '<p class="empty-sm">Tes notes de plus de 2 jours reviendront ici, une à la fois. Relire régulièrement, c’est ce qui transforme l’information en savoir.</p>'}`;
     if (!n) return;
     $('#rd-next').onclick = () => { skipRediscover.push(n.id); redisc(); };
