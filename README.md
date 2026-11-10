@@ -176,6 +176,21 @@ Ouvre une mission (**›**) et, dans **⏱ Minuteur de focus**, choisis **🍅 2
 de 15 min toutes les 4 sessions). À la fin de la pause, touche ▶ pour relancer un focus.
 Le temps de focus et le nombre de 🍅 sont enregistrés sur la mission.
 
+## ⚔️ Aventure (RPG)
+Un petit jeu de rôle nourri par ta vraie vie, dans le royaume d'Ordrelune envahi par le Brouillard de la
+Procrastination (5 chapitres, puis une Arène sans fin).
+- **Statistiques** calculées à partir de tes XP : 💪 Force (entraînements, habitudes sportives), ❤️ Endurance
+  (habitudes, séries), 🎯 Discipline (missions, étapes, focus, objectifs), 🧠 Intelligence (cours RBQ, notes,
+  liens, pages manuscrites), 🔮 Sagesse (journal, humeur, révisions).
+- **Énergie ⚡** : +1 par tranche de 10 XP gagnés (10 pour commencer). Un combat coûte ⚡1, un boss ⚡3.
+- **Combats** : chaque ennemi teste une statistique ; tes chances s'affichent avant de te lancer. Victoire = or 🪙
+  et parfois de l'équipement ; les boss donnent toujours un objet rare ou mieux.
+- **Équipement** : 5 emplacements (arme, tête, armure, bijou, compagnon), 4 raretés, bonus de statistiques.
+  Vends les objets en trop ; le **Marchand** propose 4 objets différents chaque jour.
+- **Coffres** gagnés par tes accomplissements réels : chaque niveau, objectif atteint, entraînement, badge et
+  série de 7 jours d'une habitude. 15 % de chance qu'un coffre soit meilleur que prévu.
+- Un bandeau en haut de la page du héros montre ton énergie, ton or et les coffres à ouvrir.
+
 ## Habitudes
 Elles sont dans la page de ton **héros** (clique ton avatar en haut du menu), au-dessus de l'évolution du savoir.
 Des « missions spéciales » qui reviennent : choisis les jours, le nombre de fois par jour (ex. 💧 3 fois)

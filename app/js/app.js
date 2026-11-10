@@ -22,6 +22,7 @@ import * as docs from './docs.js';
 import * as assoc from './assoc.js';
 import * as news from './news.js';
 import * as reminders from './reminders.js';
+import * as rpg from './rpg.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -109,6 +110,7 @@ const routes = {
   missions: () => missions.renderPage(pageCtx()),
   month: renderMonth, year: renderYear,
   news: () => news.renderPage(pageCtx()),
+  quest: () => rpg.renderPage(pageCtx()),
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
@@ -777,6 +779,7 @@ async function renderHero() {
         </div>
       </section>
       <div class="hero-right">
+        <a class="card rpg-banner" id="hero-rpg" href="#/quest"></a>
         <section class="hero-habits" id="hero-habits"></section>
         <section class="card">
           <div class="card-head"><h2>Évolution du savoir</h2><a href="#/brain">Ouvrir le Cerveau →</a></div>
@@ -806,6 +809,12 @@ async function renderHero() {
       </div>
     </div>`;
 
+  // Aventure (RPG) : énergie, or, coffres à ouvrir
+  rpg.summary().then((r) => {
+    const el = $('#hero-rpg');
+    if (el) el.innerHTML = `<span class="rpg-banner-ico">⚔️</span><span class="rpg-banner-txt"><b>Aventure · ${esc(r.where)}</b><small>Tes habitudes et missions rendent ton héros plus fort. Combats, équipement et coffres.</small></span>
+      <span class="rpg-banner-res"><span class="rpg-pill">⚡ ${r.energy}</span><span class="rpg-pill">🪙 ${r.gold}</span>${r.chests ? `<span class="rpg-pill hot">🎁 ${r.chests}</span>` : ''}</span>`;
+  });
   // Habitudes : suivi et rappels, directement dans la page du héros
   await habits.renderPage({ ...pageCtx(), view: $('#hero-habits'), embedded: true });
 
@@ -2754,7 +2763,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'workout', 'rbq', 'news']; // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'quest', 'workout', 'rbq', 'news']; // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
