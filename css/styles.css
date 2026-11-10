@@ -1107,3 +1107,95 @@ div.kpi { cursor: default; }
 .rail a.brand-logo.active { background: none; box-shadow: 0 0 0 2px var(--accent); }
 .rail a.brand-logo img { width: 32px; height: 32px; display: block; }
 @media (min-width: 601px) { .rail > a[data-route="today"] { display: none; } }
+/* =========================================================
+   Documents joints (PDF, Word, EPUB…)
+   ========================================================= */
+.doc-chip { display: inline-flex; align-items: stretch; max-width: 100%; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
+.doc-open { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 10px; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+button.doc-open:hover { color: var(--accent); }
+.doc-ico { font-size: 18px; line-height: 1; flex: none; }
+.doc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; min-width: 0; }
+.doc-open small { color: var(--muted); font-size: 12px; flex: none; }
+.doc-rm { border: 0; border-left: 1px solid var(--border); background: none; color: var(--muted); width: 32px; cursor: pointer; font-size: 16px; flex: none; }
+.doc-rm:hover { color: var(--danger); background: var(--surface); }
+.doc-list { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.doc-list .doc-chip { width: 100%; }
+.doc-list .doc-open { flex: 1; }
+.cap-imgs { align-items: center; }
+.n-doc { margin: 0 0 10px; }
+.n-doc .doc-open { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.note-add { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+#n-doc { cursor: pointer; }
+.ink-docs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--surface); font-size: 13px; }
+.ink-docs .doc-open { padding: 4px 8px; font-size: 13px; }
+#ink-doc { cursor: pointer; }
+
+/* =========================================================
+   Cours RBQ : module en cours
+   ========================================================= */
+.rbq-current { display: grid; gap: 14px; margin-bottom: 18px; }
+.rbq-cur-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface) 65%); padding: 20px 22px; }
+.rbq-cur-main { display: grid; gap: 6px; min-width: 0; }
+.rbq-cur-main .eyebrow { color: var(--accent); }
+.rbq-cur-main h2 { font-size: 22px; overflow-wrap: anywhere; }
+.rbq-cur-main > p.muted { margin: 0; font-size: 14px; }
+.rbq-cur-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin-top: 4px; }
+.rbq-cur-stats b { color: var(--text); font-size: 15px; }
+.rbq-cur-bar { display: grid; gap: 4px; max-width: 420px; margin-top: 4px; }
+.rbq-cur-bar small { font-size: 12px; }
+.rbq-cur-actions { display: grid; gap: 8px; justify-items: stretch; }
+.rbq-cur-actions .btn { justify-content: center; }
+.rbq-mod.is-current { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+.rbq-today-cur { display: grid; gap: 1px; padding: 8px 12px; margin-bottom: 8px; border-radius: 10px; background: var(--accent-soft); color: var(--text); }
+.rbq-today-cur small { font-size: 11px; font-weight: 650; color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
+@media (max-width: 700px) { .rbq-cur-card { grid-template-columns: 1fr; } .rbq-cur-actions { grid-auto-flow: column; justify-content: start; } }
+
+/* =========================================================
+   Cerveau : projets en vedette
+   ========================================================= */
+.brain-projects { margin-bottom: 18px; }
+.bp-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.bp-head h2 { font-size: 17px; }
+.bp-head .muted { font-size: 13px; }
+.bp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.bp-card { display: grid; gap: 8px; padding: 14px 16px; color: var(--text); border-left: 4px solid var(--accent); transition: transform .12s, border-color .12s; }
+.bp-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.bp-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.bp-top b { overflow-wrap: anywhere; }
+.bp-pct { font-weight: 750; color: var(--accent); font-variant-numeric: tabular-nums; }
+.bp-card small { font-size: 12px; }
+
+/* =========================================================
+   Associations (projet, cours RBQ, objectif, mission)
+   ========================================================= */
+.assoc-card .card-head { margin-bottom: 8px; }
+.assoc-card h3 { margin: 0; }
+.assoc-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.assoc-list > .muted { font-size: 13px; }
+.assoc-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; }
+a.assoc-chip { padding: 4px 11px; }
+.assoc-chip a { color: inherit; padding: 4px 4px 4px 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assoc-chip button { border: 0; background: none; color: inherit; opacity: .6; cursor: pointer; padding: 2px 9px 2px 4px; font-size: 15px; }
+.assoc-chip button:hover { opacity: 1; }
+.assoc-tabs { margin-bottom: 10px; flex-wrap: wrap; }
+.assoc-tabs button { padding: 0 12px; font: inherit; font-size: 13px; font-weight: 600; height: 34px; }
+.goal-missions .assoc-list { margin: 2px 0; }
+
+/* =========================================================
+   Logo personnel
+   ========================================================= */
+.rail a.brand-logo svg { width: 34px; height: 34px; fill: initial; stroke: initial; stroke-width: initial; stroke-linecap: initial; stroke-linejoin: initial; }
+.rail a.brand-logo img { width: 32px; height: 32px; }
+.logo-modes { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.logo-opt { display: grid; justify-items: center; gap: 6px; padding: 12px 14px; min-width: 110px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.logo-opt:hover { border-color: var(--accent); }
+.logo-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: var(--accent-soft); }
+.logo-opt svg, .logo-opt img { width: 52px; height: 52px; }
+.logo-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.logo-fields label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); flex: 1 1 180px; }
+.logo-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.logo-col { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--surface); background: var(--sw); box-shadow: 0 0 0 1px var(--border); cursor: pointer; }
+.logo-col.on { box-shadow: 0 0 0 2px var(--accent); }
+#lg-color { width: 36px; height: 30px; padding: 0; border: 0; background: none; cursor: pointer; }
+.logo-card .card-head { flex-wrap: wrap; align-items: baseline; }
+.logo-card .card-head .muted { font-size: 13px; }

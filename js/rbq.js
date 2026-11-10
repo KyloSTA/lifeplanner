@@ -12,6 +12,7 @@ import * as game from './game.js';
 import { renderBody } from './brain.js';
 import * as brain from './brain.js';
 import * as images from './images.js';
+import * as docs from './docs.js';
 import { openWindow } from './launcher.js';
 
 const { esc, iso } = U;
@@ -55,6 +56,13 @@ async function load() {
   return { modules, cards };
 }
 const dueCards = (cards, today = iso(new Date())) => cards.filter((c) => (c.due || '') <= today);
+export function currentModules(modules) {
+  const doing = modules.filter((m) => m.status === 'doing');
+  if (doing.length) return doing;
+  const rev = modules.filter((m) => m.status === 'review');
+  if (rev.length) return rev.slice(0, 1);
+  return modules.filter((m) => m.status === 'todo').slice(0, 1);
+}
 export async function stats() {
   const { modules, cards } = await load();
   const conf = await getConf();
@@ -132,6 +140,8 @@ export async function renderPage(ctx, moduleId) {
   const pct = modules.length ? Math.round((done / modules.length) * 100) : 0;
   const left = modules.filter((m) => m.status !== 'done').length;
   const pace = daysLeft > 0 && left ? Math.max(1, Math.floor(daysLeft / left)) : null;
+  // Module(s) en cours mis en avant ; sinon ceux à réviser ; sinon le prochain à commencer
+  const current = currentModules(modules);
 
   view.innerHTML = `
     <header class="page-head">
@@ -155,10 +165,34 @@ export async function renderPage(ctx, moduleId) {
       <div class="rbq-due"><button class="btn primary" id="rbq-review" ${due ? '' : 'disabled'}>🃏 Réviser ${due ? `(${due})` : ''}</button>
         <small class="muted">${due ? 'cartes à revoir aujourd’hui' : cards.length ? 'Rien à revoir aujourd’hui 👍' : 'Ajoute des cartes dans un module'}</small></div>
     </section>
+    ${current.length ? `<section class="rbq-current">${current.map((m) => {
+      const mc = cards.filter((c) => c.moduleId === m.id);
+      const md = dueCards(mc).length;
+      const known = mc.filter((c) => (c.box || 1) >= 3).length;
+      const pctK = mc.length ? Math.round((known / mc.length) * 100) : 0;
+      return `<div class="card rbq-cur-card">
+        <div class="rbq-cur-main">
+          <p class="eyebrow">${m.status === 'doing' ? '📖 Module en cours' : m.status === 'review' ? '🟠 À réviser' : '➡️ Prochain module'}</p>
+          <h2>${esc(m.title)}</h2>
+          ${m.desc ? `<p class="muted">${esc(m.desc)}</p>` : ''}
+          <div class="rbq-cur-stats">
+            <span><b>${(m.keys || []).length}</b> points clés</span>
+            <span><b>${mc.length}</b> cartes</span>
+            <span><b>${(m.docIds || []).length}</b> documents</span>
+            <span><b>${(m.noteIds || []).length}</b> du Cerveau</span>
+          </div>
+          ${mc.length ? `<div class="rbq-cur-bar" title="Cartes bien connues (boîte 3 et plus)"><div class="bar"><i style="width:${pctK}%"></i></div><small class="muted">${known}/${mc.length} cartes bien connues</small></div>` : ''}
+        </div>
+        <div class="rbq-cur-actions">
+          <a class="btn primary" href="#/rbq/${m.id}">Continuer →</a>
+          ${md ? `<button class="btn" data-review-mod="${m.id}">🃏 Réviser (${md})</button>` : ''}
+        </div>
+      </div>`;
+    }).join('')}</section>` : ''}
     <div class="rbq-mods">${modules.map((m) => {
       const mc = cards.filter((c) => c.moduleId === m.id);
       const md = dueCards(mc).length;
-      return `<a class="card rbq-mod st-${m.status}" href="#/rbq/${m.id}">
+      return `<a class="card rbq-mod st-${m.status} ${current.includes(m) ? 'is-current' : ''}" href="#/rbq/${m.id}">
         <div class="rbq-mod-head"><h3>${esc(m.title)}</h3><span class="chip">${ST[m.status]?.i || ''} ${ST[m.status]?.l || ''}</span></div>
         ${m.desc ? `<p class="muted rbq-desc">${esc(m.desc)}</p>` : ''}
         <p class="rbq-meta"><span>📝 ${(m.notes || '').trim() ? 'notes' : 'pas de notes'}</span><span>⭐ ${(m.keys || []).length} point${(m.keys || []).length > 1 ? 's' : ''} clé${(m.keys || []).length > 1 ? 's' : ''}</span><span>🃏 ${mc.length} carte${mc.length > 1 ? 's' : ''}${md ? ` · <b>${md} à revoir</b>` : ''}</span>${(m.noteIds || []).length ? `<span>🧠 ${m.noteIds.length} du Cerveau</span>` : ''}</p>
@@ -193,6 +227,10 @@ export async function renderPage(ctx, moduleId) {
     if (!openWindow({ id: 'rbq-course', url: conf.courseUrl })) toast('La fenêtre a été bloquée : autorise les pop-ups pour Life Planner', 'err');
   });
   view.querySelector('#rbq-review').onclick = () => review(ctx, dueCards(cards), 'Révision du jour', redraw);
+  view.querySelectorAll('[data-review-mod]').forEach((b) => (b.onclick = () => {
+    const m = modules.find((x) => x.id === b.dataset.reviewMod);
+    review(ctx, dueCards(cards.filter((c) => c.moduleId === m.id)), m.title, redraw);
+  }));
   view.querySelector('#rbq-addmod').onclick = () => modal(`<h2>Nouveau module</h2>
     <form id="rbq-nm" class="hb-form"><input name="title" placeholder="Ex. Code de construction — chapitre 9" required autocomplete="off" autofocus>
     <div class="modal-actions"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Ajouter</button></div></form>`, (m, close) => {
@@ -271,6 +309,7 @@ async function renderModule(ctx, id) {
       <section class="card rbq-brain" id="md-brain"></section>
       </div>
       <div class="rbq-side">
+        <section class="card" id="md-docs"></section>
         <section class="card">
           <div class="card-head"><h2>⭐ Points clés</h2><span class="muted">${(m.keys || []).length}</span></div>
           <form class="add-row" id="md-kform"><input name="k" placeholder="Ex. Licence obligatoire dès 25 000 $ ?" autocomplete="off"><button class="btn icon" aria-label="Ajouter">+</button></form>
@@ -376,6 +415,37 @@ async function renderModule(ctx, id) {
     }));
   };
   await drawBrain();
+
+  // Documents du cours (PDF, Word, EPUB…) : manuel, notes du formateur, examens blancs…
+  const drawDocs = async () => {
+    const el = view.querySelector('#md-docs');
+    if (!el) return;
+    const cur = await db.get('study', id);
+    const ms = await docs.metas(cur.docIds || []);
+    el.innerHTML = `<div class="card-head"><h2>📎 Documents du cours</h2>
+        <label class="btn" title="Joindre des PDF, Word, EPUB…"><input type="file" accept="${docs.ACCEPT}" multiple hidden>+ Ajouter</label></div>
+      ${ms.length ? `<div class="doc-list">${ms.map((m) => docs.chip(m, { remove: true })).join('')}</div>`
+        : '<p class="empty-sm">Joins ici le manuel, les PDF du cours, les examens blancs… Un clic les ouvre. Tu peux aussi les glisser sur cette carte.</p>'}`;
+    const add = async (list) => {
+      try {
+        const ids = [];
+        for (const f of list) ids.push((await docs.save(f)).id);
+        await edit((x) => { x.docIds = [...(x.docIds || []), ...ids]; });
+        toast(`📎 ${ids.length > 1 ? ids.length + ' documents ajoutés' : 'Document ajouté'}`);
+        drawDocs();
+      } catch (err) { toast(err.message, 'err'); }
+    };
+    const inp = el.querySelector('input[type=file]');
+    inp.onchange = () => { add(docs.docFiles(inp.files)); inp.value = ''; };
+    el.ondragover = (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); };
+    el.ondrop = (e) => { const d = docs.docFiles(e.dataTransfer?.files); if (d.length) { e.preventDefault(); add(d); } };
+    el.querySelectorAll('[data-doc-rm]').forEach((b) => (b.onclick = async () => {
+      await edit((x) => { x.docIds = (x.docIds || []).filter((d) => d !== b.dataset.docRm); });
+      await docs.removeUnused([b.dataset.docRm]);
+      drawDocs();
+    }));
+  };
+  await drawDocs();
   view.querySelector('#md-del').onclick = async () => {
     if (!(await confirmBox(`Supprimer le module « ${m.title} », ses notes et ses ${cards.length} carte(s) ?`))) return;
     for (const c of cards) await db.del('study', c.id);
@@ -390,6 +460,7 @@ export async function todayCard(el) {
   const { daysLeft, due, conf, modules, done } = await stats();
   el.hidden = false;
   el.innerHTML = `<div class="card-head"><h2>📘 ${esc(conf.name || 'Cours RBQ')}</h2><a href="#/rbq">Ouvrir →</a></div>
+    ${(() => { const cur = currentModules(modules)[0]; return cur ? `<a class="rbq-today-cur" href="#/rbq/${cur.id}"><small>${cur.status === 'doing' ? '📖 En cours' : cur.status === 'review' ? '🟠 À réviser' : '➡️ Prochain'}</small><b>${esc(cur.title)}</b></a>` : ''; })()}
     <p>${daysLeft > 0 ? `<b>${daysLeft}</b> jour${daysLeft > 1 ? 's' : ''} avant l’examen · ` : daysLeft === null ? '📅 <a href="#/rbq">Ajoute la date de ton examen</a> · ' : ''}${done}/${modules.length} modules maîtrisés</p>
     ${due ? `<a class="btn primary" href="#/rbq">🃏 ${due} carte${due > 1 ? 's' : ''} à réviser</a>` : '<p class="muted">Aucune carte à revoir aujourd’hui 👍</p>'}`;
 }

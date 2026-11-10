@@ -199,6 +199,8 @@ export async function openTaskEditor(id, onChange = () => {}) {
     if (!t) return close();
     const subs = t.subtasks || [];
     const sd = subs.filter((s) => s.done).length;
+    // Notes du Cerveau associées à cette mission (« 🧷 Associé à » dans une note)
+    const linked = (await db.all('notes')).filter((x) => !x.archived && (x.rel?.tasks || []).includes(t.id));
     box.innerHTML = `
       <div class="tm-head">
         <input type="checkbox" class="tm-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie" title="Mission accomplie">
@@ -243,11 +245,14 @@ export async function openTaskEditor(id, onChange = () => {}) {
         <h3>Notes</h3>
         <textarea class="notes" placeholder="Notes, détails, liens…">${esc(t.notes || '')}</textarea>
       </section>
+      ${linked.length ? `<section class="tm-sec"><h3>🧠 Notes du Cerveau <span class="muted">${linked.length}</span></h3>
+        <div class="assoc-list">${linked.map((x) => `<a class="assoc-chip" href="#/note/${x.id}" data-go="${x.id}">${esc(x.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
       <div class="modal-actions tm-actions">
         <button class="btn danger tm-del">🗑 Supprimer</button>
         <button class="btn primary tm-ok">Terminé</button>
       </div>`;
 
+    box.querySelectorAll('[data-go]').forEach((a) => (a.onclick = async (e) => { e.preventDefault(); await close(); location.hash = '#/note/' + a.dataset.go; }));
     const title = box.querySelector('.tm-title');
     const grow = () => { title.style.height = 'auto'; title.style.height = title.scrollHeight + 'px'; };
     grow();

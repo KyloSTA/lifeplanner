@@ -4,7 +4,7 @@
 // Une habitude : { id, name, emoji, days: [0..6] (0 = dimanche), times: ['08:00'], target: 1,
 //                  log: { 'AAAA-MM-JJ': nombre }, createdAt, order, archived }
 
-import { db, onDbChange } from './db.js';
+import { db, onDbChange, syncDb } from './db.js';
 import * as U from './util.js';
 import * as game from './game.js';
 import { chime } from './alarms.js';
@@ -202,9 +202,34 @@ async function drawBanner() {
   })));
 }
 
+/* ---------- Habitudes demandées (ajoutées une seule fois, mêmes identifiants sur tous les appareils) ---------- */
+const WEEKDAYS = [1, 2, 3, 4, 5];
+const PRESET = [
+  { id: 'hb-dents', emoji: '🦷', name: 'Brosser les dents (matin et soir)', days: [0, 1, 2, 3, 4, 5, 6], times: ['05:45', '21:30'], target: 2 },
+  { id: 'hb-eglise', emoji: '⛪', name: 'Église', days: [0], times: ['09:00'], target: 1 },
+  { id: 'hb-lunch', emoji: '🥪', name: 'Préparer mon lunch', days: WEEKDAYS, times: ['05:45'], target: 1 },
+  { id: 'hb-reveil', emoji: '⏰', name: 'Me réveiller à 5 h 30', days: WEEKDAYS, times: ['05:30'], target: 1 },
+  { id: 'hb-partir', emoji: '🚗', name: 'Partir travailler à 6 h 15', days: WEEKDAYS, times: ['06:05'], target: 1 },
+];
+async function ensurePreset() {
+  // Indicateur propre à l'appareil : chaque appareil vérifie une fois que ces habitudes existent
+  try { if (localStorage.getItem('lp.habitsPreset1')) return; } catch { /* ignore */ }
+  let order = Date.now();
+  const add = [];
+  for (const p of PRESET) {
+    if (await db.get('habits', p.id)) continue;
+    add.push({ key: p.id, rec: { at: 1, v: { ...p, log: {}, createdAt: U.startOfDay(new Date()).getTime(), order: order++, archived: false } } });
+  }
+  // Horodatage « le plus ancien possible » : si un autre appareil a déjà ces habitudes (avec leur suivi),
+  // sa version gagne à la synchro au lieu d'être écrasée par cette copie neuve.
+  await syncDb.apply('habits', add);
+  try { localStorage.setItem('lp.habitsPreset1', '1'); } catch { /* ignore */ }
+}
+
 /** Démarre les rappels (app). onChange() : rafraîchir l'affichage après une action. */
 export function start(onChange = () => {}) {
   onChanged = onChange;
+  ensurePreset().then(() => onChange()).catch(console.error);
   setTimeout(check, 2000);
   setInterval(check, 30_000);
   addEventListener('focus', check);
