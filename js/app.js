@@ -115,7 +115,7 @@ async function router() {
   $$('#rail a').forEach((a) => a.classList.toggle('active', a.dataset.route === navName));
   $('#brand-launch')?.classList.toggle('active', name === 'launcher');
   // Sur cellulaire, « Plus » s'allume quand la page ouverte est dans son menu
-  $('#rail-more')?.classList.toggle('active', !!$('#rail a.active.nav-extra, #rail a.active[data-route="settings"], #rail a.active[data-route="hero"]'));
+  $('#rail-more')?.classList.toggle('active', !!$('#rail a.active.nav-extra, #rail a.active[data-route="settings"], #rail a.active[data-route="hero"], #rail .brand-ico.active'));
   document.body.classList.toggle('ink-mode', name === 'page');
   $('#modal-root').innerHTML = '';
   view.scrollTop = 0;
@@ -2066,7 +2066,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'week', 'journal', 'notebook', 'brain', 'goals', 'habits', 'workout', 'rbq']; // le Lanceur est l'icône à côté du logo
+const NAV_KEYS = ['today', 'journal', 'brain', 'goals', 'habits', 'workout', 'rbq']; // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
@@ -2086,8 +2086,12 @@ async function applyNavOrder() {
 // Menu « Plus » (cellulaire)
 $('#rail-more').onclick = () => {
   const links = [$('#hero-mini'), ...$$('#rail a.nav-extra'), $('#rail a[data-route="settings"]')];
-  // Sur cellulaire le logo est caché : le Lanceur est dans « Plus »
-  const launch = `<a href="#/launcher" data-close class="${location.hash.startsWith('#/launcher') ? 'active' : ''}">${$('#brand-launch svg').outerHTML}<span>Lanceur</span></a>`;
+  // Sur cellulaire le logo est caché : Semaine, Carnet et Lanceur sont dans « Plus »
+  const launch = [...$$('#rail .brand-tools a'), $('#brand-launch')].map((b) => {
+    const href = b.getAttribute('href') || '#/launcher';
+    const on = b.classList.contains('active');
+    return `<a href="${href}" data-close class="${on ? 'active' : ''}">${b.querySelector('svg').outerHTML}<span>${esc(b.getAttribute('aria-label'))}</span></a>`;
+  }).join('');
   modal(`<h2>Plus</h2><nav class="more-sheet">${launch}${links.map((a) => {
     const route = a.dataset.route;
     const label = route === 'hero' ? 'Ton héros' : a.querySelector('span')?.textContent || '';
