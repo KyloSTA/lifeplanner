@@ -78,7 +78,10 @@ export async function hydrate(root = document) {
 /** Supprime les images qui ne sont plus utilisées par aucune note. */
 export async function removeUnused(ids) {
   if (!ids.length) return;
-  const used = new Set((await db.all('notes')).flatMap((n) => refsIn(n.body)));
+  const used = new Set([
+    ...(await db.all('notes')).flatMap((n) => refsIn(n.body)),
+    ...(await db.all('ink')).flatMap((p) => (p.images || []).map((m) => m.id)), // images des pages du Carnet
+  ]);
   for (const id of ids) if (!used.has(id)) { await db.del('files', id); cache.delete(id); }
 }
 

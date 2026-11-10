@@ -17,6 +17,7 @@ import * as habits from './habits.js';
 import * as rbq from './rbq.js';
 import * as workout from './workout.js';
 import * as images from './images.js';
+import * as missions from './missions.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -99,11 +100,13 @@ const routes = {
   today: renderToday, week: renderWeek, journal: renderJournal, notebook: renderNotebook,
   page: renderPage, goals: renderGoals, settings: renderSettings, hero: renderHero,
   brain: renderBrain, note: renderNote, launcher: renderLauncher, setup: renderSetup,
-  habits: () => habits.renderPage(pageCtx()),
+  // Les habitudes sont dans la page du héros : #/habits y mène directement
+  habits: async () => { await renderHero(); $('#hero-habits')?.scrollIntoView({ block: 'start' }); },
+  missions: () => missions.renderPage(pageCtx()),
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
-const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings' };
+const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', habits: 'hero' };
 // Outils d'interface passés aux modules des onglets Habitudes, Cours RBQ et Workout
 const pageCtx = () => ({ view, modal, toast, confirmBox, setCleanup: (fn) => { cleanup = fn; } });
 
@@ -240,7 +243,7 @@ async function taskCard(el, date) {
       .filter((t) => t.date === date || (!t.done && t.date && t.date < date))
       .sort((a, b) => a.done - b.done || a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
     const done = items.filter((t) => t.done).length;
-    el.innerHTML = `<div class="card-head"><h2>Missions</h2><span class="muted">${done}/${items.length}</span></div>
+    el.innerHTML = `<div class="card-head"><h2>📋 Missions du jour</h2><span class="muted">${done}/${items.length} · <a href="#/missions">Gérer →</a></span></div>
       <form class="add-row"><input name="t" placeholder="Ajouter une mission…" autocomplete="off"><button class="btn icon" aria-label="Ajouter">+</button></form>
       <ul class="tasks">${items.map((t) => taskHTML(t, date)).join('') || '<li class="empty-sm">Rien de prévu pour l’instant.</li>'}</ul>
       <p class="hint muted">Astuce : touche › sur une mission pour l’ouvrir : étapes, notes, date et objectif.</p>`;
@@ -271,21 +274,30 @@ async function renderToday() {
         <a class="btn primary" href="#/page/day-${today}">✎ Écrire à la main</a>
       </div>
     </header>
-    <div class="grid today-grid">
-      <a class="card wide hero-card" id="c-hero" href="#/hero"></a>
-      <section class="card wide capture-card" id="c-brain"></section>
-      <section class="card wide quote-card" id="c-quote"></section>
-      <section class="card wide assist" id="c-assist"></section>
-      <section class="card" id="c-agenda"><div class="skeleton"></div></section>
-      <section class="card" id="c-tasks"></section>
-      <section class="card" id="c-habits"></section>
-      <section class="card" id="c-workout"></section>
-      <section class="card" id="c-rbq" hidden></section>
-      <section class="card" id="c-journal"></section>
-      <section class="card" id="c-ink"></section>
-      <section class="card" id="c-goals"></section>
+    <div class="today">
+      <section class="card today-summary" id="c-hero"></section>
+      <section class="card capture-card" id="c-brain"></section>
+      <section class="card assist" id="c-assist"></section>
+      <div class="today-cols">
+        <div class="today-col col-main">
+          <section class="card t-tasks" id="c-tasks"></section>
+          <section class="card t-agenda" id="c-agenda"><div class="skeleton"></div></section>
+          <section class="card t-goals" id="c-goals"></section>
+        </div>
+        <div class="today-col col-side">
+          <section class="card t-habits" id="c-habits"></section>
+          <section class="card t-workout" id="c-workout"></section>
+          <section class="card t-rbq" id="c-rbq" hidden></section>
+          <section class="card t-journal" id="c-journal"></section>
+          <section class="card t-ink" id="c-ink"></section>
+          <section class="card quote-card t-quote" id="c-quote"></section>
+        </div>
+      </div>
     </div>`;
   $('#add-ev').onclick = () => eventModal(today, renderToday);
+  // Le résumé du haut suit les cases cochées (missions, habitudes…)
+  const refreshSummary = U.debounce(() => heroCard(), 500);
+  $('.today-cols', view).addEventListener('click', () => refreshSummary());
 
   // Agenda
   const agenda = async () => {
@@ -294,7 +306,7 @@ async function renderToday() {
     const { events, source } = await getEvents(from, to);
     const el = $('#c-agenda');
     if (!el || day !== agendaDay) return;
-    el.innerHTML = `<div class="card-head"><h2>Agenda</h2>
+    el.innerHTML = `<div class="card-head"><h2>📅 Agenda</h2>
         <div class="seg seg-sm" role="group" aria-label="Jour affiché">
           <button class="${day ? '' : 'on'}" data-aday="0" aria-pressed="${!day}">Aujourd’hui</button>
           <button class="${day ? 'on' : ''}" data-aday="1" aria-pressed="${!!day}">Demain</button>
@@ -311,7 +323,7 @@ async function renderToday() {
   const journal = async () => {
     const e = (await db.get('journal', today)) || { date: today };
     const el = $('#c-journal');
-    el.innerHTML = `<div class="card-head"><h2>Comment te sens-tu ?</h2><a href="#/journal/${today}">Journal complet →</a></div>
+    el.innerHTML = `<div class="card-head"><h2>🙂 Humeur et intention</h2><a href="#/journal/${today}">Journal →</a></div>
       <div class="moods" style="margin-bottom:14px">${MOODS.map((m) => `<button class="mood ${e.mood === m.v ? 'on' : ''}" data-mood="${m.v}" title="${m.l}">${m.e}</button>`).join('')}</div>
       <div class="field"><h3>Intention du jour</h3><textarea data-f="intention" placeholder="Qu’est-ce qui rendrait cette journée réussie ?">${esc(e.intention || '')}</textarea></div>`;
     const save = U.debounce(async () => { e.updatedAt = Date.now(); await db.put('journal', e); game.checkJournal(e); }, 500);
@@ -327,7 +339,7 @@ async function renderToday() {
   // Page manuscrite du jour
   const ink = async () => {
     const meta = await db.get('pages', 'day-' + today);
-    $('#c-ink').innerHTML = `<div class="card-head"><h2>Page manuscrite du jour</h2></div>
+    $('#c-ink').innerHTML = `<div class="card-head"><h2>✒️ Page manuscrite</h2></div>
       <a class="ink-link" href="#/page/day-${today}">
         <div class="thumb" style="${meta?.thumb ? `background-image:url(${meta.thumb})` : ''}"></div>
         <div><strong>${meta ? 'Continuer à écrire' : 'Commencer à écrire'}</strong><br>
@@ -337,10 +349,11 @@ async function renderToday() {
 
   // Objectifs
   const goals = async () => {
-    const list = (await db.all('goals')).filter((g) => g.horizon === 'semaine' || g.horizon === 'mois').slice(0, 5);
-    $('#c-goals').innerHTML = `<div class="card-head"><h2>Objectifs en cours</h2><a href="#/goals">Tout voir →</a></div>
-      ${list.map((g) => `<div class="goal mini"><span class="title">${esc(g.title)}</span><span class="pct">${g.progress}%</span><div class="bar"><i style="width:${g.progress}%"></i></div></div>`).join('')
-      || '<p class="empty-sm">Aucun objectif pour la semaine ou le mois. <a href="#/goals">En ajouter</a></p>'}`;
+    const list = (await db.all('goals')).filter((g) => (g.horizon === 'semaine' || g.horizon === 'mois') && g.progress < 100)
+      .sort((a, b) => (a.horizon === 'semaine' ? 0 : 1) - (b.horizon === 'semaine' ? 0 : 1) || b.progress - a.progress).slice(0, 5);
+    $('#c-goals').innerHTML = `<div class="card-head"><h2>🎯 Objectifs en cours</h2><a href="#/goals">Tout voir →</a></div>
+      ${list.map((g) => `<div class="goal mini"><span class="title">${esc(g.title)} <small class="muted">· ${esc(HZ_LABEL[g.horizon])}</small></span><span class="pct">${g.progress}%</span><div class="bar"><i style="width:${g.progress}%"></i></div></div>`).join('')
+      || '<p class="empty-sm">Aucun objectif en cours pour la semaine ou le mois. <a href="#/goals">En ajouter</a></p>'}`;
   };
 
   // Second cerveau : capture rapide
@@ -599,22 +612,33 @@ function xpBar(s) {
   return `<div class="xp-bar" title="${s.into} / ${s.need} XP"><i style="width:${s.pct}%"></i></div>`;
 }
 
+/** Résumé du jour (haut de la page Aujourd'hui) : héros, missions, habitudes, workout, série. */
 async function heroCard() {
   const el = $('#c-hero');
   if (!el) return;
   const s = await game.stats();
   const av = await getAvatar(s);
-  const next = AV.nextUnlock(s.level);
-  el.innerHTML = `${AV.avatarSVG(av, 64)}
-    <div class="hc-main">
-      <div class="hc-top"><strong>${esc(av.name || 'Ton héros')}</strong><span class="lvl">Niv. ${s.level}</span><span class="muted">${esc(s.title)}</span>
-        <span class="evo-chip" title="Stade d’évolution">${game.EVO[s.evo].icon} ${esc(s.evoName)}</span></div>
-      ${xpBar(s)}
-      <div class="hc-sub muted">${s.into} / ${s.need} XP${next ? ` · prochain déblocage au niveau ${next.lvl}` : ''}</div>
-    </div>
-    <div class="hc-stats">
-      <div><b>${s.streak ? '🔥 ' + s.streak : '–'}</b><small>série</small></div>
-      <div><b>+${s.todayXp}</b><small>XP aujourd’hui</small></div>
+  const day = iso(new Date());
+  const tasks = (await db.all('tasks')).filter((t) => t.date === day || (!t.done && t.date && t.date < day));
+  const tDone = tasks.filter((t) => t.done).length;
+  const hs = (await habits.list()).filter((h) => habits.isDue(h, new Date()));
+  const hDone = hs.filter((h) => habits.doneOn(h, day)).length;
+  const wk = await workout.todayStatus();
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  const tile = (href, label, value, sub, p, cls = '') => `<a class="sum-tile ${cls}" href="${href}">
+      <span class="sum-label">${label}</span><b>${value}</b><small>${sub}</small>
+      ${p !== null ? `<i class="sum-bar"><i style="width:${p}%"></i></i>` : ''}</a>`;
+  el.innerHTML = `
+    <a class="sum-hero" href="#/hero" title="${esc(s.title)} — ${s.xp} XP au total">
+      ${AV.avatarSVG(av, 52)}
+      <span class="sum-hero-txt"><span><strong>${esc(av.name || 'Ton héros')}</strong> <span class="lvl">Niv. ${s.level}</span></span>
+        ${xpBar(s)}<small class="muted">${s.into} / ${s.need} XP · ${game.EVO[s.evo].icon} ${esc(s.evoName)}</small></span>
+    </a>
+    <div class="sum-tiles">
+      ${tile('#/missions', 'Missions', `${tDone}/${tasks.length}`, tasks.length ? (tDone === tasks.length ? 'tout est fait ✓' : `${tasks.length - tDone} à faire`) : 'rien de prévu', tasks.length ? pct(tDone, tasks.length) : null, tasks.length && tDone === tasks.length ? 'ok' : '')}
+      ${tile('#/habits', 'Habitudes', `${hDone}/${hs.length}`, hs.length ? (hDone === hs.length ? 'toutes faites ✓' : `${hs.length - hDone} restante${hs.length - hDone > 1 ? 's' : ''}`) : 'aucune aujourd’hui', hs.length ? pct(hDone, hs.length) : null, hs.length && hDone === hs.length ? 'ok' : '')}
+      ${tile('#/workout', 'Workout', wk.icon, esc(wk.label), null, wk.done ? 'ok' : '')}
+      ${tile('#/hero', 'Série', s.streak ? `🔥 ${s.streak}` : '–', `+${s.todayXp} XP aujourd’hui`, null)}
     </div>`;
 }
 
@@ -688,6 +712,7 @@ async function renderHero() {
         </div>
       </section>
       <div class="hero-right">
+        <section class="hero-habits" id="hero-habits"></section>
         <section class="card">
           <div class="card-head"><h2>Évolution du savoir</h2><a href="#/brain">Ouvrir le Cerveau →</a></div>
           <p class="muted" style="margin-top:0">Chaque note, lien et révision dans ton second cerveau donne des points de <b>Savoir</b> qui font évoluer ton avatar.</p>
@@ -715,6 +740,9 @@ async function renderHero() {
         </section>
       </div>
     </div>`;
+
+  // Habitudes : suivi et rappels, directement dans la page du héros
+  await habits.renderPage({ ...pageCtx(), view: $('#hero-habits'), embedded: true });
 
   const cfg = { ...av };
   const save = async () => {
@@ -1546,7 +1574,9 @@ async function renderPage(id) {
           <button data-tool="pen" class="on" title="Stylo">${ICONS.pen}</button>
           <button data-tool="hl" title="Surligneur">${ICONS.hl}</button>
           <button data-tool="eraser" title="Gomme (ou retourne ton stylet)">${ICONS.eraser}</button>
+          <button data-tool="select" title="Sélection : déplacer, agrandir ou retirer une image"><svg viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6z"/></svg></button>
         </div>
+        <label class="btn" id="ink-img" title="Ajouter une image (tu peux aussi la coller avec Ctrl + V ou la glisser sur la page)"><input type="file" accept="image/*" multiple hidden>🖼 Image</label>
         <div class="seg" id="colors"></div>
         <div class="seg" id="sizes">${[6, 9, 13].map((s, i) => `<button data-size="${i}" class="${i === 1 ? 'on' : ''}" title="Épaisseur"><span class="dot" style="width:${s}px;height:${s}px"></span></button>`).join('')}</div>
         <div class="seg">
@@ -1570,7 +1600,7 @@ async function renderPage(id) {
       meta.updatedAt = Date.now();
       meta.thumb = ed.thumbnail();
       meta.bg = ed.bg;
-      await db.put('ink', { id, strokes: ed.strokes, height: ed.H });
+      await db.put('ink', { id, strokes: ed.strokes, height: ed.H, images: ed.imgs });
       await db.put('pages', meta);
       const s = $('#saved');
       if (s) s.textContent = 'Enregistré ✓';
@@ -1583,7 +1613,37 @@ async function renderPage(id) {
     $('#saved').textContent = '…';
     syncUndo();
     save();
-  });
+  }, { imageUrl: images.url });
+
+  // Images sur la page (comme OneNote) : coller, glisser ou 🖼 ; elles restent sous l'encre
+  const setTool = (t) => {
+    ed.setTool(t);
+    $$('[data-tool]').forEach((x) => x.classList.toggle('on', x.dataset.tool === t));
+    drawColors();
+  };
+  const addImages = async (list) => {
+    if (!list.length) return;
+    try {
+      for (const f of list) {
+        const fid = await images.save(f);
+        const rec = await db.get('files', fid);
+        ed.addImage(fid, rec?.w, rec?.h);
+      }
+      setTool('select');
+      toast('🖼 Image ajoutée : glisse-la pour la placer, tire le coin pour la redimensionner, puis reprends le stylo');
+    } catch (err) { toast('Impossible d’ajouter l’image : ' + err.message, 'err'); }
+  };
+  const onPaste = (e) => {
+    if (e.target.closest?.('input, textarea')) return;
+    const list = images.imageFiles(e.clipboardData);
+    if (list.length) { e.preventDefault(); addImages(list); }
+  };
+  document.addEventListener('paste', onPaste);
+  const sc = $('#ink-scroll');
+  sc.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
+  sc.addEventListener('drop', (e) => { const list = images.imageFiles(e.dataTransfer); if (list.length) { e.preventDefault(); addImages(list); } });
+  const pickImg = $('#ink-img input');
+  pickImg.onchange = () => { addImages([...pickImg.files]); pickImg.value = ''; };
 
   const syncUndo = () => {
     $('#undo').disabled = !ed.undoStack.length;
@@ -1595,7 +1655,7 @@ async function renderPage(id) {
     const list = ed.tool === 'hl' ? HL_COLORS : INK_COLORS;
     const cur = ed.tool === 'hl' ? ed.hlColor : ed.color;
     $('#colors').innerHTML = list.map((c) => `<button data-color="${c}" class="${c === cur ? 'on' : ''}" title="Couleur"><span class="swatch" style="--sw:${c}"></span></button>`).join('');
-    $('#colors').hidden = ed.tool === 'eraser';
+    $('#colors').hidden = ed.tool === 'eraser' || ed.tool === 'select';
     $$('[data-color]').forEach((b) => (b.onclick = () => {
       if (ed.tool === 'hl') ed.hlColor = b.dataset.color; else ed.color = b.dataset.color;
       drawColors();
@@ -1603,11 +1663,7 @@ async function renderPage(id) {
   };
   drawColors();
 
-  $$('[data-tool]').forEach((b) => (b.onclick = () => {
-    ed.tool = b.dataset.tool;
-    $$('[data-tool]').forEach((x) => x.classList.toggle('on', x === b));
-    drawColors();
-  }));
+  $$('[data-tool]').forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
   $$('[data-size]').forEach((b) => (b.onclick = () => {
     ed.sizeIdx = Number(b.dataset.size);
     $$('[data-size]').forEach((x) => x.classList.toggle('on', x === b));
@@ -1629,6 +1685,8 @@ async function renderPage(id) {
     if (e.target.matches('input, textarea')) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? ed.redo() : ed.undo(); }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); ed.redo(); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && ed.sel) { e.preventDefault(); ed.deleteSelected(); }
+    else if (e.key === 'Escape' && ed.sel) ed.select(null);
   };
   const onHide = () => save.flush();
   document.addEventListener('keydown', onKey);
@@ -1637,6 +1695,7 @@ async function renderPage(id) {
 
   cleanup = async () => {
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('paste', onPaste);
     document.removeEventListener('visibilitychange', onHide);
     window.removeEventListener('pagehide', onHide);
     save.flush();
@@ -1649,6 +1708,7 @@ async function renderPage(id) {
    Vue : Objectifs
    ========================================================= */
 const openGoals = new Set(); // objectifs dont la liste de missions est dépliée
+let goalsView = 'hz'; // page Objectifs : 'hz' (par échéance) ou 'proj' (par projet)
 
 async function renderGoals() {
   const goals = await loadGoals();
@@ -1699,28 +1759,53 @@ async function renderGoals() {
     </div>`;
   };
 
+  // Chiffres clés
+  const active = goals.filter((g) => g.progress < 100);
+  const reached = goals.filter((g) => g.progress >= 100);
+  const linked = tasks.filter((t) => t.goalId && goals.some((g) => g.id === t.goalId));
+  const avg = active.length ? Math.round(active.reduce((n, g) => n + (g.progress || 0), 0) / active.length) : 0;
+  const byOrder = (a, b) => (a.progress >= 100) - (b.progress >= 100) || b.progress - a.progress || (a.createdAt || 0) - (b.createdAt || 0);
+  const column = (title, list, extra = '') => {
+    const open = list.filter((g) => g.progress < 100);
+    const cAvg = open.length ? Math.round(open.reduce((n, g) => n + g.progress, 0) / open.length) : (list.length ? 100 : 0);
+    return `<section class="card goal-col">
+      <div class="card-head"><h2>${title}</h2><span class="muted">${list.length ? `${list.length - open.length}/${list.length} atteint${list.length - open.length > 1 ? 's' : ''}` : ''}</span></div>
+      ${extra}${list.length ? `<div class="bar goal-col-bar" title="Progression moyenne"><i style="width:${cAvg}%"></i></div>` : ''}
+      ${[...list].sort(byOrder).map((g) => goalHTML(g, !!extra)).join('') || '<p class="empty-sm">Aucun objectif.</p>'}</section>`;
+  };
+
   view.innerHTML = `
-    <header class="page-head"><div><p class="eyebrow">Vision</p><h1>Objectifs</h1></div></header>
-    <form class="card add-row" id="add-goal" style="margin-bottom:18px;padding:12px">
-      <input name="title" placeholder="Nouvel objectif…" autocomplete="off">
-      <select name="horizon" style="width:auto" aria-label="Échéance">${hzOptions('mois')}</select>
-      ${projects.length ? `<select name="project" style="width:auto" aria-label="Projet">${projOptions('')}</select>` : ''}
+    <header class="page-head">
+      <div><p class="eyebrow">Vision</p><h1>Objectifs</h1></div>
+      <div class="seg wk-tabs" role="group" aria-label="Affichage">
+        <button class="${goalsView === 'hz' ? 'on' : ''}" data-gv="hz">📅 Par échéance</button>
+        <button class="${goalsView === 'proj' ? 'on' : ''}" data-gv="proj">🚀 Par projet${projGroups.length ? ` (${projGroups.length})` : ''}</button>
+      </div>
+    </header>
+    <div class="kpis">
+      <div class="kpi"><b>${active.length}</b><span>objectif${active.length > 1 ? 's' : ''} en cours</span></div>
+      <div class="kpi"><b>${avg} %</b><span>progression moyenne</span></div>
+      <div class="kpi ok"><b>${reached.length}</b><span>objectif${reached.length > 1 ? 's' : ''} atteint${reached.length > 1 ? 's' : ''} 🏁</span></div>
+      <a class="kpi" href="#/missions"><b>${linked.filter((t) => t.done).length}/${linked.length}</b><span>missions liées accomplies</span></a>
+    </div>
+    <form class="card ms-add" id="add-goal">
+      <input name="title" placeholder="Nouvel objectif…" autocomplete="off" required style="flex:3 1 240px">
+      <select name="horizon" aria-label="Échéance">${hzOptions('mois')}</select>
+      ${projects.length ? `<select name="project" aria-label="Projet">${projOptions('')}</select>` : ''}
       <button class="btn primary">Ajouter</button>
     </form>
-    <p class="hint muted" style="margin:-8px 0 16px">Ajoute des missions à un objectif : sa progression se calcule toute seule. Sans mission, règle-la avec le curseur. Déplie un objectif pour changer son échéance ou son projet.</p>
-    <h2 class="goal-sec">📅 Par échéance</h2>
-    <div class="goal-groups">${[...HORIZONS, ...(dated.some((g) => !g.horizon) ? [['', 'Sans échéance']] : [])].map(([v, l]) => {
-      const list = dated.filter((g) => (g.horizon || '') === v);
-      return `<section class="card"><div class="card-head"><h2>${l}</h2><span class="muted">${list.length}</span></div>
-        ${list.map((g) => goalHTML(g)).join('') || '<p class="empty-sm">Aucun objectif.</p>'}</section>`;
-    }).join('')}</div>
-    ${projGroups.length ? `<h2 class="goal-sec">🚀 Par projet</h2>
-    <div class="goal-groups">${projGroups.map(({ p, list }) => {
-      const st = brain.projectStats(p.id, goals, tasks);
-      return `<section class="card proj-group"><div class="card-head"><h2><a href="#/note/${p.id}">${p.archived ? '🗄' : '🚀'} ${esc(p.title || 'Projet')}</a></h2><span class="muted">${st.pct} %</span></div>
-        <div class="bar proj-group-bar"><i style="width:${st.pct}%"></i></div>
-        ${list.map((g) => goalHTML(g, true)).join('')}</section>`;
-    }).join('')}</div>` : ''}`;
+    ${goalsView === 'hz'
+      ? `<div class="goal-groups">${[...HORIZONS, ...(dated.some((g) => !g.horizon) ? [['', 'Sans échéance']] : [])]
+        .map(([v, l]) => column(l, dated.filter((g) => (g.horizon || '') === v))).join('')}</div>`
+      : projGroups.length
+        ? `<div class="goal-groups">${projGroups.map(({ p, list }) => {
+          const st = brain.projectStats(p.id, goals, tasks);
+          return column(`<a href="#/note/${p.id}">${p.archived ? '🗄' : '🚀'} ${esc(p.title || 'Projet')}</a>`, list,
+            `<p class="muted goal-proj-meta">${st.pct} % · ${st.missions ? `${st.done}/${st.missions} missions` : 'aucune mission'}</p>`);
+        }).join('')}</div>`
+        : '<div class="card empty-card"><p>Aucun objectif rattaché à un projet. Crée une note 🚀 Projet dans le Cerveau, puis choisis-la quand tu déplies un objectif.</p></div>'}
+    <p class="hint muted">Ajoute des missions à un objectif : sa progression se calcule toute seule. Sans mission, règle-la avec le curseur. Déplie un objectif pour changer son échéance ou son projet.</p>`;
+  $$('[data-gv]').forEach((b) => (b.onclick = () => { goalsView = b.dataset.gv; renderGoals(); }));
 
   $('#add-goal').onsubmit = async (e) => {
     e.preventDefault();
@@ -2066,7 +2151,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'journal', 'brain', 'goals', 'habits', 'workout', 'rbq']; // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'missions', 'journal', 'brain', 'goals', 'workout', 'rbq']; // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
@@ -2176,7 +2261,7 @@ game.init().catch(console.error).finally(() => {
   habits.start(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
     if (route === 'today') refreshToday();
-    else if (route === 'habits' && !$('#modal-root').children.length) router();
+    else if ((route === 'habits' || route === 'hero') && !$('#modal-root').children.length) router();
   });
   // Posts Reddit sauvegardés avec le bouton « 🧠 Cerveau » (extension extension-edge)
   clips.start((note, updated) => {

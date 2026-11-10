@@ -42,13 +42,14 @@ supprimer des missions. Les changements apparaissent instantanément dans l'app,
 
 | Section | Contenu |
 |---|---|
-| **Aujourd'hui** | Agenda Google du jour, missions (y compris celles en retard), humeur et intention, page manuscrite du jour, objectifs |
+| **Aujourd'hui** | Résumé du jour (héros, missions, habitudes, workout, série), capture rapide, puis deux colonnes : missions, agenda et objectifs à gauche ; habitudes, workout, cours RBQ, humeur, page manuscrite et citation à droite |
+| **Missions** | Toutes les missions : filtres (à faire, en retard, aujourd'hui, à venir, sans date, terminées), recherche, regroupement par date ou par objectif, ajout rapide |
 | **Semaine** | Les 7 jours avec événements Google et missions ; `+` pour créer un événement dans Google Agenda |
 | **Journal** | Humeur, intention, récit de la journée, gratitude, leçons, plus une page manuscrite par jour |
 | **Carnet** | Pages libres à écrire au Surface Pen (lignes, carreaux, points ou vierge) |
 | **Cerveau** | Ton second cerveau : idées, apprentissages, ressources, personnes, projets, citations, reliés entre eux |
 | **Objectifs** | Objectifs par horizon (semaine, mois, année, long terme), avec leurs missions et leur progression |
-| **Habitudes** | Habitudes récurrentes avec rappels à l'heure, suivi quotidien et séries 🔥 |
+| **Ton héros** (avatar) | Niveau, évolution, badges, personnalisation, et la section **Habitudes** (rappels, suivi quotidien, séries 🔥) |
 | **Workout** | Séance du jour, programme de la semaine, séances modèles et progrès |
 | **Cours RBQ** | Préparation de l'examen : modules, notes de cours, points clés, cartes de révision, compte à rebours |
 | **Réglages** | Connexion Google Agenda, assistant, sauvegarde/restauration, **ordre des onglets du menu**, thème |
@@ -167,6 +168,7 @@ de 15 min toutes les 4 sessions). À la fin de la pause, touche ▶ pour relance
 Le temps de focus et le nombre de 🍅 sont enregistrés sur la mission.
 
 ## Habitudes
+Elles sont dans la page de ton **héros** (clique ton avatar en haut du menu), au-dessus de l'évolution du savoir.
 Des « missions spéciales » qui reviennent : choisis les jours, le nombre de fois par jour (ex. 💧 3 fois)
 et les heures de rappel. Elles apparaissent sur la page **Aujourd'hui** (carte « Habitudes du jour ») :
 touche une habitude pour la cocher (+1 si elle se fait plusieurs fois, − pour corriger).
@@ -193,7 +195,8 @@ sur Aujourd'hui) et adresse du cours en ligne (bouton **📖 Ouvrir le cours**, 
 - **Modules** : quatre modules de départ suivent les grands volets des examens de licence d'entrepreneur
   (administration, sécurité des chantiers, gestion de projets, exécution des travaux) ; renomme-les, supprime-les
   ou ajoute ceux de ton cours. Statut : À commencer, En cours, À réviser, Maîtrisé.
-- Dans un module : **📝 notes de cours** (Écrire / Lire), **⭐ points clés** et **🃏 cartes de révision** (question/réponse).
+- Dans un module : **📝 notes de cours** (Écrire / Lire), **⭐ points clés**, **🃏 cartes de révision** (question/réponse)
+  et **🧠 Du Cerveau** : « + Ajouter depuis le Cerveau » rattache des notes capturées (idées, photos, captures d'écran).
 - **🃏 Réviser** : les cartes du jour, en répétition espacée. Une carte ratée revient dans la séance puis le
   lendemain ; une carte connue revient après 1, 3, 7, 14 puis 30 jours.
 
@@ -255,6 +258,10 @@ Cela fonctionne partout : sur la page Aujourd'hui, dans la Semaine et dans le wi
   dessiner au doigt.
 - Stylo, surligneur, 6 couleurs, 3 épaisseurs, annuler/rétablir (Ctrl+Z / Ctrl+Y),
   « + Espace » pour agrandir la page, export PNG.
+- **Images (comme OneNote)** : colle une image ou une capture (Ctrl + V), glisse-la sur la page ou
+  touche **🖼 Image**. Elle se place sous l'encre : tu peux écrire et surligner par-dessus. Avec l'outil
+  **Sélection** (flèche), glisse l'image pour la déplacer, tire le coin pour la redimensionner,
+  × ou Suppr pour la retirer. Ctrl+Z annule aussi ces changements.
 - Enregistrement automatique.
 
 ## Connecter Google Agenda (une seule fois, environ 5 min)
