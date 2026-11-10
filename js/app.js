@@ -20,6 +20,7 @@ import * as images from './images.js';
 import * as missions from './missions.js';
 import * as docs from './docs.js';
 import * as assoc from './assoc.js';
+import * as news from './news.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -106,6 +107,7 @@ const routes = {
   habits: async () => { await renderHero(); $('#hero-habits')?.scrollIntoView({ block: 'start' }); },
   missions: () => missions.renderPage(pageCtx()),
   month: renderMonth, year: renderYear,
+  news: () => news.renderPage(pageCtx()),
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
@@ -293,6 +295,7 @@ async function renderToday() {
           <section class="card t-workout" id="c-workout"></section>
           <section class="card t-rbq" id="c-rbq" hidden></section>
           <section class="card t-journal" id="c-journal"></section>
+          <section class="card t-news" id="c-news"></section>
           <section class="card t-ink" id="c-ink"></section>
           <section class="card quote-card t-quote" id="c-quote"></section>
         </div>
@@ -380,6 +383,7 @@ async function renderToday() {
   const lifeCards = () => Promise.all([habits.todayCard($('#c-habits')), workout.todayCard($('#c-workout')), rbq.todayCard($('#c-rbq'))]);
   refreshToday = () => Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), goals(), heroCard(), brainCard()]);
 
+  news.todayCard($('#c-news')); // en parallèle (réseau) : ne retarde pas le reste de la page
   await Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard(), assistCard()]);
   agenda();
 }
@@ -2604,7 +2608,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'workout', 'rbq']; // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'workout', 'rbq', 'news']; // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
