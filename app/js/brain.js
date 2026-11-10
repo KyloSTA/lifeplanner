@@ -131,10 +131,16 @@ export async function setArchived(id, archived) {
 /** Avancement d'un projet : moyenne de ses objectifs, plus le total de missions. */
 export function projectStats(projectId, goals, tasks) {
   const gs = goals.filter((g) => g.projectId === projectId);
-  const ms = tasks.filter((t) => t.goalId && gs.some((g) => g.id === t.goalId));
+  const viaGoals = tasks.filter((t) => t.goalId && gs.some((g) => g.id === t.goalId));
+  // Missions rattachées directement au projet (sans passer par un objectif)
+  const direct = tasks.filter((t) => t.projectId === projectId && !viaGoals.includes(t));
+  const ms = [...viaGoals, ...direct];
+  const parts = gs.map((g) => g.progress || 0);
+  if (direct.length) parts.push((direct.filter((t) => t.done).length / direct.length) * 100);
   return {
     goals: gs,
-    pct: gs.length ? Math.round(gs.reduce((s, g) => s + (g.progress || 0), 0) / gs.length) : 0,
+    direct,
+    pct: parts.length ? Math.round(parts.reduce((s, p) => s + p, 0) / parts.length) : 0,
     missions: ms.length,
     done: ms.filter((t) => t.done).length,
   };

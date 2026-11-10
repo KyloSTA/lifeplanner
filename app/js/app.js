@@ -4,7 +4,7 @@ import * as gcal from './gcal.js';
 import { InkEditor, INK_COLORS, HL_COLORS } from './ink.js';
 import * as game from './game.js';
 import * as AV from './avatar.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, openTaskEditor } from './tasks.js';
+import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor } from './tasks.js';
 import * as brain from './brain.js';
 import * as quotes from './quotes.js';
 import * as assistant from './assistant.js';
@@ -105,10 +105,11 @@ const routes = {
   // Les habitudes sont dans la page du héros : #/habits y mène directement
   habits: async () => { await renderHero(); $('#hero-habits')?.scrollIntoView({ block: 'start' }); },
   missions: () => missions.renderPage(pageCtx()),
+  month: renderMonth, year: renderYear,
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
-const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', habits: 'hero' };
+const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', habits: 'hero', month: 'week', year: 'week', journal: 'week' };
 // Outils d'interface passés aux modules des onglets Habitudes, Cours RBQ et Workout
 const pageCtx = () => ({ view, modal, toast, confirmBox, setCleanup: (fn) => { cleanup = fn; } });
 
@@ -991,7 +992,7 @@ async function renderBrain() {
   const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 14);
   if (brainState.tag && !tagCount[brainState.tag]) brainState.tag = '';
   const filters = [['all', 'Tout', notes.length], ['inbox', '📥 À classer', inbox], ['pinned', '📌 Épinglées', notes.filter((n) => n.pinned).length]]
-    .concat(brain.TYPES.map((t) => [t.id, `${t.icon} ${t.name}`, notes.filter((n) => n.type === t.id).length]))
+    .concat(brain.TYPES.filter((t) => t.id !== 'projet').map((t) => [t.id, `${t.icon} ${t.name}`, notes.filter((n) => n.type === t.id).length])) // les projets ont leur propre rangée en haut
     .filter(([id, , c]) => id === 'all' || c);
   if (!filters.some(([id]) => id === brainState.f)) brainState.f = 'all';
 
@@ -1099,7 +1100,7 @@ async function renderNote(id) {
       <div class="head-actions">
         <select id="n-type" style="width:auto" aria-label="Type">${brain.TYPES.map((t) => `<option value="${t.id}" ${t.id === n.type ? 'selected' : ''}>${t.icon} ${t.name}</option>`).join('')}</select>
         <button class="btn" id="n-pin">${n.pinned ? '📌 Épinglée' : '📌 Épingler'}</button>
-        <button class="btn" id="n-task" title="Ajouter une mission pour aujourd’hui">✅ En faire une mission</button>
+        <button class="btn" id="n-task" title="Crée une mission pour aujourd’hui et range cette note dans les Archives">✅ En faire une mission</button>
         <button class="btn" id="n-arch" title="${n.archived ? 'Remettre la note avec les autres' : 'Ranger la note dans les archives (elle garde son type)'}">${n.archived ? '↩ Désarchiver' : '🗄 Archiver'}</button>
         <button class="btn danger" id="n-del">Supprimer</button>
       </div>
@@ -1186,9 +1187,9 @@ async function renderNote(id) {
     const st = brain.projectStats(n.id, goals, tasks);
     const others = goals.filter((g) => g.projectId !== n.id);
     const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || a.createdAt - b.createdAt;
-    el.innerHTML = `<div class="card-head"><h2>🎯 Objectifs du projet</h2>
-        <span class="muted">${st.goals.length ? `${st.pct} %${st.missions ? ` · ${st.done}/${st.missions} missions` : ''}` : ''}</span></div>
-      ${st.goals.length ? `<div class="xp-bar proj-bar"><i style="width:${st.pct}%"></i></div>` : '<p class="empty-sm">Associe des objectifs à ce projet : son avancement suivra leurs missions.</p>'}
+    el.innerHTML = `<div class="card-head"><h2>🎯 Objectifs et missions du projet</h2>
+        <span class="muted">${st.goals.length || st.direct.length ? `${st.pct} %${st.missions ? ` · ${st.done}/${st.missions} missions` : ''}` : ''}</span></div>
+      ${st.goals.length || st.direct.length ? `<div class="xp-bar proj-bar"><i style="width:${st.pct}%"></i></div>` : '<p class="empty-sm">Ajoute des objectifs ou des missions à ce projet : son avancement les suivra.</p>'}
       ${st.goals.map((g) => {
         const ms = tasks.filter((t) => t.goalId === g.id).sort(sortM);
         return `<div class="pgoal" data-gid="${g.id}">
@@ -1201,6 +1202,15 @@ async function renderNote(id) {
             <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
         </div>`;
       }).join('')}
+      <div class="pgoal pdirect">
+        <div class="pg-head"><b>📋 Missions du projet</b><span class="muted">${st.direct.length ? `${st.direct.filter((t) => t.done).length}/${st.direct.length}` : ''}</span>
+          <button class="btn icon sm pd-toggle" type="button" aria-label="Ajouter une mission au projet" title="Ajouter une mission">+</button></div>
+        ${st.direct.length ? `<ul class="tasks">${st.direct.sort(sortM).map((t) => taskHTML(t, today, { showDate: true, hideProject: true })).join('')}</ul>`
+          : '<p class="empty-sm">Des missions directement liées au projet, sans objectif. Touche + pour en ajouter.</p>'}
+        <form class="add-mission pd-add" hidden><input name="t" placeholder="Nouvelle mission du projet…" autocomplete="off">
+          <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
+        ${(() => { const free = tasks.filter((t) => !t.done && !t.projectId && !t.goalId); return free.length ? `<select class="pd-link" aria-label="Lier une mission existante"><option value="">🔗 Lier une mission existante…</option>${free.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('')}</select>` : ''; })()}
+      </div>
       <form class="proj-new">
         <input name="title" placeholder="Nouvel objectif pour ce projet…" autocomplete="off">
         <select name="horizon" aria-label="Échéance">${hzOptions('')}</select>
@@ -1219,6 +1229,17 @@ async function renderNote(id) {
       await drawProject();
       $(`.pgoal[data-gid="${gid}"] .pg-add input`)?.focus();
     }));
+    // Missions directes du projet
+    $('.pd-toggle', el).onclick = () => { const f = $('.pd-add', el); f.hidden = !f.hidden; if (!f.hidden) f.t.focus(); };
+    $('.pd-add', el).onsubmit = async (e) => {
+      e.preventDefault();
+      const f = e.target, v = f.t.value.trim();
+      if (!v) return;
+      await addTask(v, f.d.value || null, null, n.id);
+      await drawProject();
+      const nf = $('.pd-add', el); nf.hidden = false; nf.t.focus();
+    };
+    $('.pd-link', el)?.addEventListener('change', async (e) => { if (e.target.value) { await setTaskProject(e.target.value, n.id); drawProject(); } });
     $('.proj-new', el).onsubmit = async (e) => {
       e.preventDefault();
       const f = e.target;
@@ -1335,9 +1356,15 @@ async function renderNote(id) {
   $('#n-title').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); ta.focus(); } };
   $('#n-type').onchange = (e) => { n.type = e.target.value; save(); drawProject(); };
   $('#n-pin').onclick = (e) => { n.pinned = !n.pinned; e.target.textContent = n.pinned ? '📌 Épinglée' : '📌 Épingler'; save(); };
+  // Devient une mission : la mission est créée (liée à la note), puis la note est archivée
   $('#n-task').onclick = async () => {
-    await addTask(n.title.trim() || brain.excerpt(n.body, 60) || 'Note', today);
-    toast('✅ Mission ajoutée pour aujourd’hui');
+    await flush();
+    const t = await addTask(n.title.trim() || brain.excerpt(n.body, 60) || 'Note', today);
+    await assoc.toggle(n, 'tasks', t.id, true); // la mission garde un lien vers la note (fenêtre de la mission)
+    Object.assign(n, await brain.setArchived(n.id, true));
+    brainState.arch = false;
+    toast(`✅ Mission « ${t.title} » ajoutée pour aujourd’hui — la note est rangée dans les Archives`);
+    location.hash = '#/brain';
   };
   $('#n-arch').onclick = async () => {
     await flush();
@@ -1480,6 +1507,141 @@ async function renderLauncher() {
 /* =========================================================
    Vue : Semaine
    ========================================================= */
+/* ---------- Planificateur : onglets Semaine / Mois / Année / Journal ---------- */
+function plannerTabs(active, d = new Date()) {
+  const day = iso(d);
+  const tabs = [['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${day}`]];
+  return `<nav class="seg planner-tabs" aria-label="Vues du planificateur">${tabs.map(([k, l, h]) => `<a href="${h}" class="${k === active ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
+}
+const moodOf = (j) => MOODS.find((m) => m.v === j?.mood);
+const journalHas = (j) => !!(j && (j.mood || j.text || j.grat || j.lesson || j.intention));
+const MONTH_FMT = new Intl.DateTimeFormat('fr-CA', { month: 'long', year: 'numeric' });
+const MONTH_SHORT = new Intl.DateTimeFormat('fr-CA', { month: 'long' });
+
+/** Vision : objectifs d'un horizon (mois, année…), avec progression. */
+async function visionCard(title, horizons, empty) {
+  const goals = (await db.all('goals')).filter((g) => horizons.includes(g.horizon)).sort((a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0));
+  return `<section class="card vision-card"><div class="card-head"><h2>${title}</h2><a href="#/goals">Objectifs →</a></div>
+    ${goals.map((g) => `<div class="goal mini"><span class="title">${g.progress >= 100 ? '🏁 ' : ''}${esc(g.title)}</span><span class="pct">${g.progress}%</span><div class="bar"><i style="width:${g.progress}%"></i></div></div>`).join('')
+    || `<p class="empty-sm">${empty} <a href="#/goals">En ajouter</a></p>`}</section>`;
+}
+
+/* =========================================================
+   Vue : Mois
+   ========================================================= */
+async function renderMonth(arg) {
+  const base = arg && /^\d{4}-\d{2}$/.test(arg) ? U.parseISO(arg + '-01') : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const first = new Date(base.getFullYear(), base.getMonth(), 1);
+  const next = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+  const prev = new Date(base.getFullYear(), base.getMonth() - 1, 1);
+  const gridStart = U.startOfWeek(first);
+  const weeks = Math.ceil(((next - gridStart) / 86_400_000) / 7);
+  const days = [...Array(weeks * 7)].map((_, i) => U.addDays(gridStart, i));
+  const today = iso(new Date());
+  const ym = (d) => iso(d).slice(0, 7);
+  const [tasks, journal] = await Promise.all([db.all('tasks'), db.all('journal')]);
+  const jBy = Object.fromEntries(journal.map((j) => [j.date, j]));
+
+  view.innerHTML = `
+    <header class="page-head">
+      <div><p class="eyebrow">Planificateur</p><h1>${cap(MONTH_FMT.format(first))}</h1></div>
+      <div class="head-actions">
+        ${plannerTabs('month', first)}
+        <span id="sync"></span>
+        <a class="btn icon" href="#/month/${ym(prev)}" aria-label="Mois précédent">‹</a>
+        <a class="btn" href="#/month">Ce mois-ci</a>
+        <a class="btn icon" href="#/month/${ym(next)}" aria-label="Mois suivant">›</a>
+      </div>
+    </header>
+    <div class="month-layout">
+      <div class="card month-cal">
+        <div class="mc-dows">${['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'].map((d) => `<span>${d}</span>`).join('')}</div>
+        <div class="mc-grid">${days.map((d) => {
+          const k = iso(d), j = jBy[k], m = moodOf(j);
+          const ts = tasks.filter((t) => t.date === k), td = ts.filter((t) => t.done).length;
+          return `<div class="mc-day ${d.getMonth() !== first.getMonth() ? 'out' : ''} ${k === today ? 'is-today' : ''}" data-day="${k}">
+            <div class="mc-top"><a class="mc-num" href="#/week/${k}" title="Voir la semaine">${d.getDate()}</a>
+              <a class="mc-j ${journalHas(j) ? 'has' : ''}" href="#/journal/${k}" title="${journalHas(j) ? 'Ouvrir le journal de ce jour' : 'Écrire dans le journal'}">${m ? m.e : journalHas(j) ? '📝' : '✎'}</a></div>
+            <ul class="mc-evs"></ul>
+            ${ts.length ? `<a class="mc-tasks ${td === ts.length ? 'ok' : ''}" href="#/week/${k}" title="Missions">✓ ${td}/${ts.length}</a>` : ''}
+          </div>`;
+        }).join('')}</div>
+      </div>
+      <aside class="month-side">
+        ${await visionCard(`🎯 Vision du mois`, ['mois'], 'Aucun objectif pour ce mois.')}
+        ${await visionCard('📅 Cette semaine', ['semaine'], 'Aucun objectif pour la semaine.')}
+        <section class="card"><div class="card-head"><h2>📖 Journal du mois</h2></div>
+          ${(() => {
+            const js = journal.filter((j) => j.date.startsWith(ym(first)) && journalHas(j));
+            const moods = js.filter((j) => j.mood);
+            const avg = moods.length ? moods.reduce((s, j) => s + j.mood, 0) / moods.length : 0;
+            return `<p class="month-jstats"><b>${js.length}</b> jour${js.length > 1 ? 's' : ''} écrit${js.length > 1 ? 's' : ''}${moods.length ? ` · humeur moyenne ${MOODS[Math.round(avg) - 1].e}` : ''}</p>
+              <div class="mood-strip">${days.filter((d) => d.getMonth() === first.getMonth()).map((d) => { const mm = moodOf(jBy[iso(d)]); return `<a href="#/journal/${iso(d)}" class="ms-cell m${mm?.v || 0}" title="${U.fmtShort(d)}${mm ? ' : ' + mm.l : ''}"></a>`; }).join('')}</div>`;
+          })()}</section>
+      </aside>
+    </div>`;
+
+  // Événements Google du mois (3 par jour au maximum)
+  const { events, source } = await getEvents(gridStart, U.addDays(gridStart, weeks * 7));
+  if (!$('#sync')) return;
+  $('#sync').innerHTML = await syncBadge(source);
+  $$('.mc-day').forEach((cell) => {
+    const ds = +U.parseISO(cell.dataset.day), de = +U.addDays(ds, 1);
+    const list = events.filter((e) => e.start < de && e.end > ds);
+    cell.querySelector('.mc-evs').innerHTML = list.slice(0, 3).map((e) => `<li title="${esc(e.title)}">${e.allDay ? '' : `<small>${U.fmtTime(new Date(e.start))}</small> `}${esc(e.title)}</li>`).join('')
+      + (list.length > 3 ? `<li class="more">+ ${list.length - 3}</li>` : '');
+  });
+}
+
+/* =========================================================
+   Vue : Année
+   ========================================================= */
+async function renderYear(arg) {
+  const y = /^\d{4}$/.test(arg || '') ? Number(arg) : new Date().getFullYear();
+  const today = iso(new Date());
+  const [tasks, journal] = await Promise.all([db.all('tasks'), db.all('journal')]);
+  const jBy = Object.fromEntries(journal.map((j) => [j.date, j]));
+  const doneBy = {};
+  for (const t of tasks) if (t.done && t.date?.startsWith(String(y))) doneBy[t.date] = (doneBy[t.date] || 0) + 1;
+  const months = [...Array(12)].map((_, m) => new Date(y, m, 1));
+  const written = journal.filter((j) => j.date.startsWith(String(y)) && journalHas(j)).length;
+  const doneYear = Object.values(doneBy).reduce((s, n) => s + n, 0);
+
+  view.innerHTML = `
+    <header class="page-head">
+      <div><p class="eyebrow">Planificateur</p><h1>${y}</h1></div>
+      <div class="head-actions">
+        ${plannerTabs('year', y === new Date().getFullYear() ? new Date() : new Date(y, 0, 1))}
+        <a class="btn icon" href="#/year/${y - 1}" aria-label="Année précédente">‹</a>
+        <a class="btn" href="#/year">Cette année</a>
+        <a class="btn icon" href="#/year/${y + 1}" aria-label="Année suivante">›</a>
+      </div>
+    </header>
+    <div class="year-layout">
+      <div class="year-grid">${months.map((first) => {
+        const gs = U.startOfWeek(first);
+        const cells = [...Array(42)].map((_, i) => U.addDays(gs, i));
+        return `<section class="card ym">
+          <a class="ym-title" href="#/month/${iso(first).slice(0, 7)}">${cap(MONTH_SHORT.format(first))}</a>
+          <div class="ym-grid">${['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d) => `<span class="ym-dow">${d}</span>`).join('')}
+            ${cells.map((d) => {
+              if (d.getMonth() !== first.getMonth()) return '<span></span>';
+              const k = iso(d), m = moodOf(jBy[k]), n = doneBy[k] || 0;
+              return `<a href="#/journal/${k}" class="ym-d m${m?.v || 0} ${n ? 'did' : ''} ${k === today ? 'is-today' : ''}" title="${U.fmtShort(d)}${m ? ' · ' + m.l : ''}${n ? ` · ${n} mission${n > 1 ? 's' : ''} accomplie${n > 1 ? 's' : ''}` : ''}">${d.getDate()}</a>`;
+            }).join('')}</div>
+        </section>`;
+      }).join('')}</div>
+      <aside class="month-side">
+        ${await visionCard(`🌟 Vision ${y}`, ['annee'], 'Aucun objectif pour l’année.')}
+        ${await visionCard('🧭 Long terme', ['vie'], 'Aucun objectif à long terme.')}
+        <section class="card"><div class="card-head"><h2>📊 Bilan ${y}</h2></div>
+          <p class="month-jstats"><b>${doneYear}</b> missions accomplies · <b>${written}</b> jours de journal</p>
+          <div class="ym-legend"><span><i class="m5"></i>Super</span><span><i class="m4"></i>Bien</span><span><i class="m3"></i>Neutre</span><span><i class="m2"></i>Bof</span><span><i class="m1"></i>Difficile</span><span><i class="did-dot"></i>Mission faite</span></div>
+        </section>
+      </aside>
+    </div>`;
+}
+
 async function renderWeek(arg) {
   const start = U.startOfWeek(arg ? U.parseISO(arg) : new Date());
   const days = [...Array(7)].map((_, i) => U.addDays(start, i));
@@ -1489,11 +1651,13 @@ async function renderWeek(arg) {
   const title = sameMonth
     ? `${start.getDate()} – ${U.addDays(end, -1).getDate()} ${new Intl.DateTimeFormat('fr-CA', { month: 'long', year: 'numeric' }).format(start)}`
     : `${U.fmtShort(start)} – ${U.fmtShort(U.addDays(end, -1))}`;
+  const jBy = Object.fromEntries((await db.all('journal')).map((j) => [j.date, j]));
 
   view.innerHTML = `
     <header class="page-head">
       <div><p class="eyebrow">Planificateur</p><h1>${esc(title)}</h1></div>
       <div class="head-actions">
+        ${plannerTabs('week', start)}
         <span id="sync"></span>
         <a class="btn icon" href="#/week/${iso(U.addDays(start, -7))}" aria-label="Semaine précédente">‹</a>
         <a class="btn" href="#/week">Cette semaine</a>
@@ -1502,8 +1666,10 @@ async function renderWeek(arg) {
     </header>
     <div class="week">${days.map((d) => {
       const k = iso(d);
+      const j = jBy[k], m = moodOf(j);
       return `<section class="day ${k === today ? 'is-today' : ''}" data-day="${k}">
         <header><span class="dow">${U.fmtDow(d)}</span><span class="dnum">${d.getDate()}</span>
+          <a class="day-j ${journalHas(j) ? 'has' : ''}" href="#/journal/${k}" title="${journalHas(j) ? 'Journal de ce jour' : 'Écrire dans le journal'}">${m ? m.e : '📖'}</a>
           <button class="btn icon sm" data-addev title="Ajouter un événement">+</button></header>
         <ul class="evs"></ul>
         <ul class="tasks"></ul>
@@ -1561,8 +1727,9 @@ async function renderJournal(date) {
 
   view.innerHTML = `
     <header class="page-head">
-      <div><p class="eyebrow">Journal de bord</p><h1>${cap(U.fmtLong(d))}${d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''}</h1></div>
+      <div><p class="eyebrow">Planificateur · Journal de bord</p><h1>${cap(U.fmtLong(d))}${d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''}</h1></div>
       <div class="head-actions">
+        ${plannerTabs('journal', d)}
         <a class="btn icon" href="#/journal/${iso(U.addDays(d, -1))}" aria-label="Jour précédent">‹</a>
         <input type="date" id="pick" value="${date}" style="width:auto">
         <a class="btn icon" href="#/journal/${iso(U.addDays(d, 1))}" aria-label="Jour suivant">›</a>
@@ -1953,14 +2120,16 @@ async function renderGoals() {
   const inGroup = new Set(projGroups.flatMap((x) => x.list.map((g) => g.id)));
   const dated = goals.filter((g) => !inGroup.has(g.id));
 
-  const goalHTML = (g, inProjectGroup = false) => {
+  const goalHTML = (g, inProjectGroup = false, prev = null, next = null) => {
     const ms = tasks.filter((t) => t.goalId === g.id).sort(sortM);
     const md = ms.filter((t) => t.done).length;
     const open = openGoals.has(g.id);
     const proj = g.projectId && allProjects.find((p) => p.id === g.projectId);
     return `<div class="goal ${open ? 'open' : ''}" data-id="${g.id}">
       <span class="title">${esc(g.title)}</span>
-      <span><span class="pct">${g.progress}%</span><button class="x g-del" aria-label="Supprimer l’objectif">×</button></span>
+      <span class="g-tools"><span class="pct">${g.progress}%</span>
+        <button class="g-mv" data-swap="${prev || ''}" ${prev ? '' : 'disabled'} aria-label="Monter l’objectif" title="Monter">↑</button><button class="g-mv" data-swap="${next || ''}" ${next ? '' : 'disabled'} aria-label="Descendre l’objectif" title="Descendre">↓</button>
+        <button class="x g-del" aria-label="Supprimer l’objectif">×</button></span>
       ${proj && !inProjectGroup ? `<a class="chip proj-chip" href="#/note/${proj.id}" title="Projet du Cerveau${proj.archived ? ' (archivé)' : ''}">${proj.archived ? '🗄' : '🚀'} ${esc(proj.title || 'Projet')}</a>` : ''}
       ${ms.length
         ? `<div class="bar"><i style="width:${g.progress}%"></i></div>`
@@ -1976,8 +2145,9 @@ async function renderGoals() {
         ${(() => { const ln = relNotes.filter((x) => (x.rel?.goals || []).includes(g.id)); return ln.length ? `<div class="assoc-list"><span class="muted">🧠 Notes :</span>${assoc.noteChips(ln)}</div>` : ''; })()}
         ${ms.length ? `<ul class="tasks">${ms.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>`
           : '<p class="empty-sm">Découpe cet objectif en missions : sa progression avancera toute seule à chaque mission accomplie.</p>'}
-        <form class="add-mission">
-          <input name="t" placeholder="+ Nouvelle mission…" autocomplete="off">
+        <button type="button" class="btn sm-text g-addm">+ Mission</button>
+        <form class="add-mission" hidden>
+          <input name="t" placeholder="Nouvelle mission…" autocomplete="off">
           <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)" title="Date prévue (laisse vide pour « sans date »)">
           <button class="btn icon" aria-label="Ajouter la mission">+</button>
         </form>
@@ -1992,14 +2162,15 @@ async function renderGoals() {
   const reached = goals.filter((g) => g.progress >= 100);
   const linked = tasks.filter((t) => t.goalId && goals.some((g) => g.id === t.goalId));
   const avg = active.length ? Math.round(active.reduce((n, g) => n + (g.progress || 0), 0) / active.length) : 0;
-  const byOrder = (a, b) => (a.progress >= 100) - (b.progress >= 100) || b.progress - a.progress || (a.createdAt || 0) - (b.createdAt || 0);
+  // Ordre choisi avec ↑ ↓ (sinon ordre de création)
+  const byOrder = (a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0);
   const column = (title, list, extra = '') => {
     const open = list.filter((g) => g.progress < 100);
     const cAvg = open.length ? Math.round(open.reduce((n, g) => n + g.progress, 0) / open.length) : (list.length ? 100 : 0);
     return `<section class="card goal-col">
       <div class="card-head"><h2>${title}</h2><span class="muted">${list.length ? `${list.length - open.length}/${list.length} atteint${list.length - open.length > 1 ? 's' : ''}` : ''}</span></div>
       ${extra}${list.length ? `<div class="bar goal-col-bar" title="Progression moyenne"><i style="width:${cAvg}%"></i></div>` : ''}
-      ${[...list].sort(byOrder).map((g) => goalHTML(g, !!extra)).join('') || '<p class="empty-sm">Aucun objectif.</p>'}</section>`;
+      ${(() => { const s = [...list].sort(byOrder); return s.map((g, i) => goalHTML(g, !!extra, s[i - 1]?.id, s[i + 1]?.id)).join(''); })() || '<p class="empty-sm">Aucun objectif.</p>'}</section>`;
   };
 
   view.innerHTML = `
@@ -2044,7 +2215,7 @@ async function renderGoals() {
     await db.put('goals', { id, title, horizon: f.horizon.value, projectId: f.project?.value || null, progress: 0, createdAt: Date.now() });
     openGoals.add(id);
     await renderGoals();
-    $(`.goal[data-id="${id}"] .add-mission input`)?.focus();
+    $(`.goal[data-id="${id}"] .g-addm`)?.click(); // nouvel objectif : la boîte « mission » s'ouvre tout de suite
   };
   $$('.goal').forEach((el) => {
     const id = el.dataset.id;
@@ -2059,6 +2230,18 @@ async function renderGoals() {
       };
     }
     el.querySelector('.goal-toggle').onclick = () => { openGoals.has(id) ? openGoals.delete(id) : openGoals.add(id); renderGoals(); };
+    // ↑ ↓ : échange la place avec l'objectif voisin de la même colonne
+    el.querySelectorAll('.g-mv').forEach((b) => (b.onclick = async () => {
+      const other = b.dataset.swap;
+      if (!other) return;
+      const [a, c] = await Promise.all([db.get('goals', id), db.get('goals', other)]);
+      let oa = a.order ?? a.createdAt ?? 0, oc = c.order ?? c.createdAt ?? 0;
+      if (oa === oc) oc += b.textContent === '↑' ? -1 : 1;
+      a.order = oc; c.order = oa;
+      await db.put('goals', a);
+      await db.put('goals', c);
+      renderGoals();
+    }));
     el.querySelector('.g-del').onclick = async () => {
       const ms = await missionsOf(id);
       const g = goals.find((x) => x.id === id);
@@ -2078,13 +2261,21 @@ async function renderGoals() {
       renderGoals();
     };
     bindTaskList(box, renderGoals);
+    box.querySelector('.g-addm').onclick = (e) => {
+      const f = box.querySelector('.add-mission');
+      f.hidden = !f.hidden;
+      e.currentTarget.textContent = f.hidden ? '+ Mission' : '− Fermer';
+      if (!f.hidden) f.t.focus();
+    };
     box.querySelector('.add-mission').onsubmit = async (e) => {
       e.preventDefault();
       const v = e.target.t.value.trim();
       if (!v) return;
       await addTask(v, e.target.d.value || null, id);
       await renderGoals();
-      $(`.goal[data-id="${id}"] .add-mission input`)?.focus();
+      // On garde la boîte ouverte pour enchaîner plusieurs missions
+      const box2 = $(`.goal[data-id="${id}"] .goal-missions`);
+      if (box2) { box2.querySelector('.add-mission').hidden = false; box2.querySelector('.g-addm').textContent = '− Fermer'; box2.querySelector('.add-mission input').focus(); }
     };
     const link = box.querySelector('.link-mission');
     if (link) link.onchange = async () => {
@@ -2413,7 +2604,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'missions', 'journal', 'brain', 'goals', 'workout', 'rbq']; // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'workout', 'rbq']; // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
