@@ -197,7 +197,7 @@ export async function syncGoal(g) {
     if (g.progress >= m) await award(k, XP.goal, `« ${g.title} » à ${m} %`);
     else await revoke(k, { showPop: false });
   }
-  if (g.progress >= 100) await award('goaldone:' + g.id, XP.goalDone, `Objectif atteint : ${g.title}`);
+  if (g.progress >= 100 || g.done) await award('goaldone:' + g.id, XP.goalDone, `Objectif atteint : ${g.title}`); // atteint, ou terminé à la main
   else await revoke('goaldone:' + g.id, { showPop: false });
 }
 
