@@ -215,6 +215,17 @@ sur Aujourd'hui) et adresse du cours en ligne (bouton **📖 Ouvrir le cours**, 
 - **🃏 Réviser** : les cartes du jour, en répétition espacée. Une carte ratée revient dans la séance puis le
   lendemain ; une carte connue revient après 1, 3, 7, 14 puis 30 jours.
 
+## 🔔 Rappels fiables (Google Agenda)
+Une page web ne sonne que si elle est ouverte. **Réglages → 🔔 Rappels fiables → Activer** : chaque alarme de
+mission (⏰) et chaque heure de rappel d'habitude (🔁, événement récurrent les jours choisis) est aussi créée dans
+ton Google Agenda avec une notification à l'heure exacte. Ton cellulaire (app Google Agenda, notifications
+permises) et ta montre sonnent alors même quand Life Planner est fermé.
+- Les rappels ne bloquent pas ton horaire (« disponible ») et sont cachés de l'agenda de Life Planner (pas de doublon).
+- Mission faite, alarme retirée ou passée, habitude modifiée, en pause ou supprimée : Google Agenda suit tout seul
+  (vérification toutes les 45 s quand l'app est ouverte et connectée à Google).
+- « Désactiver » retire de Google Agenda tous les rappels créés par Life Planner.
+- Une habitude déjà faite plus tôt dans la journée sonne quand même dans Google Agenda à son heure.
+
 ## Planificateur (icône 📅 à côté du logo)
 Onglets **Semaine**, **Mois**, **Année** et **📖 Journal** :
 - **Semaine** : tes événements Google et missions jour par jour ; l'icône de chaque jour ouvre son journal
