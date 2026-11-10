@@ -215,6 +215,23 @@ sur Aujourd'hui) et adresse du cours en ligne (bouton **📖 Ouvrir le cours**, 
 - **🃏 Réviser** : les cartes du jour, en répétition espacée. Une carte ratée revient dans la séance puis le
   lendemain ; une carte connue revient après 1, 3, 7, 14 puis 30 jours.
 
+## Planificateur (icône 📅 à côté du logo)
+Onglets **Semaine**, **Mois**, **Année** et **📖 Journal** :
+- **Semaine** : tes événements Google et missions jour par jour ; l'icône de chaque jour ouvre son journal
+  (elle montre ton humeur si tu l'as notée).
+- **Mois** : calendrier avec événements, missions (✓ faites/total) et humeur de chaque jour ; à droite, la
+  **vision du mois** (objectifs « Ce mois-ci »), ceux de la semaine et le bilan du journal.
+- **Année** : les 12 mois, chaque jour coloré selon ton humeur (point = mission accomplie) ; à droite, la
+  **vision de l'année** et du long terme, et le bilan.
+- **Journal** : humeur, intention, récit, gratitude, leçons et page manuscrite du jour.
+
+## Actualités
+Les grands titres de **Radio-Canada, Le Devoir, La Presse et TVA Nouvelles** (Google Actualités en option),
+avec photos, filtres par source et **💾** pour garder un article dans le Cerveau. **⚙ Sources** pour activer,
+désactiver ou ajouter un journal (son fil RSS). Les titres sont mis à jour toutes les 20 minutes ; les 4 premiers
+sont aussi sur Aujourd'hui (« À la une »). Les sites qui bloquent la lecture directe passent par le service
+gratuit rss2json.com, qui ne reçoit que l'adresse publique du fil.
+
 ## Lanceur
 L'onglet **Lanceur** ouvre tes applications : **Edge** et **Spotify** comme applications Windows
 (🌐 = version web), **YouTube, Reddit, Facebook, Messenger** chacun dans sa propre fenêtre (un 2e clic
