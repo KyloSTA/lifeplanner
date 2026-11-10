@@ -1569,3 +1569,13 @@ a.assoc-chip { padding: 4px 11px; }
 .rpg-banner-res { display: flex; gap: 6px; }
 @media (max-width: 900px) { .rpg-layout { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .hero-right > .rpg-banner { order: 0; } .rpg-slots { gap: 4px; } .rpg-slot { font-size: 20px; } .rpg-item-act { flex-direction: column; } }
+
+/* Aventure : rangées d'objets lisibles même étroites (les boutons passent sous le nom) */
+.rpg-item, .rpg-chest { flex-wrap: wrap; }
+.rpg-item-txt { flex: 1 1 150px; }
+.rpg-item-txt b { overflow-wrap: normal; word-break: normal; hyphens: auto; }
+.rpg-item-act, .rpg-item > .btn, .rpg-chest > .btn { margin-left: auto; }
+.rpg-item-act { flex-direction: row !important; flex-wrap: wrap; justify-content: flex-end; }
+.rpg-slot small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
+.rpg-slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }.rpg-col .card-head { flex-wrap: wrap; row-gap: 2px; }
+.rpg-col .card-head > .muted { font-size: 13px; }
