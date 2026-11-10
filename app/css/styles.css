@@ -1464,3 +1464,26 @@ a.assoc-chip { padding: 4px 11px; }
 #undo-bar.show i { animation: undo-count linear forwards; }
 @keyframes undo-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @media (max-width: 600px) { #undo-bar { bottom: calc(76px + env(safe-area-inset-bottom)); } }@media (max-width: 600px) { .capture-foot .cap-hint { display: none; } .capture-foot .btn.cap-photo, .capture-foot .cap-paste { padding: 0 10px; } }
+
+/* Habitudes : bande des derniers jours lisible (colonnes égales, cases visibles) */
+.hb-strip { grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; }
+.hb-day { min-width: 0; min-height: 0; padding: 2px 0; gap: 4px; }
+.hb-day small { font-size: 10px; line-height: 1; }
+.hb-day i { width: 100%; max-width: 24px; height: auto; aspect-ratio: 1; border-radius: 5px; background: color-mix(in srgb, var(--text) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--text) 16%, transparent); }
+.hb-day.part i { background: color-mix(in srgb, var(--ok) 40%, var(--surface)); border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
+.hb-day.ok i { background: var(--ok); border-color: var(--ok); }
+.hb-day.off i { background: transparent; border: 1px dashed var(--border); opacity: .6; }
+.hb-day:disabled { opacity: 1; }
+.hb-day:disabled i { background: transparent; border: 1px dashed color-mix(in srgb, var(--text) 14%, transparent); }
+.hb-day:disabled small { opacity: .45; }
+.hb-day.today i { box-shadow: 0 0 0 2px var(--accent); }
+.hb-day:not(:disabled):hover i { border-color: var(--accent); }
+@media (max-width: 600px) { .hb-strip { grid-template-columns: repeat(7, minmax(0, 1fr)); } .hb-day i { max-width: 32px; } }/* Carte d'habitude étroite : les 7 derniers jours, cases plus grandes */
+.hb-card { container-type: inline-size; }
+@container (max-width: 420px) {
+  .hb-strip { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .hb-strip .hb-day:nth-child(-n+7) { display: none; }
+  .hb-day i { max-width: 30px; }
+  .hb-day small { font-size: 11px; }
+}
+.hb-day:disabled i { border-color: color-mix(in srgb, var(--text) 28%, transparent); }
