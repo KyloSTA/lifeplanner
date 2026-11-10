@@ -1351,3 +1351,9 @@ a.assoc-chip { padding: 4px 11px; }
 .ag-journal .moods { display: flex; gap: 6px; flex-wrap: wrap; }
 .ag-intent { width: 100%; min-height: 64px; border-color: transparent; background: var(--surface-2); }.ag-journal .moods { flex-wrap: nowrap; }
 .ag-journal .mood { flex: 1 1 0; min-width: 0; }
+
+/* Projet : objectif terminé en vert */
+.pgoal.is-done { background: color-mix(in srgb, var(--ok) 10%, var(--surface-2)); }
+.pgoal.is-done .pg-head a { color: var(--ok); }
+.pgoal.is-done .pct { color: var(--ok); }
+.pgoal.is-done .bar i { background: var(--ok); }
