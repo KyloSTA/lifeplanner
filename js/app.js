@@ -1199,10 +1199,11 @@ async function renderNote(id) {
         return `<div class="pgoal" data-gid="${g.id}">
           <div class="pg-head"><a href="#/goals" data-opengoal="${g.id}" title="Ouvrir dans Objectifs">${esc(g.title)}</a>
             <select class="pg-hz" data-hz="${g.id}" aria-label="Échéance" title="Échéance">${hzOptions(g.horizon || '')}</select><span class="pct">${g.progress}%</span>
+            <button class="btn icon sm pg-plus" type="button" aria-label="Ajouter une mission à cet objectif" title="Ajouter une mission">+</button>
             <button class="x pg-unlink" data-unlink="${g.id}" title="Retirer du projet" aria-label="Retirer l’objectif du projet">×</button></div>
           <div class="bar"><i style="width:${g.progress}%"></i></div>
           ${ms.length ? `<ul class="tasks">${ms.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>` : ''}
-          <form class="add-mission pg-add"><input name="t" placeholder="+ Mission pour cet objectif…" autocomplete="off">
+          <form class="add-mission pg-add" hidden><input name="t" placeholder="Mission pour cet objectif…" autocomplete="off">
             <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
         </div>`;
       }).join('')}
@@ -1231,7 +1232,16 @@ async function renderNote(id) {
       const gid = f.closest('.pgoal').dataset.gid;
       await addTask(v, f.d.value || null, gid);
       await drawProject();
-      $(`.pgoal[data-gid="${gid}"] .pg-add input`)?.focus();
+      // La boîte reste ouverte pour enchaîner plusieurs missions
+      const nf = $(`.pgoal[data-gid="${gid}"] .pg-add`);
+      if (nf) { nf.hidden = false; nf.t.focus(); }
+    }));
+    // « + » d'un objectif : affiche (ou cache) la boîte d'ajout de mission
+    $$('.pg-plus', el).forEach((b) => (b.onclick = () => {
+      const f = b.closest('.pgoal').querySelector('.pg-add');
+      f.hidden = !f.hidden;
+      b.textContent = f.hidden ? '+' : '−';
+      if (!f.hidden) f.t.focus();
     }));
     // Missions directes du projet
     $('.pd-toggle', el).onclick = () => { const f = $('.pd-add', el); f.hidden = !f.hidden; if (!f.hidden) f.t.focus(); };
@@ -1253,7 +1263,7 @@ async function renderNote(id) {
       await db.put('goals', { id, title, horizon: f.horizon.value, projectId: n.id, progress: 0, createdAt: Date.now() });
       toast(`🎯 Objectif « ${title} » ajouté au projet`);
       await drawProject();
-      $(`.pgoal[data-gid="${id}"] .pg-add input`)?.focus();
+      $(`.pgoal[data-gid="${id}"] .pg-plus`)?.click(); // nouvel objectif : la boîte « mission » s'ouvre tout de suite
     };
     const link = $('.proj-link', el);
     if (link) link.onchange = async () => { if (link.value) { await brain.setGoalProject(link.value, n.id); drawProject(); } };
