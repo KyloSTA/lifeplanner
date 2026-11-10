@@ -870,6 +870,7 @@ function captureForm(id) {
     <div class="capture-foot">
       <label class="btn cap-photo" title="Ajouter une photo ou une capture"><input type="file" accept="image/*" multiple hidden>📷 Photo</label>
       <label class="btn cap-photo cap-doc" title="Joindre un document (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎 Fichier</label>
+      <button type="button" class="btn cap-paste" title="Coller ce que tu as copié (texte, image ou capture d’écran)">📋 Coller</button>
       <span class="muted cap-hint">Ctrl + Entrée</span>
       <button class="btn primary">💡 Capturer</button>
     </div>
@@ -949,6 +950,36 @@ function bindCapture(form, after) {
   pick.onchange = () => { add([...pick.files]); pick.value = ''; };
   const pickD = form.querySelector('.cap-doc input');
   pickD.onchange = () => { addDocs([...pickD.files]); pickD.value = ''; };
+  // 📋 Coller : lit le presse-papiers (images, captures d'écran et texte)
+  form.querySelector('.cap-paste').onclick = async () => {
+    const insertText = (txt) => {
+      const ta = form.t, at = ta.selectionStart ?? ta.value.length;
+      ta.value = ta.value.slice(0, at) + txt + ta.value.slice(ta.selectionEnd ?? at);
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = at + txt.length;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    try {
+      let got = false;
+      if (navigator.clipboard?.read) {
+        const imgs = [];
+        let text = '';
+        for (const item of await navigator.clipboard.read()) {
+          const it = item.types.find((t) => t.startsWith('image/'));
+          if (it) imgs.push(await item.getType(it));
+          else if (!text && item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+        }
+        if (imgs.length) { add(imgs); got = true; }
+        if (text.trim()) { insertText(text); got = true; }
+      } else if (navigator.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text.trim()) { insertText(text); got = true; }
+      } else throw new Error('unsupported');
+      if (!got) toast('Le presse-papiers est vide : copie d’abord un texte ou une image');
+    } catch (err) {
+      toast(err.message === 'unsupported' ? 'Ton navigateur ne permet pas de lire le presse-papiers : utilise Ctrl + V' : 'Accès au presse-papiers refusé : autorise-le quand le navigateur le demande, ou utilise Ctrl + V', 'err');
+    }
+  };
 }
 
 // Coller une image n'importe où sur la page (hors champ de texte) : elle va dans la capture rapide visible

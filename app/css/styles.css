@@ -1463,4 +1463,4 @@ a.assoc-chip { padding: 4px 11px; }
 #undo-bar i { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--accent); transform-origin: left; }
 #undo-bar.show i { animation: undo-count linear forwards; }
 @keyframes undo-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-@media (max-width: 600px) { #undo-bar { bottom: calc(76px + env(safe-area-inset-bottom)); } }
+@media (max-width: 600px) { #undo-bar { bottom: calc(76px + env(safe-area-inset-bottom)); } }@media (max-width: 600px) { .capture-foot .cap-hint { display: none; } .capture-foot .btn.cap-photo, .capture-foot .cap-paste { padding: 0 10px; } }
