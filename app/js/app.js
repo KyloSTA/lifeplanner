@@ -2195,7 +2195,7 @@ async function renderGoals() {
     const proj = g.projectId && allProjects.find((p) => p.id === g.projectId);
     const done = isGoalDone(g);
     return `<div class="goal ${open ? 'open' : ''} ${done ? 'is-done' : ''}" data-id="${g.id}">
-      <span class="title">${done ? '✅ ' : ''}${esc(g.title)}</span>
+      <span class="title" title="Clique pour renommer">${done ? '✅ ' : ''}<span class="g-name" tabindex="0" role="button" aria-label="Renommer « ${esc(g.title)} »">${esc(g.title)}</span></span>
       <span class="g-tools"><span class="pct">${g.progress}%</span>
         <button class="g-done ${g.done ? 'on' : ''}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}" title="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}">${g.done ? '↺' : '✓'}</button>
         <button class="g-mv" data-swap="${prev || ''}" ${prev ? '' : 'disabled'} aria-label="Monter l’objectif" title="Monter">↑</button><button class="g-mv" data-swap="${next || ''}" ${next ? '' : 'disabled'} aria-label="Descendre l’objectif" title="Descendre">↓</button>
@@ -2300,6 +2300,35 @@ async function renderGoals() {
       };
     }
     el.querySelector('.goal-toggle').onclick = () => { openGoals.has(id) ? openGoals.delete(id) : openGoals.add(id); renderGoals(); };
+    // Renommer : clic sur le nom -> champ de texte (Entrée ou clic ailleurs = enregistrer, Échap = annuler)
+    const nameEl = el.querySelector('.g-name');
+    const startRename = () => {
+      const old = nameEl.textContent;
+      const inp = document.createElement('input');
+      inp.className = 'g-rename';
+      inp.value = old;
+      inp.setAttribute('aria-label', 'Nouveau nom de l’objectif');
+      nameEl.replaceWith(inp);
+      inp.focus();
+      inp.select();
+      let finished = false;
+      const finish = async (save) => {
+        if (finished) return;
+        finished = true;
+        const v = inp.value.trim();
+        if (save && v && v !== old) {
+          const g = await db.get('goals', id);
+          g.title = v;
+          await db.put('goals', g);
+          toast(`✎ Objectif renommé : « ${v} »`);
+        }
+        renderGoals();
+      };
+      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') finish(false); };
+      inp.onblur = () => finish(true);
+    };
+    nameEl.onclick = startRename;
+    nameEl.onkeydown = (e) => { if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startRename(); } };
     // ✓ Terminer (ou ↺ Rouvrir) : l'objectif passe en vert et va au bas de sa colonne
     el.querySelector('.g-done').onclick = async () => {
       const g = await db.get('goals', id);

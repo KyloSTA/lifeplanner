@@ -1487,3 +1487,7 @@ a.assoc-chip { padding: 4px 11px; }
   .hb-day small { font-size: 11px; }
 }
 .hb-day:disabled i { border-color: color-mix(in srgb, var(--text) 28%, transparent); }
+/* Objectifs : renommer en cliquant sur le nom */
+.g-name { cursor: text; border-radius: 6px; padding: 1px 3px; margin: -1px -3px; }
+.g-name:hover, .g-name:focus-visible { background: var(--surface-2); outline: none; box-shadow: inset 0 -1px 0 var(--accent); }
+.g-rename { width: 100%; min-height: 34px; padding: 4px 8px; font: inherit; font-weight: 550; }
