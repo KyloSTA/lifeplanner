@@ -427,7 +427,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 .redisc:hover { outline: 2px solid var(--accent); }
 .redisc p { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
 .brain-bar { display: grid; gap: 10px; margin-bottom: 16px; }
-.brain-bar input[type="search"] { max-width: 520px; }
+.brain-bar input[type="search"] { max-width: none; }
 .filters { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-btn { border: 1px solid var(--border); background: var(--surface); border-radius: 99px; padding: 5px 12px; font-size: 13px; cursor: pointer; min-height: 32px; }
 .chip-btn small { color: var(--muted); margin-left: 2px; }
@@ -1059,3 +1059,51 @@ div.kpi { cursor: default; }
 .ctx-menu button.danger { color: var(--danger); }
 .ctx-menu kbd { margin-left: auto; font: inherit; font-size: 12px; color: var(--muted); }
 .ctx-menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 2px; }
+/* Habitude : nom sur toute la largeur, détails en dessous (lisible même en colonne étroite) */
+.hb-tap { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "emo name" "emo meta"; row-gap: 1px; column-gap: 12px; padding: 9px 12px; }
+.hb-emo { grid-area: emo; font-size: 22px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: var(--surface-2); }
+.hb-chip.done .hb-emo { background: color-mix(in srgb, var(--ok) 18%, transparent); }
+.hb-name { grid-area: name; overflow-wrap: normal; word-break: normal; line-height: 1.3; }
+.hb-meta { grid-area: meta; white-space: normal; line-height: 1.3; }
+.hb-minus { margin-right: 8px; flex: none; }
+
+/* =========================================================
+   Cerveau : haut de page et barre de recherche
+   ========================================================= */
+.brain-top { grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); align-items: stretch; }
+.brain-cap { display: flex; flex-direction: column; }
+.brain-cap .capture { flex: 1; display: flex; flex-direction: column; }
+.brain-cap .capture textarea { flex: 1; min-height: 120px; }
+.brain-aside { display: grid; gap: 18px; align-content: start; min-width: 0; }
+.brain-aside .evo-card { padding: 14px 16px; gap: 12px; flex-wrap: nowrap; }
+.brain-aside .evo-card svg.avatar { width: 56px; height: 56px; flex: none; }
+.brain-aside .evo-card .hc-main { min-width: 0; }
+.brain-aside #c-redisc .card-head { margin-bottom: 8px; }
+.brain-aside .redisc { padding: 10px 12px; margin-bottom: 8px; }
+.brain-aside .redisc p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rd-actions { display: flex; align-items: center; gap: 8px; }
+.rd-actions .btn.primary { flex: 1; }
+
+.brain-bar { display: grid; gap: 12px; padding: 14px 16px; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.brain-search { position: relative; }
+.brain-search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+.brain-search input { width: 100%; height: 44px; padding: 0 14px 0 40px; border-radius: 12px; border: 1px solid transparent; background: var(--surface-2); font-size: 15px; }
+.brain-search input:focus { background: var(--surface); }
+.brain-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.brain-filters .chip-btn { min-height: 34px; padding: 5px 13px; font-weight: 600; background: var(--surface-2); border-color: transparent; }
+.brain-filters .chip-btn:hover { border-color: var(--border); background: var(--surface); }
+.brain-filters .chip-btn.on { background: var(--accent); border-color: var(--accent); }
+.brain-filters .arch-chip { margin-left: auto; background: transparent; border: 1px dashed var(--border); color: var(--muted); }
+.brain-tags { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding-top: 10px; border-top: 1px solid var(--border); }
+.brain-tags > span { font-size: 12px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
+.brain-tags .chip-btn { min-height: 28px; padding: 3px 10px; font-size: 12.5px; background: transparent; border-color: transparent; color: var(--muted); }
+.brain-tags .chip-btn:hover { color: var(--text); background: var(--surface-2); }
+.brain-tags .chip-btn.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+@media (max-width: 900px) { .brain-top { grid-template-columns: minmax(0, 1fr); } .brain-filters .arch-chip { margin-left: 0; } }.brain-search { display: block; }
+
+/* Logo = Aujourd'hui (l'entrée du menu ne reste que dans la barre du bas sur cellulaire) */
+.rail a.brand-logo { padding: 0; min-height: 0; gap: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; flex: none; transition: transform .12s, box-shadow .12s; }
+.rail a.brand-logo:hover { background: none; transform: scale(1.06); }
+.rail a.brand-logo.active { background: none; box-shadow: 0 0 0 2px var(--accent); }
+.rail a.brand-logo img { width: 32px; height: 32px; display: block; }
+@media (min-width: 601px) { .rail > a[data-route="today"] { display: none; } }

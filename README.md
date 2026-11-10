@@ -55,7 +55,8 @@ supprimer des missions. Les changements apparaissent instantanément dans l'app,
 | **Réglages** | Connexion Google Agenda, assistant, sauvegarde/restauration, **ordre des onglets du menu**, thème |
 
 Pour réorganiser le menu : **Réglages → Menu**, puis les flèches ↑ ↓ (Réglages reste en bas).
-**Semaine**, **Carnet** et le **Lanceur** sont les petites icônes à droite du logo (sur cellulaire :
+Un clic sur le **logo** ramène à **Aujourd'hui**. **Semaine**, **Carnet** et le **Lanceur** sont les
+petites icônes à droite du logo (sur cellulaire : Aujourd'hui est dans la barre du bas, les trois autres
 dans le menu **Plus**).
 
 ## Assistant (page Aujourd'hui)
