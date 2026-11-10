@@ -138,7 +138,7 @@ export function taskHTML(t, ref, opts = {}) {
   const sd = subs.filter((s) => s.done).length;
   const late = t.date && ref && t.date < ref && !t.done;
   const goal = t.goalId && goalsCache.find((g) => g.id === t.goalId);
-  const dateChip = late ? `<span class="chip warn">${U.fmtShort(U.parseISO(t.date))}</span>`
+  const dateChip = late ? `<span class="chip warn" title="Prévue le ${U.fmtShort(U.parseISO(t.date))}">⚠ En retard · ${U.fmtShort(U.parseISO(t.date))}</span>`
     : opts.showDate ? `<span class="chip">${t.date ? U.fmtShort(U.parseISO(t.date)) : 'sans date'}</span>` : '';
   // Les pastilles vont sous le titre : le titre garde toute la largeur, même dans une colonne étroite.
   const focusChip = timer.current()?.taskId === t.id ? '<span class="chip focus-chip" title="Minuteur en cours">⏱ focus</span>' : '';

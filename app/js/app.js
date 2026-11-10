@@ -305,8 +305,9 @@ async function renderToday() {
     </div>`;
   $('#add-ev').onclick = () => eventModal(today, renderToday);
   // Le résumé du haut suit les cases cochées (missions, habitudes…)
-  const refreshSummary = U.debounce(() => heroCard(), 500);
-  $('.today-cols', view).addEventListener('click', () => refreshSummary());
+  const refreshSummary = U.debounce(() => heroCard(), 800);
+  // clic (cocher), Entrée (ajouter une mission) ou changement : le résumé suit
+  for (const ev of ['click', 'submit', 'change']) $('.today-cols', view).addEventListener(ev, () => refreshSummary(), true);
 
   // Agenda
   const agenda = async () => {
@@ -782,23 +783,23 @@ async function renderHero() {
             ${AV.avatarSVG({ ...av, evoFx: true, evo: i }, 64)}<b>${st.icon} ${esc(st.name)}</b><small>${i <= s.evo ? esc(st.desc) : `${st.k} Savoir`}</small></div>`).join('')}</div>
           <label class="check-line"><input type="checkbox" id="evo-fx" ${av.evoFx === false ? '' : 'checked'}> Afficher les effets d’évolution sur mon avatar</label>
         </section>
-        <section class="card">
-          <div class="card-head"><h2>Personnalisation</h2><span class="muted">Monte de niveau pour débloquer plus d’options</span></div>
+        <details class="card hero-fold">
+          <summary><h2>🎨 Personnalisation</h2><span class="muted">Monte de niveau pour débloquer plus d’options</span></summary>
           <div id="custom"></div>
-        </section>
-        <section class="card">
-          <div class="card-head"><h2>Badges</h2><span class="muted">${owned.size}/${game.BADGES.length}</span></div>
+        </details>
+        <details class="card hero-fold">
+          <summary><h2>🏅 Badges</h2><span class="muted">${owned.size}/${game.BADGES.length}</span></summary>
           <div class="badges">${game.BADGES.map((b) => `<div class="badge ${owned.has(b.id) ? 'on' : ''}" title="${esc(b.desc)}">
             <span class="bi">${b.icon}</span><b>${esc(b.name)}</b><small>${esc(b.desc)}</small></div>`).join('')}</div>
-        </section>
-        <section class="card">
-          <div class="card-head"><h2>Comment gagner des XP</h2></div>
+        </details>
+        <details class="card hero-fold">
+          <summary><h2>📜 Comment gagner des XP</h2></summary>
           <ul class="rules">${game.RULES.map(([i, l, x]) => `<li><span>${i}</span><span>${esc(l)}</span><b>+${x}</b></li>`).join('')}</ul>
-        </section>
-        <section class="card">
-          <div class="card-head"><h2>Derniers gains</h2></div>
+        </details>
+        <details class="card hero-fold">
+          <summary><h2>⚡ Derniers gains</h2><span class="muted">${s.recent[0] ? `+${s.recent[0].amount} · ${esc(s.recent[0].reason)}` : ''}</span></summary>
           <ul class="rules">${s.recent.map((e) => `<li><span class="muted">${U.fmtShort(new Date(e.at))}</span><span>${esc(e.reason)}</span><b>+${e.amount}</b></li>`).join('') || '<li class="empty-sm">Accomplis une mission pour gagner tes premiers XP !</li>'}</ul>
-        </section>
+        </details>
       </div>
     </div>`;
 
@@ -1905,19 +1906,20 @@ async function renderPage(id) {
           <button data-tool="select" title="Sélection : déplacer, agrandir ou retirer une image"><svg viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6z"/></svg></button>
         </div>
         <label class="btn" id="ink-img" title="Ajouter une image (tu peux aussi la coller avec Ctrl + V ou la glisser sur la page)"><input type="file" accept="image/*" multiple hidden>🖼 Image</label>
-        <label class="btn" id="ink-doc" title="Joindre un document à cette page (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎</label>
+        <label class="btn ink-extra" id="ink-doc" title="Joindre un document à cette page (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎</label>
         <div class="seg" id="colors"></div>
-        <div class="seg" id="sizes">${[6, 9, 13].map((s, i) => `<button data-size="${i}" class="${i === 1 ? 'on' : ''}" title="Épaisseur"><span class="dot" style="width:${s}px;height:${s}px"></span></button>`).join('')}</div>
+        <div class="seg ink-extra" id="sizes">${[6, 9, 13].map((s, i) => `<button data-size="${i}" class="${i === 1 ? 'on' : ''}" title="Épaisseur"><span class="dot" style="width:${s}px;height:${s}px"></span></button>`).join('')}</div>
         <div class="seg">
           <button id="undo" title="Annuler (Ctrl+Z)">${ICONS.undo}</button>
           <button id="redo" title="Rétablir (Ctrl+Y)">${ICONS.redo}</button>
         </div>
         <div class="seg"><button id="finger" title="Doigt : défiler (désactivé = le doigt dessine)" class="on">${ICONS.hand}</button></div>
         <span class="spacer"></span>
-        <select id="bg" aria-label="Fond de page">${BGS.map(([v, l]) => `<option value="${v}" ${meta.bg === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
-        <button class="btn" id="more">+ Espace</button>
-        <button class="btn" id="png">Exporter</button>
-        <button class="btn danger" id="clear">Effacer</button>
+        <button class="btn ink-more-btn" id="ink-more" type="button" aria-label="Plus d’outils" aria-expanded="false" title="Plus d’outils">⋯</button>
+        <select id="bg" class="ink-extra" aria-label="Fond de page">${BGS.map(([v, l]) => `<option value="${v}" ${meta.bg === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <button class="btn ink-extra" id="more">+ Espace</button>
+        <button class="btn ink-extra" id="png">Exporter</button>
+        <button class="btn danger ink-extra" id="clear">Effacer</button>
         <span class="saved muted" id="saved"></span>
       </div>
       <div class="ink-docs" id="ink-docs" hidden></div>
@@ -2097,6 +2099,8 @@ async function renderPage(id) {
   $('#bg').onchange = (e) => ed.setBg(e.target.value);
   $('#more').onclick = () => { if (!ed.extend()) toast('Taille maximale de page atteinte'); else $('#ink-scroll').scrollBy({ top: 400, behavior: 'smooth' }); };
   $('#png').onclick = () => ed.exportPNG(meta.title);
+  // Cellulaire : les outils moins utilisés sont derrière « ⋯ »
+  $('#ink-more').onclick = (e) => { const bar = $('.ink-bar'); bar.classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', bar.classList.contains('open')); };
   $('#clear').onclick = async () => { if (await confirmBox('Effacer tout le contenu de la page ? (Ctrl+Z pour annuler ensuite)', 'Effacer')) ed.clear(); };
   $('#title').oninput = (e) => { meta.title = e.target.value || 'Sans titre'; $('#saved').textContent = '…'; save(); };
 

@@ -1357,3 +1357,100 @@ a.assoc-chip { padding: 4px 11px; }
 .pgoal.is-done .pg-head a { color: var(--ok); }
 .pgoal.is-done .pct { color: var(--ok); }
 .pgoal.is-done .bar i { background: var(--ok); }
+/* =========================================================
+   Corrections d'ergonomie (ordi et cellulaire)
+   ========================================================= */
+
+/* Héros : sections repliables */
+.hero-fold { padding: 0; }
+.hero-fold > summary { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; padding: 16px 20px; cursor: pointer; list-style: none; }
+.hero-fold > summary::-webkit-details-marker { display: none; }
+.hero-fold > summary::before { content: '›'; width: 12px; color: var(--muted); transition: transform .15s; }
+.hero-fold[open] > summary::before { transform: rotate(90deg); color: var(--accent); }
+.hero-fold > summary h2 { margin: 0; }
+.hero-fold > summary .muted { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.hero-fold > :not(summary) { padding: 0 20px 18px; }
+
+/* Semaine (ordi) : les jours passent à la ligne au lieu de défiler de côté */
+.week { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); overflow-x: visible; }
+.day { min-height: 200px; }
+
+/* Actualités : « Voir plus » */
+.nw-more { text-align: center; margin: 4px 0 0; }
+
+@media (max-width: 600px) {
+  /* Aujourd'hui : les missions d'abord, la capture ensuite et plus compacte */
+  .today .today-cols, .today .today-col { display: contents; }
+  #c-hero { order: 0; } .t-tasks { order: 1; } .t-habits { order: 2; } .capture-card { order: 3; } .t-agenda { order: 4; }
+  .assist { order: 5; } .t-workout { order: 6; } .t-rbq { order: 7; } .t-goals { order: 8; } .t-news { order: 9; } .t-ink { order: 10; } .t-quote { order: 11; }
+  .capture-card .capture textarea { min-height: 46px; height: 46px; transition: height .15s; }
+  .capture-card .capture textarea:focus, .capture-card .capture textarea:not(:placeholder-shown) { height: 110px; }
+  .capture-card .card-head { margin-bottom: 8px; }
+  .sum-hero { padding-bottom: 10px; }
+  .today-summary { padding: 12px; gap: 12px; }
+
+  /* Page manuscrite : une seule rangée d'outils, le reste derrière « ⋯ » */
+  .ink-bar { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 6px 8px; scrollbar-width: none; }
+  .ink-bar::-webkit-scrollbar { display: none; }
+  .ink-bar > * { flex: none; }
+  .ink-bar .ink-title { width: 120px; max-width: 120px; }
+  .ink-bar .spacer { display: none; }
+  .ink-bar .ink-extra { display: none; }
+  .ink-bar.open { flex-wrap: wrap; overflow-x: visible; }
+  .ink-bar.open .ink-extra { display: inline-flex; }
+  .ink-bar .seg button { min-width: 38px; height: 38px; }
+  .ink-scroll { padding: 12px 6px 40px; }
+
+  /* Semaine : une liste de jours, de haut en bas */
+  .week { grid-template-columns: 1fr; }
+  .day { min-height: 0; }
+  .day .tasks:empty { display: none; }
+
+  /* En-tête du planificateur : onglets, puis une rangée compacte */
+  .head-actions:has(.planner-tabs) { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; width: 100%; align-items: center; }
+  .head-actions:has(.planner-tabs) .planner-tabs { grid-column: 1 / -1; }
+  .head-actions:has(.planner-tabs) #sync { min-width: 0; overflow: hidden; font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+  .head-actions:has(.planner-tabs) #sync a { font-size: 12px; }
+  .head-actions:has(.planner-tabs) .btn { min-height: 38px; padding: 0 12px; }
+  .page-head:has(.planner-tabs) { margin-bottom: 14px; }
+  .page-head:has(.planner-tabs) h1 { font-size: 22px; }
+
+  /* Mois : toute la case du jour se touche (elle ouvre la semaine) */
+  .mc-day { position: relative; }
+  .mc-num::after { content: ''; position: absolute; inset: 0; }
+  .mc-j { pointer-events: none; }
+  .mc-j:not(.has) { display: none; }
+  .mc-tasks { position: relative; z-index: 1; pointer-events: none; }
+
+  /* Héros : les habitudes d'abord */
+  .hero-layout { display: flex; flex-direction: column; }
+  .hero-right { display: contents; }
+  .hero-habits { order: 0; }
+  .hero-id { order: 1; position: static; }
+  .hero-right > :not(.hero-habits) { order: 2; }
+
+  /* Habitudes : les 7 derniers jours (cases plus grandes) */
+  .hb-strip { grid-template-columns: repeat(7, 1fr); }
+  .hb-strip .hb-day:nth-child(-n+7) { display: none; }
+  .hb-day i { max-width: 30px; }
+}
+
+/* Écran tactile : boutons plus faciles à toucher */
+@media (pointer: coarse) {
+  .g-mv, .g-done { width: 36px; height: 36px; font-size: 16px; }
+  .card-head > a, .card-head .muted > a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 4px; }
+  .task .exp, .task .x { min-width: 36px; min-height: 36px; }
+  .pg-plus { width: 36px; height: 36px; }
+}
+
+/* Bouton « ⋯ » de la page manuscrite : seulement sur cellulaire, juste après les outils */
+.ink-more-btn { display: none; }
+@media (max-width: 600px) {
+  .ink-more-btn { display: inline-flex; width: 40px; padding: 0; justify-content: center; font-size: 18px; }
+  .ink-bar > * { order: 5; }
+  .ink-bar > a.btn.icon { order: 0; }
+  .ink-bar .ink-title { order: 1; width: 96px; max-width: 96px; }
+  .ink-bar #tools { order: 2; }
+  .ink-bar #ink-more { order: 3; }
+  .ink-bar #colors { order: 4; }
+}@media (max-width: 600px) { .ink-bar .ink-title { order: 6; width: 140px; max-width: 140px; } }

@@ -134,6 +134,7 @@ export async function renderPage(ctx, force = false) {
   const { view, toast, modal } = ctx;
   const fl = await feeds();
   const byId = Object.fromEntries(fl.map((f) => [f.id, f]));
+  let shown = 23; // 1 à la une + 23 titres, puis « Voir plus »
   view.innerHTML = `
     <header class="page-head">
       <div><p class="eyebrow">Ce qui se passe</p><h1>Actualités</h1></div>
@@ -162,11 +163,13 @@ export async function renderPage(ctx, force = false) {
         </div>
       </article>`;
     $('#nw-list').innerHTML = items.length
-      ? `${card(top, true)}<div class="nw-grid">${rest.map((x) => card(x)).join('')}</div>`
+      ? `${card(top, true)}<div class="nw-grid">${rest.slice(0, shown).map((x) => card(x)).join('')}</div>
+        ${rest.length > shown ? `<p class="nw-more"><button class="btn" id="nw-more">Voir plus de titres (${rest.length - shown})</button></p>` : ''}`
       : `<div class="card empty-card"><p>${data.errors.length ? 'Impossible de charger les actualités (connexion ?).' : 'Aucune source activée : choisis-en dans ⚙ Sources.'}</p></div>`;
     if (data.errors.length && items.length) $('#nw-list').insertAdjacentHTML('beforeend', `<p class="hint muted">Non chargé : ${data.errors.map(esc).join(' · ')}</p>`);
-    $$('[data-nf]').forEach((b) => (b.onclick = () => { filter = b.dataset.nf; draw(false); }));
+    $$('[data-nf]').forEach((b) => (b.onclick = () => { filter = b.dataset.nf; shown = 23; draw(false); }));
     bindSave(view, data.items, byId, toast);
+    $('#nw-more')?.addEventListener('click', () => { shown += 24; draw(false); });
   };
   const $ = (s) => view.querySelector(s), $$ = (s) => [...view.querySelectorAll(s)];
   $('#nw-ref').onclick = () => { $('#nw-list').innerHTML = '<div class="card empty-card"><p>Actualisation…</p></div>'; draw(true); };
