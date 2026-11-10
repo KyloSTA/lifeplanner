@@ -202,8 +202,7 @@ export async function renderPage(ctx) {
     <div class="rpg-layout">
       <div class="rpg-col">
         <section class="card rpg-hero">
-          <div class="rpg-hero-av">${AV.avatarSVG(avCfg, 132)}
-            ${SLOTS.map((sl, i) => `<span class="rpg-eq rpg-eq-${i}" title="${sl.name}${eqItems[sl.id] ? ' : ' + esc(eqItems[sl.id].name) : ''}" style="--rc:${eqItems[sl.id] ? RARITY[eqItems[sl.id].rarity].color : 'var(--border)'}">${eqItems[sl.id] ? eqItems[sl.id].icon : `<i>${sl.icon}</i>`}</span>`).join('')}</div>
+          <div class="rpg-hero-body">${AV.heroSVG(avCfg, Object.values(eqItems).filter(Boolean), 260)}</div>
           <h2>${esc(avCfg.name || 'Ton héros')}</h2>
           <p class="muted">Niveau ${level.level} · ${esc(game.titleFor(level.level))} · ${s.wins || 0} victoire${(s.wins || 0) > 1 ? 's' : ''}</p>
           <p class="rpg-energy-hint">⚡ Prochaine énergie dans <b>${nextEnergyXp} XP</b> : accomplis une mission, une habitude ou un entraînement.</p>
@@ -290,6 +289,13 @@ export async function renderPage(ctx) {
     if (x.gold < p) return;
     x.gold -= p; x.inv.push({ uid: U.uid(), id: it.id }); addLog(x, `🛒 Acheté : ${it.icon} ${it.name} (−${p} 🪙)`); toast(`${it.icon} ${it.name} acheté`);
   })));
+}
+
+/** Objets équipés (pour dessiner le héros en entier ailleurs). */
+export async function equippedItems() {
+  const s = await db.get('settings', 'rpg');
+  if (!s) return [];
+  return SLOTS.map((sl) => ITEM[(s.inv.find((x) => x.uid === s.equip?.[sl.id]) || {}).id]).filter(Boolean);
 }
 
 /** Pour le résumé ailleurs (page du héros) : énergie, or, coffres, chapitre. */

@@ -31,7 +31,20 @@ export const BACKS = [
   { id: 'forest', g: ['#43e97b', '#2bb38f'], lvl: 8 }, { id: 'galaxy', g: ['#1e1145', '#6b3fd4'], stars: true, lvl: 12 },
 ];
 
-export const DEFAULT_AVATAR = { skin: 1, hair: 'short', hairColor: 1, eyes: 'dots', outfit: 0, bg: 'lilac', acc: 'none', name: '' };
+// Corps entier (Aventure et page du héros)
+export const TOPS = [
+  { id: 'tshirt', name: 'T-shirt' }, { id: 'hoodie', name: 'Chandail à capuchon' },
+  { id: 'dress', name: 'Robe', lvl: 2 }, { id: 'jacket', name: 'Veste ouverte', lvl: 4 },
+];
+export const PANTS = [
+  { c: '#334155' }, { c: '#1e3a8a' }, { c: '#6b4f2a' }, { c: '#111827' },
+  { c: '#9ca3af', lvl: 3 }, { c: '#166534', lvl: 5 }, { c: '#7c2d12', lvl: 7 },
+];
+export const SHOES = [
+  { c: '#1f2937' }, { c: '#f8fafc' }, { c: '#7c4a2d' }, { c: '#dc2626', lvl: 3 }, { c: '#2563eb', lvl: 5 }, { c: '#f59e0b', lvl: 8 },
+];
+
+export const DEFAULT_AVATAR = { skin: 1, hair: 'short', hairColor: 1, eyes: 'dots', outfit: 0, bg: 'lilac', acc: 'none', name: '', top: 'tshirt', pants: 0, shoes: 0 };
 
 // type "color" -> la valeur est l'index ; sinon la valeur est l'id
 export const CATEGORIES = [
@@ -39,7 +52,10 @@ export const CATEGORIES = [
   { key: 'hair', name: 'Coiffure', items: HAIRS, type: 'style' },
   { key: 'hairColor', name: 'Couleur des cheveux', items: HAIR_COLORS, type: 'color' },
   { key: 'eyes', name: 'Yeux', items: EYES, type: 'style' },
-  { key: 'outfit', name: 'Tenue', items: OUTFITS, type: 'color' },
+  { key: 'outfit', name: 'Couleur du haut', items: OUTFITS, type: 'color' },
+  { key: 'top', name: 'Style du haut', items: TOPS, type: 'style', body: true },
+  { key: 'pants', name: 'Pantalon', items: PANTS, type: 'color' },
+  { key: 'shoes', name: 'Souliers', items: SHOES, type: 'color' },
   { key: 'acc', name: 'Accessoire', items: ACCS, type: 'style' },
   { key: 'bg', name: 'Fond', items: BACKS, type: 'bg' },
 ];
@@ -192,4 +208,121 @@ export function avatarSVG(cfg = {}, size = 48) {
   <ellipse cx="46" cy="66" rx="4" ry="2.4" fill="#ff7b7b" opacity=".35"/><ellipse cx="74" cy="66" rx="4" ry="2.4" fill="#ff7b7b" opacity=".35"/>
   <path d="M54 68Q60 73.5 66 68" fill="none" stroke="#7a3b2e" stroke-width="2.2" stroke-linecap="round"/>
   ${(HAIR_TOP[a.hair] || HAIR_TOP.short)(hair)}${(ACC[a.acc] || ACC.none)()}${evoFront(stage)}</g></svg>`;
+}
+
+/* =========================================================
+   Corps entier (Aventure, page du héros) + équipement porté
+   equip : liste d'objets { slot, id, icon, rarity } (voir rpg-data.js)
+   ========================================================= */
+const RARE_GLOW = { rare: '#3b82f6', epique: '#a855f7', legendaire: '#f59e0b' };
+
+// Couvre-chefs (dessinés dans le repère de la tête, 0-120)
+const HEADGEAR = {
+  bandeau: () => `<rect x="36" y="38" width="48" height="7" rx="3.5" fill="#e11d48"/><path d="M84 41L95 36L93 46Z" fill="#be123c"/>`,
+  chapeau: () => `<rect x="44" y="6" width="32" height="30" rx="3" fill="#1f2937"/><rect x="44" y="27" width="32" height="5" fill="#a855f7"/><ellipse cx="60" cy="36" rx="30" ry="5" fill="#111827"/>`,
+  casque: () => `<path d="M33 46C33 18 87 18 87 46Z" fill="#facc15" stroke="#ca8a04" stroke-width="1.5"/><rect x="28" y="43" width="64" height="6" rx="3" fill="#eab308"/><rect x="56" y="20" width="8" height="24" rx="3" fill="#fde047"/>`,
+  heaume: () => `<path d="M33 64C30 24 90 24 87 64L87 76Q60 84 33 76Z" fill="#cbd5e1" stroke="#64748b" stroke-width="1.6"/>
+    <rect x="40" y="53" width="40" height="6" rx="2" fill="#1e293b"/><path d="M60 28V50" stroke="#94a3b8" stroke-width="3"/>
+    <path d="M60 24C70 10 84 14 86 22C78 18 68 20 62 30Z" fill="#dc2626"/>`,
+  couronne: () => ACC.crown(),
+};
+const COVERS_HAIR = new Set(['casque', 'heaume', 'chapeau']);
+
+/** Tête seule, dans le repère 0-120 (réutilise le dessin de l'avatar). */
+function headLayer(a, skin, hair, gear) {
+  const backHair = a.hair === 'long' && !COVERS_HAIR.has(gear?.id)
+    ? `<path d="M33 54C32 28 88 28 87 54L90 96C78 102 42 102 30 96Z" fill="${hair}"/>`
+    : a.hair === 'ponytail' && !COVERS_HAIR.has(gear?.id) ? `<path d="M77 38C100 44 98 78 86 92C88 72 84 56 73 46Z" fill="${hair}"/>` : '';
+  const top = COVERS_HAIR.has(gear?.id) ? '' : (HAIR_TOP[a.hair] || HAIR_TOP.short)(hair);
+  return `${backHair}
+    <circle cx="37" cy="58" r="4.5" fill="${skin}"/><circle cx="83" cy="58" r="4.5" fill="${skin}"/>
+    <ellipse cx="60" cy="56" rx="23" ry="25" fill="${skin}"/>
+    ${(EYE[a.eyes] || EYE.dots)()}
+    <ellipse cx="46" cy="66" rx="4" ry="2.4" fill="#ff7b7b" opacity=".35"/><ellipse cx="74" cy="66" rx="4" ry="2.4" fill="#ff7b7b" opacity=".35"/>
+    <path d="M54 68Q60 73.5 66 68" fill="none" stroke="#7a3b2e" stroke-width="2.2" stroke-linecap="round"/>
+    ${top}${gear ? (HEADGEAR[gear.id] || (() => ''))() : (ACC[a.acc] || ACC.none)()}`;
+}
+
+export function heroSVG(cfg = {}, equip = [], height = 240) {
+  const a = { ...DEFAULT_AVATAR, ...cfg };
+  const id = ++n;
+  const skin = (SKINS[a.skin] || SKINS[0]).c;
+  const hair = (HAIR_COLORS[a.hairColor] || HAIR_COLORS[0]).c;
+  const shirt = (OUTFITS[a.outfit] || OUTFITS[0]).c;
+  const pants = (PANTS[a.pants] || PANTS[0]).c;
+  const shoes = (SHOES[a.shoes] || SHOES[0]).c;
+  const bg = BACKS.find((b) => b.id === a.bg) || BACKS[0];
+  const eq = Object.fromEntries(equip.filter(Boolean).map((e) => [e.slot, e]));
+  const stage = a.evoFx === false ? 0 : Number(a.evo) || 0;
+  let defs = `<linearGradient id="hbg${id}" x1="0" y1="0" x2="0" y2="1">${bg.g ? `<stop offset="0" stop-color="${bg.g[0]}"/><stop offset="1" stop-color="${bg.g[1]}"/>` : `<stop offset="0" stop-color="${bg.fill}"/><stop offset="1" stop-color="${bg.fill}"/>`}</linearGradient>
+    <pattern id="mail${id}" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#9ca3af"/><circle cx="2.5" cy="2.5" r="1.7" fill="none" stroke="#6b7280" stroke-width=".8"/></pattern>
+    <linearGradient id="plate${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1f5f9"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>`;
+  defs += evoBack(stage, id);
+  const torso = 'M56 90Q80 84 104 90L108 150L52 150Z';
+  const top = a.top;
+  const longSleeves = top === 'hoodie' || top === 'jacket';
+  const armor = eq.armure?.id;
+  const sleeveCol = armor === 'cotte' ? `url(#mail${id})` : armor === 'armure-lune' ? `url(#plate${id})` : shirt;
+
+  // Arrière-plan, ombre au sol, cape
+  let s = `<rect width="160" height="240" rx="18" fill="url(#hbg${id})"/>`;
+  if (bg.stars) s += [[20, 25], [140, 18], [132, 90], [14, 120], [36, 60], [128, 160]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.4" fill="#fff" opacity=".85"/>`).join('');
+  s += `<ellipse cx="80" cy="222" rx="46" ry="7" fill="#000" opacity=".15"/>`;
+  if (eq.armure && RARE_GLOW[eq.armure.rarity] && armor !== 'cape') s += `<ellipse cx="80" cy="120" rx="44" ry="50" fill="${RARE_GLOW[eq.armure.rarity]}" opacity=".12"/>`;
+  if (armor === 'cape') s += `<path d="M57 90L38 204Q80 214 122 204L103 90Z" fill="#4c1d95"/><path d="M57 90L46 204Q60 208 66 206L70 92Z" fill="#5b21b6"/>`;
+  if (top === 'hoodie') s += `<path d="M62 92Q80 74 98 92Q80 100 62 92Z" fill="${shirt}" opacity=".9"/>`;
+
+  // Jambes et souliers
+  s += `<rect x="58" y="146" width="20" height="62" rx="6" fill="${pants}"/><rect x="82" y="146" width="20" height="62" rx="6" fill="${pants}"/>
+    <path d="M78 150V200" stroke="#000" stroke-opacity=".12" stroke-width="2"/>
+    <ellipse cx="66" cy="210" rx="13" ry="7" fill="${shoes}"/><ellipse cx="94" cy="210" rx="13" ry="7" fill="${shoes}"/>
+    <path d="M56 208H76M84 208H104" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>`;
+
+  // Bras (derrière le torse)
+  const arm = (x1, x2, col, w) => `<path d="M${x1} 96L${x2} 146" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`;
+  if (longSleeves || armor === 'cotte' || armor === 'armure-lune') s += arm(58, 45, sleeveCol, 13) + arm(102, 115, sleeveCol, 13);
+  else s += arm(58, 45, skin, 10) + arm(102, 115, skin, 10) + `<path d="M56 90L46 112L57 116L62 98Z" fill="${shirt}"/><path d="M104 90L114 112L103 116L98 98Z" fill="${shirt}"/>`;
+  s += `<circle cx="45" cy="150" r="6.5" fill="${skin}"/><circle cx="115" cy="150" r="6.5" fill="${skin}"/>`;
+
+  // Cou + torse (selon le style du haut)
+  s += `<rect x="73" y="74" width="14" height="18" rx="5" fill="${skin}"/><rect x="73" y="74" width="14" height="18" rx="5" fill="#000" opacity=".08"/>`;
+  if (top === 'dress') s += `<path d="M56 90Q80 84 104 90L118 188Q80 198 42 188Z" fill="${shirt}"/><path d="M58 128H102" stroke="#fff" stroke-opacity=".4" stroke-width="3"/>`;
+  else s += `<path d="${torso}" fill="${shirt}"/>`;
+  if (top === 'jacket') s += `<path d="M56 90Q66 88 72 96L70 150L52 150Z" fill="#1f2937" opacity=".85"/><path d="M104 90Q94 88 88 96L90 150L108 150Z" fill="#1f2937" opacity=".85"/>`;
+  if (top === 'hoodie') s += `<path d="M66 126H94V142H66Z" fill="#000" opacity=".12" rx="3"/><path d="M74 92V108M86 92V108" stroke="#fff" stroke-opacity=".7" stroke-width="1.6" stroke-linecap="round"/>`;
+  if (top === 'tshirt') s += `<path d="M70 89L80 99L90 89" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.4" stroke-linejoin="round"/>`;
+  s += `<rect x="56" y="144" width="48" height="6" rx="2" fill="#000" opacity=".25"/>`;
+
+  // Armure portée sur le torse
+  if (armor === 'tunique') s += `<path d="M56 92Q80 86 104 92L108 162L52 162Z" fill="#d6c19a"/><rect x="52" y="140" width="56" height="5" fill="#8b6b3d"/>`;
+  if (armor === 'cuir') s += `<path d="M56 91L71 93L68 150L52 150Z" fill="#7c4a2d"/><path d="M104 91L89 93L92 150L108 150Z" fill="#7c4a2d"/><circle cx="68" cy="112" r="1.6" fill="#facc15"/><circle cx="92" cy="112" r="1.6" fill="#facc15"/>`;
+  if (armor === 'cotte') s += `<path d="M55 91Q80 85 105 91L109 156L51 156Z" fill="url(#mail${id})" stroke="#4b5563" stroke-width="1"/>`;
+  if (armor === 'armure-lune') s += `<path d="M55 91Q80 85 105 91L108 152L52 152Z" fill="url(#plate${id})" stroke="#64748b" stroke-width="1.4"/>
+    <ellipse cx="55" cy="94" rx="10" ry="7" fill="url(#plate${id})" stroke="#64748b"/><ellipse cx="105" cy="94" rx="10" ry="7" fill="url(#plate${id})" stroke="#64748b"/>
+    <path d="M84 104A10 10 0 1 0 84 124A7.5 7.5 0 1 1 84 104Z" fill="#fbbf24"/>`;
+  if (armor === 'cape') s += `<circle cx="66" cy="93" r="3.5" fill="#fbbf24"/><circle cx="94" cy="93" r="3.5" fill="#fbbf24"/><path d="M66 93Q80 99 94 93" stroke="#fbbf24" stroke-width="1.5" fill="none"/>`;
+
+  // Bijou : pendentif (ou anneau à la main)
+  if (eq.bijou) {
+    if (eq.bijou.id === 'anneau') s += `<circle cx="113" cy="153" r="2.6" fill="none" stroke="#fbbf24" stroke-width="1.6"/>`;
+    else s += `<path d="M71 90Q80 104 89 90" fill="none" stroke="#fbbf24" stroke-width="1.2"/><text x="80" y="112" font-size="11" text-anchor="middle">${eq.bijou.icon}</text>`;
+  }
+  // Bouclier au bras gauche
+  if (armor === 'bouclier') s += `<path d="M27 120H55V140Q55 156 41 162Q27 156 27 140Z" fill="#2563eb" stroke="#1e3a8a" stroke-width="2"/><path d="M41 126V154M31 138H51" stroke="#fde047" stroke-width="2.4"/>`;
+
+  // Tête (repère 0-120 décalé), couvre-chef, effets d'évolution
+  s += `<g transform="translate(20 4)">${evoBehind(stage, id)}${headLayer(a, skin, hair, eq.tete)}${evoFront(stage)}</g>`;
+
+  // Arme dans la main droite, compagnon aux pieds
+  if (eq.arme) {
+    const glow = RARE_GLOW[eq.arme.rarity];
+    s += `<g transform="rotate(-28 118 146)">${glow ? `<circle cx="122" cy="132" r="16" fill="${glow}" opacity=".2"/>` : ''}<text x="122" y="146" font-size="34" text-anchor="middle">${eq.arme.icon}</text></g>`;
+  }
+  if (eq.compagnon) s += eq.compagnon.id === 'phenix'
+    ? `<text x="28" y="78" font-size="30" text-anchor="middle">${eq.compagnon.icon}</text>`
+    : `<text x="28" y="216" font-size="30" text-anchor="middle">${eq.compagnon.icon}</text>`;
+  if (Object.values(eq).some((e) => e.rarity === 'legendaire')) s += [[18, 40], [142, 30], [146, 120], [14, 150]].map(([x, y]) => spark(x, y, 4, '#fde68a')).join('');
+
+  const w = Math.round((height * 160) / 240);
+  return `<svg class="hero-body" viewBox="0 0 160 240" width="${w}" height="${height}" aria-hidden="true"><defs>${defs}</defs>${s}</svg>`;
 }

@@ -1579,3 +1579,10 @@ a.assoc-chip { padding: 4px 11px; }
 .rpg-slot small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
 .rpg-slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }.rpg-col .card-head { flex-wrap: wrap; row-gap: 2px; }
 .rpg-col .card-head > .muted { font-size: 13px; }
+
+/* Héros en entier */
+.hero-body { display: block; filter: drop-shadow(0 10px 24px rgba(0,0,0,.18)); }
+.rpg-hero-body { display: grid; place-items: center; padding: 4px 0; }
+#hero-big .hero-body { margin: 0 auto; }
+.opt.style .hero-body { filter: none; border-radius: 8px; }
+/* Pantalon et souliers : pastilles de couleur */
