@@ -7,7 +7,8 @@
 import { db, onDbChange, syncDb } from './db.js';
 import * as U from './util.js';
 import * as game from './game.js';
-import { chime } from './alarms.js';
+import { chime, DEVICE } from './alarms.js';
+import * as sync from './sync.js';
 
 const { esc, iso } = U;
 const DOW = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
@@ -120,6 +121,16 @@ const atTime = (day, hm) => { const d = U.parseISO(day); const [h, m] = hm.split
 
 const pending = new Map(); // habitudes qui attendent une réponse dans cette fenêtre : id -> heure du rappel
 
+// Rappels vus à l'écran, partagés entre appareils (réglage « habitSeen » synchronisé) : « id|jour|heure » -> appareil
+async function seenMap() { return (await db.get('settings', 'habitSeen')) || {}; }
+async function markSeen(keys) {
+  const today = iso(new Date());
+  const m = await seenMap();
+  for (const k of Object.keys(m)) if (!k.includes(`|${today}|`)) delete m[k]; // on garde seulement aujourd'hui
+  for (const k of keys) m[k] = DEVICE;
+  await db.put('settings', m, 'habitSeen');
+}
+
 async function notify(h) {
   try {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -154,6 +165,7 @@ async function check() {
   const run = async () => {
     const now = Date.now(), today = iso(new Date());
     const r = loadRem();
+    const seen = await seenMap(); // rappels déjà vus sur un autre appareil (synchronisé)
     let fired = false;
     for (const h of await list()) {
       if (!isDue(h, new Date()) || doneOn(h, today)) { pending.delete(h.id); continue; }
@@ -162,7 +174,10 @@ async function check() {
       if (sz && sz <= now) { delete r['snooze|' + h.id]; ring = true; }
       for (const t of h.times || []) {
         const key = `${h.id}|${today}|${t}`;
-        if (!r[key] && atTime(today, t) <= now) { r[key] = 1; ring = true; }
+        if (r[key] || atTime(today, t) > now) continue;
+        r[key] = 1;
+        if (seen[key] && seen[key] !== DEVICE) continue; // déjà vu ailleurs : pas de rappel ici
+        ring = true;
       }
       if (ring) { pending.set(h.id, now); notify(h); fired = true; }
     }
@@ -180,9 +195,20 @@ async function check() {
 let bannerEl = null, onChanged = () => {};
 async function drawBanner() {
   if (!pending.size) { if (bannerEl) bannerEl.innerHTML = ''; return; }
-  if (!bannerEl) { bannerEl = document.createElement('div'); bannerEl.id = 'habit-root'; document.body.appendChild(bannerEl); }
-  const hs = (await Promise.all([...pending.keys()].map((id) => db.get('habits', id)))).filter(Boolean);
   const today = iso(new Date());
+  // Déjà vu sur un autre appareil pendant qu'il attendait ici : on le retire
+  const seen = await seenMap();
+  const keysOf = (h) => (h.times || []).filter((t) => atTime(today, t) <= Date.now()).map((t) => `${h.id}|${today}|${t}`);
+  let hs = (await Promise.all([...pending.keys()].map((id) => db.get('habits', id)))).filter(Boolean);
+  for (const h of hs) { const ks = keysOf(h); if (ks.length && ks.every((k) => seen[k] && seen[k] !== DEVICE)) { pending.delete(h.id); closeNotification(h.id); } }
+  hs = hs.filter((h) => pending.has(h.id));
+  if (!hs.length) { if (bannerEl) bannerEl.innerHTML = ''; return; }
+  if (!bannerEl) { bannerEl = document.createElement('div'); bannerEl.id = 'habit-root'; document.body.appendChild(bannerEl); }
+  // Affiché à l'écran ici : vu par cet appareil (les autres ne le rappelleront pas)
+  if (document.visibilityState === 'visible') {
+    const add = hs.flatMap(keysOf).filter((k) => !seen[k]);
+    if (add.length) await markSeen(add);
+  }
   bannerEl.innerHTML = hs.map((h) => `<div class="hb-rem" role="alert" data-id="${h.id}">
       <span class="hb-rem-emo">${esc(h.emoji)}</span>
       <div class="hb-rem-txt"><small>🔔 C’est l’heure</small><strong>${esc(h.name)}</strong>${(h.target || 1) > 1 ? `<small>${countOn(h, today)}/${h.target} aujourd’hui</small>` : ''}</div>
@@ -230,10 +256,14 @@ async function ensurePreset() {
 export function start(onChange = () => {}) {
   onChanged = onChange;
   ensurePreset().then(() => onChange()).catch(console.error);
-  setTimeout(check, 2000);
-  setInterval(check, 30_000);
-  addEventListener('focus', check);
-  onDbChange(({ store }) => { if (store === 'habits') drawBanner(); });
+  // On attend le premier échange avec les autres appareils (rappel déjà vu ou habitude déjà cochée ailleurs)
+  sync.firstSync().then(() => {
+    check();
+    setInterval(check, 30_000);
+    addEventListener('focus', check);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) drawBanner(); });
+  });
+  onDbChange(({ store }) => { if (store === 'habits' || store === 'settings') drawBanner(); });
   navigator.serviceWorker?.addEventListener('message', async (e) => {
     const { type, action, id } = e.data || {};
     if (type !== 'habit-action' || !id) return;
