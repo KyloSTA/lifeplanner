@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Life Planner — Reddit et YouTube → Cerveau",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Ajoute un bouton « Cerveau » aux posts Reddit et aux vidéos YouTube ouverts depuis le Lanceur de Life Planner (ou dans leur app installée), pour les enregistrer comme note.",
   "permissions": ["storage"],
   "host_permissions": [
