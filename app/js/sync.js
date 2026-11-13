@@ -161,6 +161,15 @@ export async function fetchDoc(driveId) {
 let running = null;
 let onApplied = () => {};
 
+// Première synchro à l'ouverture : les alarmes et rappels l'attendent, pour ne pas sonner pour
+// une alarme déjà vue ou réglée sur un autre appareil (au plus 10 s d'attente).
+let firstResolve = null;
+const firstPromise = new Promise((r) => { firstResolve = r; });
+export function firstSync(maxMs = 10_000) {
+  if (!st.on || !navigator.onLine) return Promise.resolve();
+  return Promise.race([firstPromise, new Promise((r) => setTimeout(r, maxMs))]);
+}
+
 export function syncNow() {
   if (!st.on) return Promise.resolve(0);
   if (running) return running;
@@ -192,7 +201,7 @@ export function syncNow() {
   };
   // Une seule synchro à la fois, même si plusieurs fenêtres sont ouvertes
   const p = navigator.locks ? navigator.locks.request('lp-sync', go) : go();
-  running = p.finally(() => { running = null; });
+  running = p.finally(() => { running = null; firstResolve(); });
   return running;
 }
 
@@ -212,7 +221,7 @@ let debounceT = null;
 export function start(cb = () => {}) {
   onApplied = cb;
   onLocalChange(() => { if (!st.on) return; clearTimeout(debounceT); debounceT = setTimeout(syncNow, 4000); });
-  setTimeout(syncNow, 1500); // ne fait rien tant que la synchro n'est pas activée
+  setTimeout(syncNow, 300); // ne fait rien tant que la synchro n'est pas activée (les alarmes attendent ce premier échange)
   setInterval(syncNow, 2 * 60_000);
   addEventListener('online', () => syncNow());
   addEventListener('lp-google', () => syncNow());

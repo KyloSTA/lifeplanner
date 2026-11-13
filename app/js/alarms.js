@@ -7,9 +7,21 @@
 import { db, onDbChange } from './db.js';
 import * as U from './util.js';
 import { setTaskDone } from './tasks.js';
+import * as sync from './sync.js';
 
 const { esc } = U;
 export const SNOOZES = [5, 10, 30, 60];
+
+/** Identifiant de cet appareil (pour savoir où une alarme a déjà été vue). */
+export const DEVICE = (() => {
+  try {
+    let d = localStorage.getItem('lp.deviceId');
+    if (!d) { d = U.uid(); localStorage.setItem('lp.deviceId', d); }
+    return d;
+  } catch { return 'local'; }
+})();
+/** Vue à l'écran sur un autre appareil : on ne la refait pas sonner ici. */
+const seenElsewhere = (t) => !!(t.alarmSeen && t.alarmSeen.by !== DEVICE);
 
 /* ---------- Conversion pour <input type="datetime-local"> ---------- */
 export const toInput = (ms) => {
@@ -37,9 +49,9 @@ async function edit(id, fn) {
   return t;
 }
 
-export const setAlarm = (id, at) => edit(id, (t) => { t.alarmAt = at || null; t.alarmState = null; });
-export const dismiss = (id) => edit(id, (t) => { t.alarmAt = null; t.alarmState = null; });
-export const snooze = (id, minutes) => edit(id, (t) => { t.alarmAt = Date.now() + minutes * 60_000; t.alarmState = null; });
+export const setAlarm = (id, at) => edit(id, (t) => { t.alarmAt = at || null; t.alarmState = null; t.alarmSeen = null; });
+export const dismiss = (id) => edit(id, (t) => { t.alarmAt = null; t.alarmState = null; t.alarmSeen = null; });
+export const snooze = (id, minutes) => edit(id, (t) => { t.alarmAt = Date.now() + minutes * 60_000; t.alarmState = null; t.alarmSeen = null; });
 
 /** Reporter : la mission passe à une autre date ; l'alarme garde la même heure ce jour-là. */
 export const postpone = (id, dateISO) => edit(id, (t) => {
@@ -51,6 +63,7 @@ export const postpone = (id, dateISO) => edit(id, (t) => {
     t.alarmAt = d.getTime();
   }
   t.alarmState = null;
+  t.alarmSeen = null;
 });
 
 export async function complete(id) {
@@ -171,7 +184,11 @@ async function check() {
 /* ---------- Fenêtre qui sonne ---------- */
 let hostEl = null, onChanged = () => {};
 async function drawRinging() {
-  const ringing = (await db.all('tasks')).filter((t) => t.alarmState === 'ringing' && !t.done).sort((a, b) => a.alarmAt - b.alarmAt);
+  // Une alarme déjà vue sur un autre appareil ne s'affiche pas ici
+  const all = await db.all('tasks');
+  // Vue ailleurs pendant qu'elle sonnait ici : on arrête la sonnerie et la notification de cet appareil
+  for (const x of all) if (x.alarmState === 'ringing' && seenElsewhere(x) && firedHere.has(x.id)) { firedHere.delete(x.id); closeNotification(x.id); }
+  const ringing = all.filter((t) => t.alarmState === 'ringing' && !t.done && !seenElsewhere(t)).sort((a, b) => a.alarmAt - b.alarmAt);
   if (!ringing.length) {
     if (hostEl) { hostEl.innerHTML = ''; hostEl.dataset.sig = ''; }
     stopSound();
@@ -180,6 +197,11 @@ async function drawRinging() {
   if (!hostEl) { hostEl = document.createElement('div'); hostEl.id = 'alarm-root'; document.body.appendChild(hostEl); }
   if (ringing.some((t) => firedHere.has(t.id))) startSound(); else stopSound();
   const t = ringing[0];
+  // Affichée à l'écran ici : elle est « vue » par cet appareil (les autres ne la montreront pas)
+  if (document.visibilityState === 'visible' && t.alarmSeen?.by !== DEVICE) {
+    const cur = await db.get('tasks', t.id);
+    if (cur && cur.alarmState === 'ringing' && !cur.alarmSeen) { cur.alarmSeen = { by: DEVICE, at: Date.now() }; await db.put('tasks', cur); }
+  }
   const late = Date.now() - t.alarmAt > 5 * 60_000;
   const tomorrow = U.iso(U.addDays(new Date(), 1));
   // Ne pas reconstruire si rien n'a changé (évite que la fenêtre clignote) ou si on choisit une date de report
@@ -211,9 +233,13 @@ async function drawRinging() {
 /** Démarre la surveillance des alarmes (app et widget). onChange() : rafraîchir l'affichage. */
 export function start(onChange = () => {}) {
   onChanged = onChange;
-  check();
-  setInterval(check, 15_000);
-  addEventListener('focus', check);
+  // On attend le premier échange avec les autres appareils : une alarme déjà vue ou réglée ailleurs ne sonne pas ici
+  sync.firstSync().then(() => {
+    check();
+    setInterval(check, 15_000);
+    addEventListener('focus', check);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) drawRinging(); });
+  });
   onDbChange(({ store }) => { if (store === 'tasks') drawRinging(); });
   // Boutons de la notification Windows (relayés par le service worker)
   navigator.serviceWorker?.addEventListener('message', async (e) => {
