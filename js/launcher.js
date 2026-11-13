@@ -40,9 +40,21 @@ export function open(item) {
     location.href = item.app;
     return true;
   }
-  if (item.mode === 'tab') return !!window.open(item.url, '_blank', 'noopener');
+  // 'installed' : simple lien. Si le site est installé comme application dans Edge (avec « ouvrir les liens
+  // pris en charge »), Edge l'ouvre dans cette application, sans barre d'adresse ; sinon, dans un onglet.
+  if (item.mode === 'tab' || item.mode === 'installed') { followLink(item.url); return true; }
   return openWindow(item);
 }
+
+// Un vrai clic sur un lien (window.open avec noopener renvoie toujours null, et les liens cliqués
+// sont ceux qu'Edge redirige vers une application installée)
+function followLink(url) {
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+export const MODES = { window: 'Fenêtre', installed: 'App installée', tab: 'Onglet' };
 
 export function openWindow(item) {
   const w = Math.min(1280, screen.availWidth - 80), h = Math.min(900, screen.availHeight - 80);

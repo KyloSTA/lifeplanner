@@ -1522,11 +1522,12 @@ async function renderLauncher() {
       <div class="head-actions"><button class="btn ${launcherEdit ? 'primary' : ''}" id="ln-edit">${launcherEdit ? '✓ Terminé' : '✎ Modifier'}</button></div></header>
     <div class="launch-grid ${launcherEdit ? 'editing' : ''}">${items.map((it, i) => `
       <div class="lt-wrap" data-i="${i}">
-        <button class="lt" data-open="${i}" title="${esc(it.mode === 'app' ? `Ouvrir l’application ${it.name}` : `Ouvrir ${it.name} dans une nouvelle fenêtre`)}">
+        <button class="lt" data-open="${i}" title="${esc(it.mode === 'app' ? `Ouvrir l’application ${it.name}` : it.mode === 'installed' ? `Ouvrir ${it.name} dans son application installée` : `Ouvrir ${it.name} dans une nouvelle fenêtre`)}">
           <span class="lt-ico" style="--c:${esc(it.color || '#4f46e5')}">${esc(it.icon || it.name[0])}</span>
           <span class="lt-name">${esc(it.name)}</span>
-          <small class="muted">${it.mode === 'app' ? 'Application' : it.mode === 'tab' ? 'Onglet' : 'Fenêtre'}</small>
+          <small class="muted">${it.mode === 'app' ? 'Application' : launcher.MODES[it.mode] || 'Fenêtre'}</small>
         </button>
+        ${launcherEdit && it.mode !== 'app' ? `<select class="lt-mode" data-mode="${i}" aria-label="Ouverture de ${esc(it.name)}">${Object.entries(launcher.MODES).map(([k, l]) => `<option value="${k}" ${k === (it.mode || 'window') ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
         ${it.mode === 'app' && it.url && !launcherEdit ? `<button class="lt-web" data-web="${i}" title="Ouvrir la version web" aria-label="Version web de ${esc(it.name)}">🌐</button>` : ''}
         ${launcherEdit ? `<div class="lt-tools">
           <button data-mv="-1" ${i === 0 ? 'disabled' : ''} aria-label="Déplacer vers la gauche">‹</button>
@@ -1540,9 +1541,10 @@ async function renderLauncher() {
         <input name="name" placeholder="Nom (ex. Gmail)" required autocomplete="off">
         <input name="url" placeholder="Adresse (ex. mail.google.com)" required autocomplete="off" spellcheck="false">
         <input name="icon" placeholder="Icône (emoji, facultatif)" maxlength="2" autocomplete="off" style="max-width:150px">
-        <select name="mode" aria-label="Ouverture"><option value="window">Nouvelle fenêtre</option><option value="tab">Onglet du navigateur</option></select>
+        <select name="mode" aria-label="Ouverture"><option value="window">Nouvelle fenêtre</option><option value="installed">App installée dans Edge</option><option value="tab">Onglet du navigateur</option></select>
         <button class="btn primary">Ajouter</button>
       </form>
+      <p class="hint muted"><b>App installée</b> : ouvre le site sans barre d’adresse. Installe-le d’abord dans Edge (sur le site : ⋯ → Applications → Installer ce site en tant qu’application), puis dans <code>edge://apps</code>, ouvre les détails de l’app et autorise-la à ouvrir les liens pris en charge.</p>
       <button class="btn" id="ln-reset" type="button">Rétablir les raccourcis par défaut</button>
     </section>` : `<p class="hint muted">Les sites s’ouvrent chacun dans leur propre fenêtre (un 2e clic ramène la même). Edge et Spotify s’ouvrent comme applications Windows ; 🌐 ouvre la version web. Si rien ne s’ouvre, autorise les fenêtres pop-up pour Life Planner dans Edge.</p>
     <p class="hint muted">🧠 Pour enregistrer des posts Reddit dans ton Cerveau, installe l’extension du dossier <b>extension-edge</b> (voir le README).</p>`}`;
@@ -1557,6 +1559,11 @@ async function renderLauncher() {
   $$('.lt-tools [data-mv]').forEach((b) => (b.onclick = async () => {
     const i = Number(b.closest('.lt-wrap').dataset.i), j = i + Number(b.dataset.mv);
     [items[i], items[j]] = [items[j], items[i]];
+    await launcher.save(items);
+    renderLauncher();
+  }));
+  $$('[data-mode]').forEach((s) => (s.onchange = async () => {
+    items[Number(s.dataset.mode)].mode = s.value;
     await launcher.save(items);
     renderLauncher();
   }));

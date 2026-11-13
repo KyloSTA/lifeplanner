@@ -1587,3 +1587,4 @@ a.assoc-chip { padding: 4px 11px; }
 .opt.style .hero-body { filter: none; border-radius: 8px; }
 /* Pantalon et souliers : pastilles de couleur */.nw-src-h { font-size: 14px; margin: 10px 0 4px; color: var(--muted); }
 .nw-add select { flex: 0 1 auto; width: auto; }
+.lt-mode { display: block; width: 100%; margin-top: 6px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; }
