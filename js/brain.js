@@ -135,7 +135,8 @@ export function projectStats(projectId, goals, tasks) {
   // Missions rattachées directement au projet (sans passer par un objectif)
   const direct = tasks.filter((t) => t.projectId === projectId && !viaGoals.includes(t));
   const ms = [...viaGoals, ...direct];
-  const parts = gs.map((g) => g.progress || 0);
+  // Un objectif abandonné ne compte plus dans l'avancement du projet
+  const parts = gs.filter((g) => !(g.done && g.outcome === 'dropped')).map((g) => g.progress || 0);
   if (direct.length) parts.push((direct.filter((t) => t.done).length / direct.length) * 100);
   return {
     goals: gs,
