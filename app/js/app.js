@@ -21,6 +21,7 @@ import * as missions from './missions.js';
 import * as docs from './docs.js';
 import * as assoc from './assoc.js';
 import * as news from './news.js';
+import * as finance from './finance.js';
 import * as reminders from './reminders.js';
 import * as rpg from './rpg.js';
 
@@ -110,6 +111,7 @@ const routes = {
   missions: () => missions.renderPage(pageCtx()),
   month: renderMonth, year: renderYear,
   news: () => news.renderPage(pageCtx()),
+  finance: (tab) => finance.renderPage(pageCtx(), tab),
   quest: () => rpg.renderPage(pageCtx()),
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
@@ -297,6 +299,7 @@ async function renderToday() {
         </div>
         <div class="today-col col-side">
           <section class="card t-habits" id="c-habits"></section>
+          <section class="card t-money" id="c-money" hidden></section>
           <section class="card t-workout" id="c-workout"></section>
           <section class="card t-rbq" id="c-rbq" hidden></section>
           <section class="card t-news" id="c-news"></section>
@@ -391,6 +394,7 @@ async function renderToday() {
   refreshToday = () => Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), goals(), heroCard(), brainCard()]);
 
   news.todayCard($('#c-news'), toast); // en parallèle (réseau) : ne retarde pas le reste de la page
+  finance.todayCard($('#c-money')).catch(console.error);
   await Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard(), assistCard()]);
   agenda();
 }
@@ -2869,7 +2873,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'quest', 'workout', 'rbq']; // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'finance', 'quest', 'workout', 'rbq']; // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];

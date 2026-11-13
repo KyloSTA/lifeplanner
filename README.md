@@ -287,6 +287,21 @@ le dossier `extension-edge`. À installer une seule fois :
 Elle fonctionne avec la version locale (localhost:5173) et la version en ligne. Après une mise à
 jour de l'extension, clique **Recharger** sur sa carte dans `edge://extensions`.
 
+## Finances
+Onglet **Finances** : tes dépenses, ton budget et le suivi du mois, à partir des relevés de ta banque.
+1. Dans ton application bancaire, exporte l'historique du **compte chèques** (et de la **carte de crédit**) en **.csv**.
+2. **⬆ Importer un relevé .csv** (ou glisse les fichiers sur la page). Réimporter un relevé plus récent
+   ajoute seulement les nouvelles transactions ; une transaction « en attente » est remplacée quand elle devient définitive.
+3. Les dépenses sont classées toutes seules (épicerie, restos, dépanneur, essence…). Change une catégorie dans
+   **🧾 Transactions** : l'app propose de classer pareil tous les achats chez ce marchand.
+4. **🎯 Budget** propose un budget d'après la moyenne de tes derniers mois complets (ou −10 %, −20 %) ; ajuste et enregistre.
+5. **📊 Aperçu** : revenus, dépenses, ce qui reste, l'argent envoyé vers tes placements, la courbe du mois contre le
+   rythme du budget, combien tu peux encore dépenser par jour, les catégories dépassées, les prélèvements en double
+   possibles et les paiements récurrents. La carte **💰 Budget du mois** apparaît aussi dans Aujourd'hui.
+
+Les relevés de placements (activités) sont reconnus mais pas ajoutés au budget : l'argent que tu y envoies est déjà
+compté dans le compte chèques. Les courriels des destinataires et les numéros de compte ne sont pas enregistrés.
+
 ## Alarmes
 Ouvre une mission (**›**) puis, dans **⏰ Alarme**, choisis une date et une heure, ou un raccourci :
 « Dans 30 min », « Dans 1 h », « Demain 9 h », « Ce soir 19 h ». La mission affiche une pastille ⏰.
