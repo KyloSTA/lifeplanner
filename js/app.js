@@ -1142,6 +1142,21 @@ async function renderBrain() {
   await Promise.all([evoCard(), redisc()]);
 }
 
+/** Vidéos YouTube d'un texte : [{ id, start (s), short }], sans doublon, dans l'ordre. */
+function youtubeVideos(text = '') {
+  const out = new Map();
+  const re = /https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?[^\s)]*?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})([^\s)]*)/g;
+  for (const m of text.matchAll(re)) {
+    const id = m[1];
+    const t = (m[2].match(/[?&]t=(?:(\d+)h)?(?:(\d+)m)?(\d+)s?/) || []);
+    const start = t.length ? (Number(t[1] || 0) * 3600 + Number(t[2] || 0) * 60 + Number(t[3] || 0)) : 0;
+    const cur = out.get(id);
+    if (!cur) out.set(id, { id, start, short: /\/shorts\//.test(m[0]) || /#short\b/.test(text) });
+    else if (!cur.start && start) cur.start = start; // le lien « ⏱ Rendu à … » donne où reprendre
+  }
+  return [...out.values()];
+}
+
 async function renderNote(id) {
   const n = await db.get('notes', id);
   if (!n) { view.innerHTML = '<div class="empty">Note introuvable. <a href="#/brain">Retour au Cerveau</a></div>'; return; }
@@ -1182,6 +1197,7 @@ async function renderNote(id) {
     <div class="note-layout">
       <div class="note-left">
       <section class="card project-panel" id="n-proj" hidden></section>
+      <section class="card note-video" id="n-video" hidden></section>
       <section class="card note-main">
         <div class="note-tools"><div class="seg"><button data-mode="write">✎ Écrire</button><button data-mode="read">👁 Lire</button></div>
           <span class="note-add"><label class="btn" id="n-photo" title="Ajouter une photo ou une capture (tu peux aussi la coller avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden>📷 Photo</label>
@@ -1197,7 +1213,31 @@ async function renderNote(id) {
     </div>`;
 
   const ta = $('#n-body');
-  const save = U.debounce(() => (pending = brain.saveNote(n).then(drawSide)), 600);
+
+  // Lecteur YouTube : si la note contient des liens YouTube, la vidéo se regarde directement ici
+  let videoSig = '', videoIdx = 0;
+  const drawVideo = () => {
+    const el = $('#n-video');
+    if (!el) return;
+    const vids = youtubeVideos(n.body);
+    const sig = vids.map((v) => v.id + ':' + v.start).join('|');
+    if (sig === videoSig) return; // même(s) vidéo(s) : on ne recharge pas le lecteur
+    videoSig = sig;
+    if (videoIdx >= vids.length) videoIdx = 0;
+    el.hidden = !vids.length;
+    if (!vids.length) { el.innerHTML = ''; return; }
+    const v = vids[videoIdx];
+    el.innerHTML = `<div class="yt-frame ${v.short ? 'is-short' : ''}">
+        <iframe src="https://www.youtube-nocookie.com/embed/${v.id}?rel=0&modestbranding=1${v.start ? '&start=' + v.start : ''}" title="Lecteur YouTube"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+      <div class="yt-bar">
+        ${vids.length > 1 ? `<div class="yt-pick">${vids.map((x, i) => `<button class="chip-btn ${i === videoIdx ? 'on' : ''}" data-yt="${i}">▶ Vidéo ${i + 1}</button>`).join('')}</div>` : '<span></span>'}
+        <a class="btn sm-text" href="https://www.youtube.com/watch?v=${v.id}${v.start ? '&t=' + v.start + 's' : ''}" target="_blank" rel="noopener" title="Si la vidéo refuse de jouer ici, ouvre-la sur YouTube">Ouvrir sur YouTube ↗</a>
+      </div>`;
+    $$('[data-yt]', el).forEach((b) => (b.onclick = () => { videoIdx = Number(b.dataset.yt); videoSig = ''; drawVideo(); }));
+  };
+  drawVideo();
+  const save = U.debounce(() => (pending = brain.saveNote(n).then(drawSide).then(drawVideo)), 600);
   const flush = async () => { save.flush(); await pending; };
 
   // Bandeau « à classer »
