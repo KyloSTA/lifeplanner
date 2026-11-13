@@ -93,12 +93,25 @@
   function setDone(btn, text) {
     btn.disabled = true;
     btn.classList.add('lp-done');
-    btn.textContent = text;
+    btn.textContent = btn.dataset.inline ? '✓ Cerveau' : text;
+    if (btn.dataset.inline) { btn.title = text; btn.style.color = '#4ade80'; btn.style.cursor = 'default'; }
   }
 
-  function makeButton(read, tag = 'button') {
+  // Style d'un bouton de la rangée Reddit (↑↓, 💬, partager). Cette rangée est dans le « shadow DOM »
+  // du post, où la feuille de style de l'extension ne s'applique pas : style en ligne, couleurs de Reddit.
+  const INLINE = 'display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 12px;border:0;border-radius:999px;'
+    + 'font:600 12px/1 var(--font-sans, system-ui, "Segoe UI", sans-serif);cursor:pointer;white-space:nowrap;'
+    + 'color:var(--color-secondary-plain, var(--color-neutral-content, inherit));background:var(--color-button-secondary-background, rgba(127,127,127,.18));';
+
+  function makeButton(read, tag = 'button', inline = false) {
     const btn = document.createElement(tag);
     btn.className = 'lp-save';
+    if (inline) {
+      btn.dataset.inline = '1';
+      btn.style.cssText = INLINE;
+      btn.addEventListener('mouseenter', () => { if (!btn.disabled) btn.style.background = 'var(--color-button-secondary-background-hover, rgba(127,127,127,.3))'; });
+      btn.addEventListener('mouseleave', () => { btn.style.background = 'var(--color-button-secondary-background, rgba(127,127,127,.18))'; });
+    }
     btn.textContent = '🧠 Cerveau';
     btn.title = 'Enregistrer ce post dans le Cerveau de Life Planner';
     if (tag === 'a') btn.href = '#';
@@ -113,9 +126,34 @@
   }
 
   /* ---------- Ajout des boutons ---------- */
+  // Rangée d'actions d'un post (nouveau Reddit) : on se repère sur le bouton Partager, sinon Commentaires
+  const ANCHORS = ['shreddit-post-share-button', '[data-post-click-location="share"]', 'button[aria-label*="hare" i]',
+    'button[name="comments-action-button"]', 'a[name="comments-action-button"]', '[data-post-click-location="comments-button"]'];
+  function actionAnchor(p) {
+    for (const root of [p.shadowRoot, p]) {
+      if (!root) continue;
+      for (const sel of ANCHORS) {
+        const el = root.querySelector(sel);
+        if (el?.parentElement) return el;
+      }
+    }
+    return null;
+  }
+
   function decorate() {
     // Nouveau Reddit : <shreddit-post>
     for (const p of document.querySelectorAll('shreddit-post:not([data-lp])')) {
+      const anchor = actionAnchor(p);
+      if (anchor) {
+        // En ligne avec ↑↓, 💬, 🔁 et Partager
+        p.setAttribute('data-lp', '1');
+        anchor.after(makeButton(() => fromShreddit(p), 'button', true));
+        continue;
+      }
+      // La rangée n'est pas encore dessinée : on réessaie ; après ~10 s, bouton sous le post
+      const tries = Number(p.dataset.lpTry || 0) + 1;
+      p.dataset.lpTry = String(tries);
+      if (tries < 8) continue;
       p.setAttribute('data-lp', '1');
       const bar = document.createElement('div');
       bar.className = 'lp-bar';
@@ -142,5 +180,7 @@
       pending = true;
       requestAnimationFrame(() => { pending = false; decorate(); });
     }).observe(document.documentElement, { childList: true, subtree: true });
+    // Les rangées d'actions se dessinent dans le shadow DOM, que l'observateur ne voit pas
+    setInterval(decorate, 1500);
   });
 })();
