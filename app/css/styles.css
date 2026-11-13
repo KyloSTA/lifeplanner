@@ -1585,4 +1585,5 @@ a.assoc-chip { padding: 4px 11px; }
 .rpg-hero-body { display: grid; place-items: center; padding: 4px 0; }
 #hero-big .hero-body { margin: 0 auto; }
 .opt.style .hero-body { filter: none; border-radius: 8px; }
-/* Pantalon et souliers : pastilles de couleur */
+/* Pantalon et souliers : pastilles de couleur */.nw-src-h { font-size: 14px; margin: 10px 0 4px; color: var(--muted); }
+.nw-add select { flex: 0 1 auto; width: auto; }

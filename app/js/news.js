@@ -9,12 +9,20 @@ import * as U from './util.js';
 import * as brain from './brain.js';
 
 const { esc } = U;
+// cat : 'general' (onglet Actualités) ou 'lnh' (onglet 🏒 LNH)
+export const SECTIONS = [['general', '📰 Actualités'], ['lnh', '🏒 LNH']];
 export const DEFAULT_FEEDS = [
-  { id: 'rc', name: 'Radio-Canada', url: 'https://ici.radio-canada.ca/info/rss/info/a-la-une', color: '#e11d48', on: true },
-  { id: 'devoir', name: 'Le Devoir', url: 'https://www.ledevoir.com/rss/manchettes.xml', color: '#94a3b8', on: true },
-  { id: 'presse', name: 'La Presse', url: 'https://www.lapresse.ca/actualites/rss', color: '#0c4a6e', on: true },
-  { id: 'tva', name: 'TVA Nouvelles', url: 'https://www.tvanouvelles.ca/rss.xml', color: '#2563eb', on: true },
-  { id: 'gnews', name: 'Google Actualités', url: 'https://news.google.com/rss?hl=fr-CA&gl=CA&ceid=CA:fr', color: '#16a34a', on: false },
+  { id: 'rc', cat: 'general', name: 'Radio-Canada', url: 'https://ici.radio-canada.ca/info/rss/info/a-la-une', color: '#e11d48', on: true },
+  { id: 'devoir', cat: 'general', name: 'Le Devoir', url: 'https://www.ledevoir.com/rss/manchettes.xml', color: '#94a3b8', on: true },
+  { id: 'presse', cat: 'general', name: 'La Presse', url: 'https://www.lapresse.ca/actualites/rss', color: '#0c4a6e', on: true },
+  { id: 'tva', cat: 'general', name: 'TVA Nouvelles', url: 'https://www.tvanouvelles.ca/rss.xml', color: '#2563eb', on: true },
+  { id: 'gnews', cat: 'general', name: 'Google Actualités', url: 'https://news.google.com/rss?hl=fr-CA&gl=CA&ceid=CA:fr', color: '#16a34a', on: false },
+  // Nouvelles de la LNH (hockey)
+  { id: 'rc-hockey', cat: 'lnh', name: 'Radio-Canada Hockey', url: 'https://ici.radio-canada.ca/info/rss/sports/hockey', color: '#e11d48', on: true },
+  { id: 'presse-hockey', cat: 'lnh', name: 'La Presse Hockey', url: 'https://www.lapresse.ca/sports/hockey/rss', color: '#0c4a6e', on: true },
+  { id: 'jdm-hockey', cat: 'lnh', name: 'Journal de Montréal Hockey', url: 'https://www.journaldemontreal.com/sports/hockey/rss.xml', color: '#f97316', on: true },
+  { id: 'gnews-lnh', cat: 'lnh', name: 'Google Actualités LNH', url: 'https://news.google.com/rss/search?q=LNH&hl=fr-CA&gl=CA&ceid=CA:fr', color: '#16a34a', on: false },
+  { id: 'espn-nhl', cat: 'lnh', name: 'ESPN NHL (anglais)', url: 'https://www.espn.com/espn/rss/nhl/news', color: '#dc2626', on: false },
 ];
 const TTL = 20 * 60_000;
 const CONVERTER = 'https://api.rss2json.com/v1/api.json?rss_url=';
@@ -23,9 +31,9 @@ export async function feeds() {
   const saved = (await db.get('settings', 'newsFeeds')) || [];
   const byId = Object.fromEntries(saved.map((f) => [f.id, f]));
   // Sources par défaut (avec ton choix activé/désactivé) puis tes sources ajoutées
-  return [...DEFAULT_FEEDS.map((f) => ({ ...f, ...(byId[f.id] || {}) })), ...saved.filter((f) => f.custom)];
+  return [...DEFAULT_FEEDS.map((f) => ({ ...f, ...(byId[f.id] || {}), cat: f.cat })), ...saved.filter((f) => f.custom).map((f) => ({ cat: 'general', ...f }))];
 }
-const saveFeeds = (list) => db.put('settings', list.map(({ id, name, url, color, on, custom }) => ({ id, name, url, color, on, custom })), 'newsFeeds');
+const saveFeeds = (list) => db.put('settings', list.map(({ id, cat, name, url, color, on, custom }) => ({ id, cat, name, url, color, on, custom })), 'newsFeeds');
 
 const strip = (html = '') => {
   const d = document.createElement('div');
@@ -49,7 +57,7 @@ function parseXML(text, feed) {
 }
 
 // Sources qui refusent la lecture directe : on va directement au convertisseur (pas d'erreur inutile)
-const NEEDS_PROXY = new Set(['devoir', 'presse', 'tva', 'gnews']);
+const NEEDS_PROXY = new Set(['devoir', 'presse', 'tva', 'gnews', 'presse-hockey', 'jdm-hockey', 'gnews-lnh']);
 const blocked = new Set(); // sources ajoutées qui ont refusé (pour la session)
 async function fetchFeed(feed) {
   // 1) Lecture directe (si le site le permet)
@@ -73,9 +81,10 @@ async function fetchFeed(feed) {
 }
 
 /** Tous les titres des sources activées (cache 20 min, ou force = true). */
-export async function load(force = false) {
-  const list = (await feeds()).filter((f) => f.on);
-  const cache = (await db.get('cache', 'news')) || { at: 0, items: [], errors: [], key: '' };
+export async function load(force = false, cat = 'general') {
+  const list = (await feeds()).filter((f) => f.on && f.cat === cat);
+  const ckey = cat === 'general' ? 'news' : 'news-' + cat;
+  const cache = (await db.get('cache', ckey)) || { at: 0, items: [], errors: [], key: '' };
   const key = list.map((f) => f.id + f.url).join('|');
   if (!force && cache.key === key && Date.now() - cache.at < TTL && cache.items.length) return cache;
   const errors = [];
@@ -83,7 +92,7 @@ export async function load(force = false) {
   const seen = new Set();
   const items = results.flat().filter((x) => x.title && x.link && !seen.has(x.title) && seen.add(x.title)).sort((a, b) => b.date - a.date).slice(0, 120);
   const out = { at: Date.now(), items, errors, key };
-  if (items.length) await db.put('cache', out, 'news');
+  if (items.length) await db.put('cache', out, ckey);
   else if (cache.items.length) return { ...cache, errors }; // hors ligne : on garde les derniers titres
   return out;
 }
@@ -102,7 +111,7 @@ const ago = (t) => {
 async function saveToBrain(it, feed) {
   const notes = await brain.allNotes();
   if (notes.some((n) => (n.body || '').includes(it.link))) return false;
-  await brain.createNote({ title: it.title.slice(0, 80), body: `🔗 ${it.link}\n${feed?.name || ''}${it.date ? ' · ' + U.fmtShort(new Date(it.date)) : ''}\n\n${it.text ? '> ' + it.text : ''}\n\n#actualite`, type: 'ressource', inbox: true });
+  await brain.createNote({ title: it.title.slice(0, 80), body: `🔗 ${it.link}\n${feed?.name || ''}${it.date ? ' · ' + U.fmtShort(new Date(it.date)) : ''}\n\n${it.text ? '> ' + it.text : ''}\n\n#actualite${feed?.cat === 'lnh' ? ' #lnh #hockey' : ''}`, type: 'ressource', inbox: true });
   return true;
 }
 
@@ -130,20 +139,24 @@ function bindSave(root, items, byId, toast) {
 }
 
 let filter = 'all';
+let section = 'general'; // onglet ouvert : Actualités ou LNH
 export async function renderPage(ctx, force = false) {
   const { view, toast, modal } = ctx;
-  const fl = await feeds();
+  const fl = (await feeds()).filter((f) => f.cat === section);
   const byId = Object.fromEntries(fl.map((f) => [f.id, f]));
   let shown = 23; // 1 à la une + 23 titres, puis « Voir plus »
   view.innerHTML = `
     <header class="page-head">
-      <div><p class="eyebrow">Ce qui se passe</p><h1>Actualités</h1></div>
-      <div class="head-actions"><button class="btn" id="nw-src">⚙ Sources</button><button class="btn" id="nw-ref">↻ Actualiser</button></div>
+      <div><p class="eyebrow">Ce qui se passe</p><h1>${section === 'lnh' ? '🏒 Nouvelles LNH' : 'Actualités'}</h1></div>
+      <div class="head-actions">
+        <div class="seg nw-tabs" role="tablist">${SECTIONS.map(([k, l]) => `<button role="tab" data-sec="${k}" class="${section === k ? 'on' : ''}" aria-selected="${section === k}">${l}</button>`).join('')}</div>
+        <button class="btn" id="nw-src">⚙ Sources</button><button class="btn" id="nw-ref">↻ Actualiser</button>
+      </div>
     </header>
     <div class="nw-filters filters" id="nw-filters"></div>
     <div id="nw-list"><div class="card empty-card"><p>Chargement des titres…</p></div></div>`;
   const draw = async (f) => {
-    const data = await load(f);
+    const data = await load(f, section);
     const counts = {};
     data.items.forEach((x) => (counts[x.src] = (counts[x.src] || 0) + 1));
     if (filter !== 'all' && !counts[filter]) filter = 'all';
@@ -174,6 +187,7 @@ export async function renderPage(ctx, force = false) {
   const $ = (s) => view.querySelector(s), $$ = (s) => [...view.querySelectorAll(s)];
   $('#nw-ref').onclick = () => { $('#nw-list').innerHTML = '<div class="card empty-card"><p>Actualisation…</p></div>'; draw(true); };
   $('#nw-src').onclick = () => sourcesModal(modal, toast, () => renderPage(ctx, true));
+  $$('[data-sec]').forEach((b) => (b.onclick = () => { if (section === b.dataset.sec) return; section = b.dataset.sec; filter = 'all'; renderPage(ctx); }));
   draw(force);
 }
 
@@ -181,8 +195,10 @@ function sourcesModal(modal, toast, onDone) {
   modal('<h2>Sources d’actualités</h2><div id="nw-srcs"></div>', async (m, close) => {
     let list = await feeds();
     const draw = () => {
-      m.querySelector('#nw-srcs').innerHTML = `<div class="nw-src-list">${list.map((f, i) => `<label class="check-line nw-src"><input type="checkbox" data-i="${i}" ${f.on ? 'checked' : ''}><i class="nw-dot" style="--c:${esc(f.color)}"></i><span>${esc(f.name)}</span>${f.custom ? `<button type="button" class="btn sm" data-rm="${i}" aria-label="Retirer">×</button>` : ''}</label>`).join('')}</div>
-        <form class="nw-add" id="nw-add"><input name="name" placeholder="Nom (ex. Le Soleil)" required autocomplete="off"><input name="url" placeholder="Adresse du fil RSS (https://…)" required autocomplete="off" spellcheck="false"><button class="btn">Ajouter</button></form>
+      const row = (f, i) => `<label class="check-line nw-src"><input type="checkbox" data-i="${i}" ${f.on ? 'checked' : ''}><i class="nw-dot" style="--c:${esc(f.color)}"></i><span>${esc(f.name)}</span>${f.custom ? `<button type="button" class="btn sm" data-rm="${i}" aria-label="Retirer">×</button>` : ''}</label>`;
+      m.querySelector('#nw-srcs').innerHTML = SECTIONS.map(([k, l]) => `<h3 class="nw-src-h">${l}</h3><div class="nw-src-list">${list.map((f, i) => (f.cat === k ? row(f, i) : '')).join('')}</div>`).join('') + `
+        <form class="nw-add" id="nw-add"><input name="name" placeholder="Nom (ex. Le Soleil)" required autocomplete="off"><input name="url" placeholder="Adresse du fil RSS (https://…)" required autocomplete="off" spellcheck="false">
+          <select name="cat" aria-label="Section">${SECTIONS.map(([k, l]) => `<option value="${k}" ${k === section ? 'selected' : ''}>${l}</option>`).join('')}</select><button class="btn">Ajouter</button></form>
         <p class="hint muted">Astuce : la plupart des journaux ont un fil RSS (cherche « RSS » au bas de leur site).</p>
         <div class="modal-actions"><button class="btn primary" id="nw-ok">Enregistrer</button></div>`;
       m.querySelectorAll('[data-i]').forEach((c) => (c.onchange = () => { list[c.dataset.i].on = c.checked; }));
@@ -191,7 +207,7 @@ function sourcesModal(modal, toast, onDone) {
         e.preventDefault();
         let url = e.target.url.value.trim();
         if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-        list.push({ id: U.uid(), name: e.target.name.value.trim(), url, color: '#a855f7', on: true, custom: true });
+        list.push({ id: U.uid(), cat: e.target.cat.value, name: e.target.name.value.trim(), url, color: '#a855f7', on: true, custom: true });
         draw();
       };
       m.querySelector('#nw-ok').onclick = async () => { await saveFeeds(list); close(); toast('Sources enregistrées'); onDone(); };
