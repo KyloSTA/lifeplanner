@@ -1821,3 +1821,13 @@ h2 { font-weight: 600; }
 .nc-yt.is-short img { object-position: center 30%; }
 .nc-yt .nc-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 44px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: rgba(0, 0, 0, .72); color: #fff; font-style: normal; font-size: 14px; pointer-events: none; }
 .note-card:hover .nc-yt .nc-play { background: #e00; }
+/* Cartes repliables (Aujourd'hui) */
+.fold-btn { flex: none; width: 28px; height: 28px; margin-left: 2px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.fold-btn:hover { background: var(--surface-2); color: var(--text); }
+.fold-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.card.is-folded { max-height: 64px; overflow: hidden; padding-bottom: 0; }
+.card.is-folded .card-head { margin-bottom: 18px; }
+.card.is-folded .fold-btn svg { transform: rotate(-90deg); }
+@media (pointer: coarse) { .fold-btn { width: 36px; height: 36px; } .card.is-folded { max-height: 70px; } }
+.today-cols .card-head > h2 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-cols .card-head > span, .today-cols .card-head > a { white-space: nowrap; flex: none; }

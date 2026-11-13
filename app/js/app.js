@@ -276,6 +276,50 @@ async function taskCard(el, date) {
 /* =========================================================
    Vue : Aujourd'hui
    ========================================================= */
+/* Cartes repliables (page Aujourd'hui) : un bouton ⌄ au bout de l'en-tête de chaque carte la réduit à son
+   titre. Le choix est gardé sur cet appareil (une mise en page d'ordi et une de cellulaire peuvent différer). */
+const FOLD_KEY = 'lp.folded';
+const foldedSet = () => { try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY)) || []); } catch { return new Set(); } };
+const FOLD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+function foldableCards(root) {
+  if (!root) return;
+  const keyOf = (card) => [...card.classList].find((c) => c.startsWith('t-')) || card.id;
+  const decorate = () => {
+    const folded = foldedSet();
+    for (const card of root.querySelectorAll(':scope > .today-col > .card')) {
+      const key = keyOf(card);
+      if (!key) continue;
+      card.classList.toggle('is-folded', folded.has(key));
+      const head = card.querySelector('.card-head');
+      if (!head || head.querySelector(':scope > .fold-btn')) continue;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fold-btn';
+      b.innerHTML = FOLD_ICON;
+      const label = () => (card.classList.contains('is-folded') ? 'Déplier la carte' : 'Réduire la carte');
+      b.title = label(); b.setAttribute('aria-label', label()); b.setAttribute('aria-expanded', String(!card.classList.contains('is-folded')));
+      b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation(); // certaines cartes sont un lien en entier
+        const set = foldedSet();
+        const on = !card.classList.contains('is-folded');
+        card.classList.toggle('is-folded', on);
+        on ? set.add(key) : set.delete(key);
+        try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
+        b.title = label(); b.setAttribute('aria-label', label()); b.setAttribute('aria-expanded', String(!on));
+      });
+      head.append(b);
+    }
+  };
+  decorate();
+  // Les cartes se remplissent (et se redessinent) après coup : on ajoute le bouton à chaque nouvel en-tête
+  let pending = false;
+  new MutationObserver(() => {
+    if (pending) return;
+    pending = true;
+    setTimeout(() => { pending = false; decorate(); }, 30);
+  }).observe(root, { childList: true, subtree: true });
+}
+
 async function renderToday() {
   const now = new Date();
   const today = iso(now);
@@ -314,6 +358,7 @@ async function renderToday() {
   // clic (cocher), Entrée (ajouter une mission) ou changement : le résumé suit
   for (const ev of ['click', 'submit', 'change']) $('.today-cols', view).addEventListener(ev, () => refreshSummary(), true);
   summaryRefresher = refreshSummary; // aussi après « Annuler » (barre du bas)
+  foldableCards($('.today-cols', view));
 
   // Agenda
   const agenda = async () => {
