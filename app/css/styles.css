@@ -1,51 +1,56 @@
-/* Thème or et vert : vert profond (couleur principale) et or (mises en valeur), en clair et en sombre */
+/* Thème noir, or et bordeaux : noir profond, bordeaux (couleur principale) et or (touches de luxe).
+   Windows en mode sombre : noir. En mode clair : version ivoire assortie (même menu noir). */
 :root {
-  --bg: #f6f6f1;
+  --bg: #f7f4ef;
   --surface: #ffffff;
-  --surface-2: #f0f1ea;
-  --border: #e3e5dc;
-  --text: #14201a;
-  --muted: #5f6b63;
-  --accent: #1f6b4a;
-  --accent-soft: #e8f2ec;
+  --surface-2: #f1ece4;
+  --border: #e6ded3;
+  --text: #1a1414;
+  --muted: #6b605b;
+  --accent: #7a1e2c;
+  --accent-soft: #f6e6e8;
   --accent-text: #ffffff;
-  --gold: #d4a646;
-  --gold-soft: #fbf6e8;
-  --gold-text: #8a6418;
-  --gold-border: #ebddb4;
-  --warn: #8a6418;
-  --warn-soft: #fbf6e8;
-  --danger: #b42318;
+  --burgundy: #7a1e2c;
+  --burgundy-line: #9b2c3a;
+  --gold: #b8913d;
+  --gold-soft: #faf3e3;
+  --gold-text: #7a5a14;
+  --gold-border: #e8d7ae;
+  --warn: #7a5a14;
+  --warn-soft: #faf3e3;
+  --danger: #d92d20;
   --ok: #1f7a4d;
-  --rail-bg: #0f3d2e;
-  --rail-text: #c9dbd1;
-  --rail-dim: #8fb3a2;
-  --rail-hover: rgba(255, 255, 255, .07);
-  --rail-active: rgba(255, 255, 255, .11);
-  --rail-line: rgba(255, 255, 255, .14);
-  --shadow: 0 1px 2px rgba(16, 24, 20, .05), 0 4px 14px rgba(16, 24, 20, .04);
+  --rail-bg: #0d0b0b;
+  --rail-text: #c9bfb9;
+  --rail-dim: #8e837d;
+  --rail-hover: rgba(255, 255, 255, .06);
+  --rail-active: rgba(122, 30, 44, .5);
+  --rail-line: rgba(255, 255, 255, .1);
+  --shadow: 0 1px 2px rgba(26, 20, 20, .05), 0 4px 14px rgba(26, 20, 20, .04);
   --radius: 14px;
   --rail-w: 216px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b1712; --surface: #12221b; --surface-2: #16281f; --border: #21362c;
-    --text: #e8efea; --muted: #9db0a5; --accent: #3fae7d; --accent-soft: #1b3127; --accent-text: #07120d;
-    --gold: #d9b25a; --gold-soft: #1f1b0e; --gold-text: #f3dfa8; --gold-border: #4a3d1c;
-    --warn: #e3c27a; --warn-soft: #2a2414; --danger: #f87171; --ok: #5cc98f;
-    --rail-bg: #07120d; --rail-text: #a9bfb3; --rail-dim: #6e897b; --rail-hover: rgba(255,255,255,.05); --rail-active: rgba(217,178,90,.1); --rail-line: #22372d;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+    --bg: #0a0909; --surface: #141112; --surface-2: #1b1617; --border: #2a2123;
+    --text: #f2ede6; --muted: #a89e98; --accent: #c9505f; --accent-soft: #2a1a1e; --accent-text: #ffffff;
+    --burgundy: #7a1e2c; --burgundy-line: #9b2c3a;
+    --gold: #c9a24a; --gold-soft: #1f1810; --gold-text: #e6cc8a; --gold-border: #4a3b1a;
+    --warn: #e6cc8a; --warn-soft: #241c10; --danger: #f87171; --ok: #6fbf8e;
+    --rail-bg: #050404; --rail-text: #b8ada7; --rail-dim: #7a6e68; --rail-hover: rgba(255,255,255,.05); --rail-active: rgba(122,30,44,.32); --rail-line: #231c1d;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0b1712; --surface: #12221b; --surface-2: #16281f; --border: #21362c;
-  --text: #e8efea; --muted: #9db0a5; --accent: #3fae7d; --accent-soft: #1b3127; --accent-text: #07120d;
-  --gold: #d9b25a; --gold-soft: #1f1b0e; --gold-text: #f3dfa8; --gold-border: #4a3d1c;
-  --warn: #e3c27a; --warn-soft: #2a2414; --danger: #f87171; --ok: #5cc98f;
-  --rail-bg: #07120d; --rail-text: #a9bfb3; --rail-dim: #6e897b; --rail-hover: rgba(255,255,255,.05); --rail-active: rgba(217,178,90,.1); --rail-line: #22372d;
-  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+  --bg: #0a0909; --surface: #141112; --surface-2: #1b1617; --border: #2a2123;
+  --text: #f2ede6; --muted: #a89e98; --accent: #c9505f; --accent-soft: #2a1a1e; --accent-text: #ffffff;
+  --burgundy: #7a1e2c; --burgundy-line: #9b2c3a;
+  --gold: #c9a24a; --gold-soft: #1f1810; --gold-text: #e6cc8a; --gold-border: #4a3b1a;
+  --warn: #e6cc8a; --warn-soft: #241c10; --danger: #f87171; --ok: #6fbf8e;
+  --rail-bg: #050404; --rail-text: #b8ada7; --rail-dim: #7a6e68; --rail-hover: rgba(255,255,255,.05); --rail-active: rgba(122,30,44,.32); --rail-line: #231c1d;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
   color-scheme: dark;
 }
 
@@ -372,7 +377,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 .hero-layout { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
 .hero-right { display: grid; gap: 18px; min-width: 0; }
 .hero-id { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; position: sticky; top: 0; }
-.hero-id .avatar { box-shadow: 0 8px 30px rgba(31, 107, 74, .25); }
+.hero-id .avatar { box-shadow: 0 8px 30px rgba(122, 30, 44, .3); }
 .hero-name { text-align: center; font-weight: 650; font-size: 18px; border-color: transparent !important; background: transparent !important; }
 .hero-name:hover, .hero-name:focus { background: var(--surface-2) !important; }
 .lvl-big { font-size: 26px; font-weight: 750; color: var(--accent); }
@@ -401,7 +406,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 .rules b { color: var(--accent); white-space: nowrap; }
 
 #xp-pops { position: fixed; right: 20px; bottom: 20px; display: grid; gap: 8px; z-index: 70; pointer-events: none; justify-items: end; }
-.xp-pop { display: grid; background: linear-gradient(135deg, #1f6b4a, #d4a646); color: #fff; padding: 8px 14px; border-radius: 14px; box-shadow: 0 8px 24px rgba(31,107,74,.35); animation: popin .35s cubic-bezier(.3,1.6,.6,1); transition: .4s; }
+.xp-pop { display: grid; background: linear-gradient(135deg, #7a1e2c, #c9a24a); color: #fff; padding: 8px 14px; border-radius: 14px; box-shadow: 0 8px 24px rgba(122,30,44,.4); animation: popin .35s cubic-bezier(.3,1.6,.6,1); transition: .4s; }
 .xp-pop b { font-size: 17px; }
 .xp-pop small { font-size: 12px; opacity: .9; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xp-pop.neg { background: var(--surface-2); color: var(--muted); box-shadow: var(--shadow); }
@@ -1055,8 +1060,8 @@ div.kpi { cursor: default; }
 .ink-page { position: relative; }
 .ink-page.selecting canvas { cursor: default; }
 #ink-img { cursor: pointer; }
-.ink-sel { position: absolute; border: 2px solid #1f6b4a; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.8), 0 4px 20px rgba(0,0,0,.18); cursor: move; touch-action: none; }
-.ink-sel-h { position: absolute; right: -9px; bottom: -9px; width: 18px; height: 18px; border-radius: 50%; background: #1f6b4a; border: 2px solid #fff; cursor: nwse-resize; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+.ink-sel { position: absolute; border: 2px solid #9b2c3a; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.8), 0 4px 20px rgba(0,0,0,.18); cursor: move; touch-action: none; }
+.ink-sel-h { position: absolute; right: -9px; bottom: -9px; width: 18px; height: 18px; border-radius: 50%; background: #9b2c3a; border: 2px solid #fff; cursor: nwse-resize; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
 .ink-sel-del { position: absolute; top: -14px; right: -14px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #c0392b; color: #fff; font-size: 17px; line-height: 1; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
 @media (pointer: coarse) { .ink-sel-h { width: 28px; height: 28px; right: -14px; bottom: -14px; } }
 /* Habitudes dans la page du héros */
@@ -1771,7 +1776,7 @@ a.assoc-chip { padding: 4px 11px; }
   .rail .brand-ico svg { width: 15px; height: 15px; }
 }
 /* =========================================================
-   Thème or et vert : menu vert profond, police Inter, touches d'or
+   Thème noir, or et bordeaux : menu noir, police Inter, touches d’or
    ========================================================= */
 body { font-family: Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: 14.5px; }
 h1, h2, h3, .note-title, .tm-title { font-family: Inter, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
@@ -1805,3 +1810,8 @@ h2 { font-weight: 600; }
 .fi-kpis .kpi:last-child b { color: var(--gold-text); }
 .fi-kpis .kpi:last-child span { color: var(--gold-text); }
 .fi-alerts { border-left-color: var(--gold); background: var(--gold-soft); }
+/* Boutons principaux en bordeaux profond (le bordeaux plus clair de --accent sert au texte et aux barres) */
+.btn.primary { background: var(--burgundy); border-color: var(--burgundy-line); color: #fff; }
+.btn.primary:hover { filter: brightness(1.15); }
+.rail a.active { background: var(--rail-active); }
+.brand-logo { box-shadow: 0 0 0 1px rgba(201, 162, 74, .35); border-radius: 11px; }
