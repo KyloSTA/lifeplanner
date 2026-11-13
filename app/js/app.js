@@ -1262,16 +1262,16 @@ async function renderNote(id) {
     el.innerHTML = `<div class="card-head"><h2>🎯 Objectifs et missions du projet</h2>
         <span class="muted">${st.goals.length || st.direct.length ? `${st.pct} %${st.missions ? ` · ${st.done}/${st.missions} missions` : ''}` : ''}</span></div>
       ${st.goals.length || st.direct.length ? `<div class="xp-bar proj-bar"><i style="width:${st.pct}%"></i></div>` : '<p class="empty-sm">Ajoute des objectifs ou des missions à ce projet : son avancement les suivra.</p>'}
-      ${[...st.goals].sort((a, b) => isGoalDone(a) - isGoalDone(b) || (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0)).map((g) => {
+      ${[...st.goals].sort(goalSort).map((g) => {
         const ms = tasks.filter((t) => t.goalId === g.id).sort(sortM);
-        const done = isGoalDone(g);
-        return `<div class="pgoal ${done ? 'is-done' : ''}" data-gid="${g.id}">
-          <div class="pg-head"><a href="#/goals" data-opengoal="${g.id}" title="Ouvrir dans Objectifs">${done ? '✅ ' : ''}${esc(g.title)}</a>
+        return `<div class="pgoal ${goalClass(g)}" data-gid="${g.id}">
+          <div class="pg-head"><a href="#/goals" data-opengoal="${g.id}" title="Ouvrir dans Objectifs">${goalMark(g)}${esc(g.title)}</a>
             <select class="pg-hz" data-hz="${g.id}" aria-label="Échéance" title="Échéance">${hzOptions(g.horizon || '')}</select><span class="pct">${g.progress}%</span>
-            <button class="g-done ${g.done ? 'on' : ''}" type="button" data-gdone="${g.id}" title="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}">${g.done ? '↺' : '✓'}</button>
+            <button class="g-done ${g.done ? 'on' : ''}" type="button" data-gdone="${g.id}" title="${g.done ? 'Rouvrir l’objectif' : 'Conclure l’objectif (atteint ou abandonné)'}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Conclure l’objectif'}">${g.done ? '↺' : '✓'}</button>
             <button class="btn icon sm pg-plus" type="button" aria-label="Ajouter une mission à cet objectif" title="Ajouter une mission">+</button>
             <button class="x pg-unlink" data-unlink="${g.id}" title="Retirer du projet" aria-label="Retirer l’objectif du projet">×</button></div>
           <div class="bar"><i style="width:${g.progress}%"></i></div>
+          ${goalVerdict(g)}
           ${ms.length ? `<ul class="tasks">${ms.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>` : ''}
           <form class="add-mission pg-add" hidden><input name="t" placeholder="Mission pour cet objectif…" autocomplete="off">
             <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
@@ -1307,15 +1307,7 @@ async function renderNote(id) {
       if (nf) { nf.hidden = false; nf.t.focus(); }
     }));
     // ✓ Terminer / ↺ Rouvrir un objectif du projet (vert, en bas de la liste)
-    $$('[data-gdone]', el).forEach((b) => (b.onclick = async () => {
-      const g = await db.get('goals', b.dataset.gdone);
-      g.done = !g.done;
-      g.doneAt = g.done ? Date.now() : null;
-      await db.put('goals', g);
-      await game.syncGoal(g);
-      toast(g.done ? `🏁 Objectif terminé : « ${g.title} »` : `↺ « ${g.title} » est rouvert`);
-      drawProject();
-    }));
+    $$('[data-gdone]', el).forEach((b) => (b.onclick = () => concludeGoal(b.dataset.gdone, () => drawProject())));
     // « + » d'un objectif : affiche (ou cache) la boîte d'ajout de mission
     $$('.pg-plus', el).forEach((b) => (b.onclick = () => {
       const f = b.closest('.pgoal').querySelector('.pg-add');
@@ -2217,7 +2209,45 @@ async function renderPage(id) {
    Vue : Objectifs
    ========================================================= */
 const openGoals = new Set(); // objectifs dont la liste de missions est dépliée
-const isGoalDone = (g) => !!g.done || (g.progress || 0) >= 100; // terminé à la main, ou atteint à 100 %
+const isGoalDone = (g) => !!g.done || (g.progress || 0) >= 100; // conclu à la main, ou atteint à 100 %
+const isGoalDropped = (g) => !!g.done && g.outcome === 'dropped'; // conclu sans être atteint (abandonné)
+// Rang dans une liste : en cours, puis atteints (en vert), puis abandonnés (en gris)
+const goalRank = (g) => (isGoalDropped(g) ? 2 : isGoalDone(g) ? 1 : 0);
+const goalSort = (a, b) => goalRank(a) - goalRank(b) || (goalRank(a) ? (b.doneAt || 0) - (a.doneAt || 0) : 0) || (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0);
+const goalClass = (g) => (isGoalDropped(g) ? 'is-done is-dropped' : isGoalDone(g) ? 'is-done' : '');
+const goalMark = (g) => (isGoalDropped(g) ? '⛔ ' : isGoalDone(g) ? '✅ ' : '');
+const goalVerdict = (g) => (g.done && (g.verdict || g.doneAt) ? `<p class="g-verdict">${isGoalDropped(g) ? '⛔ Abandonné' : '🏁 Atteint'}${g.doneAt ? ` le ${esc(U.fmtShort(new Date(g.doneAt)))}` : ''}${g.verdict ? ` · ${esc(g.verdict)}` : ''}</p>` : '');
+
+/** ✓ Conclure un objectif (atteint ou abandonné, avec un bilan), ou ↺ le rouvrir s'il est déjà conclu. */
+async function concludeGoal(id, after) {
+  const g = await db.get('goals', id);
+  if (!g) return;
+  if (g.done) {
+    Object.assign(g, { done: false, doneAt: null, outcome: null, verdict: '' });
+    await db.put('goals', g);
+    await game.syncGoal(g);
+    toast(`↺ « ${g.title} » est rouvert`);
+    return after(g);
+  }
+  modal(`<h2>Conclure l’objectif</h2>
+    <p class="muted">« ${esc(g.title)} » · ${g.progress || 0} %</p>
+    <div class="conclude-opts" role="radiogroup" aria-label="Résultat">
+      <label class="conclude-opt ok"><input type="radio" name="out" value="reached" checked><b>🏁 Atteint</b><small>Il passe en vert, au bas de sa liste (+ XP)</small></label>
+      <label class="conclude-opt drop"><input type="radio" name="out" value="dropped"><b>⛔ Abandonné</b><small>Il passe en gris, sous les objectifs atteints</small></label>
+    </div>
+    <label class="conclude-note">Bilan (facultatif)<textarea id="cg-note" rows="3" maxlength="300" placeholder="Ce que j’ai appris, pourquoi je l’arrête…"></textarea></label>
+    <div class="modal-actions"><button class="btn" data-close>Annuler</button><button class="btn primary" id="cg-ok">Conclure</button></div>`, (m, close) => {
+    $('#cg-ok', m).onclick = async () => {
+      const outcome = $('input[name=out]:checked', m).value;
+      Object.assign(g, { done: true, doneAt: Date.now(), outcome, verdict: $('#cg-note', m).value.trim() });
+      await db.put('goals', g);
+      await game.syncGoal(g);
+      close();
+      toast(outcome === 'dropped' ? `⛔ Objectif abandonné : « ${g.title} »` : `🏁 Objectif atteint : « ${g.title} »`);
+      after(g);
+    };
+  });
+}
 let goalsView = 'hz'; // page Objectifs : 'hz' (par échéance) ou 'proj' (par projet)
 
 async function renderGoals() {
@@ -2244,12 +2274,13 @@ async function renderGoals() {
     const open = openGoals.has(g.id);
     const proj = g.projectId && allProjects.find((p) => p.id === g.projectId);
     const done = isGoalDone(g);
-    return `<div class="goal ${open ? 'open' : ''} ${done ? 'is-done' : ''}" data-id="${g.id}">
-      <span class="title" title="Clique pour renommer">${done ? '✅ ' : ''}<span class="g-name" tabindex="0" role="button" aria-label="Renommer « ${esc(g.title)} »">${esc(g.title)}</span></span>
+    return `<div class="goal ${open ? 'open' : ''} ${goalClass(g)}" data-id="${g.id}">
+      <span class="title" title="Clique pour renommer">${goalMark(g)}<span class="g-name" tabindex="0" role="button" aria-label="Renommer « ${esc(g.title)} »">${esc(g.title)}</span></span>
       <span class="g-tools"><span class="pct">${g.progress}%</span>
-        <button class="g-done ${g.done ? 'on' : ''}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}" title="${g.done ? 'Rouvrir l’objectif' : 'Terminer l’objectif'}">${g.done ? '↺' : '✓'}</button>
+        <button class="g-done ${g.done ? 'on' : ''}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Conclure l’objectif'}" title="${g.done ? 'Rouvrir l’objectif' : 'Conclure l’objectif (atteint ou abandonné)'}">${g.done ? '↺' : '✓'}</button>
         <button class="g-mv" data-swap="${prev || ''}" ${prev ? '' : 'disabled'} aria-label="Monter l’objectif" title="Monter">↑</button><button class="g-mv" data-swap="${next || ''}" ${next ? '' : 'disabled'} aria-label="Descendre l’objectif" title="Descendre">↓</button>
         <button class="x g-del" aria-label="Supprimer l’objectif">×</button></span>
+      ${goalVerdict(g)}
       ${proj && !inProjectGroup ? `<a class="chip proj-chip" href="#/note/${proj.id}" title="Projet du Cerveau${proj.archived ? ' (archivé)' : ''}">${proj.archived ? '🗄' : '🚀'} ${esc(proj.title || 'Projet')}</a>` : ''}
       ${ms.length
         ? `<div class="bar"><i style="width:${g.progress}%"></i></div>`
@@ -2279,16 +2310,19 @@ async function renderGoals() {
 
   // Chiffres clés
   const active = goals.filter((g) => !isGoalDone(g));
-  const reached = goals.filter(isGoalDone);
+  const reached = goals.filter((g) => isGoalDone(g) && !isGoalDropped(g));
+  const dropped = goals.filter(isGoalDropped);
   const linked = tasks.filter((t) => t.goalId && goals.some((g) => g.id === t.goalId));
   const avg = active.length ? Math.round(active.reduce((n, g) => n + (g.progress || 0), 0) / active.length) : 0;
-  // Objectifs terminés en bas (en vert), puis l'ordre choisi avec ↑ ↓ (sinon ordre de création)
-  const byOrder = (a, b) => isGoalDone(a) - isGoalDone(b) || (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0);
+  // En cours (ordre choisi avec ↑ ↓), puis atteints en vert, puis abandonnés en gris (les plus récents d'abord)
+  const byOrder = goalSort;
   const column = (title, list, extra = '') => {
     const open = list.filter((g) => !isGoalDone(g));
-    const cAvg = open.length ? Math.round(open.reduce((n, g) => n + g.progress, 0) / open.length) : (list.length ? 100 : 0);
+    const ok = list.filter((g) => isGoalDone(g) && !isGoalDropped(g)).length;
+    const counted = list.length - list.filter(isGoalDropped).length; // les abandonnés ne comptent pas
+    const cAvg = open.length ? Math.round(open.reduce((n, g) => n + g.progress, 0) / open.length) : (counted ? 100 : 0);
     return `<section class="card goal-col">
-      <div class="card-head"><h2>${title}</h2><span class="muted">${list.length ? `${list.length - open.length}/${list.length} atteint${list.length - open.length > 1 ? 's' : ''}` : ''}</span></div>
+      <div class="card-head"><h2>${title}</h2><span class="muted">${counted ? `${ok}/${counted} atteint${ok > 1 ? 's' : ''}` : ''}</span></div>
       ${extra}${list.length ? `<div class="bar goal-col-bar" title="Progression moyenne"><i style="width:${cAvg}%"></i></div>` : ''}
       ${(() => { const s = [...list].sort(byOrder); return s.map((g, i) => goalHTML(g, !!extra, s[i - 1]?.id, s[i + 1]?.id)).join(''); })() || '<p class="empty-sm">Aucun objectif.</p>'}</section>`;
   };
@@ -2304,7 +2338,7 @@ async function renderGoals() {
     <div class="kpis">
       <div class="kpi"><b>${active.length}</b><span>objectif${active.length > 1 ? 's' : ''} en cours</span></div>
       <div class="kpi"><b>${avg} %</b><span>progression moyenne</span></div>
-      <div class="kpi ok"><b>${reached.length}</b><span>objectif${reached.length > 1 ? 's' : ''} atteint${reached.length > 1 ? 's' : ''} 🏁</span></div>
+      <div class="kpi ok"><b>${reached.length}</b><span>objectif${reached.length > 1 ? 's' : ''} atteint${reached.length > 1 ? 's' : ''} 🏁${dropped.length ? ` · ${dropped.length} abandonné${dropped.length > 1 ? 's' : ''}` : ''}</span></div>
       <a class="kpi" href="#/missions"><b>${linked.filter((t) => t.done).length}/${linked.length}</b><span>missions liées accomplies</span></a>
     </div>
     <form class="card ms-add" id="add-goal">
@@ -2379,17 +2413,8 @@ async function renderGoals() {
     };
     nameEl.onclick = startRename;
     nameEl.onkeydown = (e) => { if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startRename(); } };
-    // ✓ Terminer (ou ↺ Rouvrir) : l'objectif passe en vert et va au bas de sa colonne
-    el.querySelector('.g-done').onclick = async () => {
-      const g = await db.get('goals', id);
-      g.done = !g.done;
-      g.doneAt = g.done ? Date.now() : null;
-      await db.put('goals', g);
-      await game.syncGoal(g);
-      if (g.done) { openGoals.delete(id); toast(`🏁 Objectif terminé : « ${g.title} »`); }
-      else toast(`↺ « ${g.title} » est rouvert`);
-      renderGoals();
-    };
+    // ✓ Conclure (atteint ou abandonné) ou ↺ Rouvrir : l'objectif se range au bas de sa colonne
+    el.querySelector('.g-done').onclick = () => concludeGoal(id, (g) => { if (g.done) openGoals.delete(id); renderGoals(); });
     // ↑ ↓ : échange la place avec l'objectif voisin de la même colonne
     el.querySelectorAll('.g-mv').forEach((b) => (b.onclick = async () => {
       const other = b.dataset.swap;
