@@ -1746,3 +1746,12 @@ a.assoc-chip { padding: 4px 11px; }
   .fi-plan-rows { grid-template-columns: 1fr; }
   .fi-input input { width: 76px; }
 }
+/* Cinq icônes à côté du logo (avec Plein écran) : un peu plus compactes sur le grand menu */
+@media (min-width: 901px) {
+  .brand { gap: 6px; padding-left: 8px; padding-right: 8px; }
+  .rail a.brand-logo { width: 32px; height: 32px; }
+  .rail a.brand-logo img { width: 28px; height: 28px; }
+  .brand-tools { gap: 3px; }
+  .rail .brand-ico { width: 28px; height: 28px; border-radius: 8px; }
+  .rail .brand-ico svg { width: 15px; height: 15px; }
+}
