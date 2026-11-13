@@ -343,6 +343,22 @@ async function callClaude(key, model, messages) {
   return data;
 }
 
+/** Question simple à Claude, sans outils (ex. analyse de l'utilisation de l'app). Renvoie le texte. */
+export async function askPlain(system, text, maxTokens = 6000) {
+  const key = await db.get('settings', 'anthropicKey');
+  if (!key) throw new Error('Ajoute ta clé API Anthropic dans Réglages → Assistant.');
+  const model = (await db.get('settings', 'assistantModel')) || DEFAULT_MODEL;
+  const body = { model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: text }], output_config: { effort: 'medium' } };
+  const headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2026-10-21', 'anthropic-dangerous-direct-browser-access': 'true' };
+  if (model !== 'claude-haiku-5-5') { body.fallbacks = 'default'; headers['anthropic-beta'] = 'server-side-fallback-2026-07-01'; }
+  let res;
+  try { res = await fetch(API, { method: 'POST', headers, body: JSON.stringify(body) }); } catch { throw new Error('Pas de connexion internet.'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(res.status === 401 ? 'Clé API refusée. Vérifie-la dans Réglages → Assistant.' : `Erreur ${res.status} : ${data?.error?.message || res.statusText}`);
+  if (data.stop_reason === 'refusal') throw new Error('Claude n’a pas pu répondre à cette demande.');
+  return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+}
+
 /**
  * Envoie un message. history (tableau) est complété sur place, sans jamais modifier les tours précédents.
  * opts : { action(icon, text), confirm(msg) → Promise<bool> }. Renvoie { text, local }.

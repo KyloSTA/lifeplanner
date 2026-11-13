@@ -22,6 +22,7 @@ import * as docs from './docs.js';
 import * as assoc from './assoc.js';
 import * as news from './news.js';
 import * as finance from './finance.js';
+import * as usage from './usage.js';
 import * as reminders from './reminders.js';
 import * as rpg from './rpg.js';
 
@@ -112,11 +113,12 @@ const routes = {
   month: renderMonth, year: renderYear,
   news: () => news.renderPage(pageCtx()),
   finance: (tab) => finance.renderPage(pageCtx(), tab),
+  usage: renderUsage,
   quest: () => rpg.renderPage(pageCtx()),
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
-const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', habits: 'hero', month: 'week', year: 'week', journal: 'week' };
+const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', usage: 'settings', habits: 'hero', month: 'week', year: 'week', journal: 'week' };
 // Outils d'interface passés aux modules des onglets Habitudes, Cours RBQ et Workout
 const pageCtx = () => ({ view, modal, toast, confirmBox, setCleanup: (fn) => { cleanup = fn; } });
 
@@ -284,11 +286,13 @@ const FOLD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6
 function foldableCards(root) {
   if (!root) return;
   const keyOf = (card) => [...card.classList].find((c) => c.startsWith('t-')) || card.id;
+  let removed = []; // cartes masquées (suggestion « Masquer la carte… », réversible dans Ton utilisation)
   const decorate = () => {
     const folded = foldedSet();
     for (const card of root.querySelectorAll(':scope > .today-col > .card')) {
       const key = keyOf(card);
-      if (!key) continue;
+      if (!key || key === 't-hint') continue;
+      card.classList.toggle('is-removed', removed.includes(key));
       card.classList.toggle('is-folded', folded.has(key));
       const head = card.querySelector('.card-head');
       if (!head || head.querySelector(':scope > .fold-btn')) continue;
@@ -311,6 +315,7 @@ function foldableCards(root) {
     }
   };
   decorate();
+  db.get('settings', 'todayHidden').then((v) => { removed = v || []; decorate(); }).catch(() => {});
   // Les cartes se remplissent (et se redessinent) après coup : on ajoute le bouton à chaque nouvel en-tête
   let pending = false;
   new MutationObserver(() => {
@@ -342,6 +347,7 @@ async function renderToday() {
           <section class="card t-goals" id="c-goals"></section>
         </div>
         <div class="today-col col-side">
+          <section class="card t-hint" id="c-hint" hidden></section>
           <section class="card t-habits" id="c-habits"></section>
           <section class="card t-money" id="c-money" hidden></section>
           <section class="card t-workout" id="c-workout"></section>
@@ -440,6 +446,7 @@ async function renderToday() {
 
   news.todayCard($('#c-news'), toast); // en parallèle (réseau) : ne retarde pas le reste de la page
   finance.todayCard($('#c-money')).catch(console.error);
+  usageState().then((st) => usage.todayHint($('#c-hint'), st)).catch(console.error);
   await Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard(), assistCard()]);
   agenda();
 }
@@ -910,7 +917,15 @@ async function renderHero() {
    Vue : Cerveau (second cerveau)
    ========================================================= */
 const brainState = { q: '', f: 'all', tag: '', arch: false, order: [] }; // order : la liste affichée (pour ‹ › dans une note)
-const skipRediscover = [];
+// Éléments du Cerveau ouverts récemment (sur cet appareil), le plus récent d'abord
+const RECENT_KEY = 'lp.recentNotes';
+let recentIdx = 0;
+const recentNoteIds = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } };
+function rememberNote(id) {
+  const list = [id, ...recentNoteIds().filter((x) => x !== id)].slice(0, 20);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+  recentIdx = 0;
+}
 
 async function evoCard() {
   const el = $('#c-evo');
@@ -1195,18 +1210,30 @@ async function renderBrain() {
   };
   bindCapture($('#cap'), () => renderBrain());
 
+  // Consultés récemment : les dernières notes ouvertes, une à la fois, avec ‹ › de chaque côté
+  const recentAll = await brain.allNotes();
+  const recent = recentNoteIds().map((id) => recentAll.find((x) => x.id === id)).filter(Boolean);
   const redisc = async () => {
     const el = $('#c-redisc');
     if (!el) return;
-    const n = brain.rediscover(await brain.allNotes(), skipRediscover);
-    el.innerHTML = `<div class="card-head"><h2>🔁 Redécouvrir</h2>${n ? '<button class="btn sm" id="rd-next" title="Une autre note" aria-label="Une autre note">↻</button>' : ''}</div>
-      ${n ? `<a class="redisc" href="#/note/${n.id}"><b>${brain.typeOf(n.type).icon} ${esc(n.title || 'Sans titre')}</b>
-          <p>${esc(brain.excerpt(n.body, 160)) || '<span class="muted">Note vide</span>'}</p></a>
-        <div class="rd-actions"><button class="btn primary" id="rd-ok">✓ Je l’ai relue (+${game.XP.review} XP)</button></div>`
-      : '<p class="empty-sm">Tes notes de plus de 2 jours reviendront ici, une à la fois. Relire régulièrement, c’est ce qui transforme l’information en savoir.</p>'}`;
-    if (!n) return;
-    $('#rd-next').onclick = () => { skipRediscover.push(n.id); redisc(); };
-    $('#rd-ok').onclick = async () => { await brain.review(n); redisc(); };
+    if (!recent.length) {
+      el.innerHTML = '<div class="card-head"><h2>🕘 Consultés récemment</h2></div><p class="empty-sm">Les éléments du Cerveau que tu ouvres apparaîtront ici, pour y revenir en un clic.</p>';
+      return;
+    }
+    recentIdx = Math.min(Math.max(recentIdx, 0), recent.length - 1);
+    const n = recent[recentIdx];
+    const v = youtubeVideos(n.body)[0];
+    el.innerHTML = `<div class="card-head"><h2>🕘 Consultés récemment</h2><span class="muted">${recentIdx + 1}/${recent.length}</span></div>
+      <div class="rc-row">
+        <button class="rc-arrow" id="rc-prev" ${recentIdx === 0 ? 'disabled' : ''} aria-label="Élément plus récent" title="Plus récent">‹</button>
+        <a class="redisc" href="#/note/${n.id}">
+          ${v ? `<img class="rc-thumb" src="https://i.ytimg.com/vi/${v.id}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+          <b>${brain.typeOf(n.type).icon} ${esc(n.title || 'Sans titre')}</b>
+          <p>${esc(brain.excerpt(cardText(n.body), 140)) || '<span class="muted">Note vide</span>'}</p></a>
+        <button class="rc-arrow" id="rc-next" ${recentIdx === recent.length - 1 ? 'disabled' : ''} aria-label="Élément consulté avant" title="Consulté avant">›</button>
+      </div>`;
+    $('#rc-prev').onclick = () => { recentIdx--; redisc(); };
+    $('#rc-next').onclick = () => { recentIdx++; redisc(); };
   };
   await Promise.all([evoCard(), redisc()]);
 }
@@ -1229,6 +1256,7 @@ function youtubeVideos(text = '') {
 async function renderNote(id) {
   const n = await db.get('notes', id);
   if (!n) { view.innerHTML = '<div class="empty">Note introuvable. <a href="#/brain">Retour au Cerveau</a></div>'; return; }
+  rememberNote(n.id);
   let origTitle = n.title;
   let deleted = false;
   let pending = Promise.resolve();
@@ -2643,9 +2671,15 @@ async function renderSettings() {
 
       <section class="card logo-card" id="logo-card"></section>
 
+      <section class="card us-link">
+        <div class="card-head"><h2>📊 Ton utilisation</h2></div>
+        <p class="muted" style="margin-top:0">L’app note quelles pages et quels boutons tu utilises (jamais le contenu de tes notes) et te propose des façons de la simplifier : ordre du menu, pages ou cartes à retirer, page d’ouverture…</p>
+        <a class="btn primary" href="#/usage">Voir mon utilisation et les suggestions</a>
+      </section>
+
       <section class="card">
         <div class="card-head"><h2>Menu</h2><button class="btn as-reset" id="nav-reset" type="button">Ordre par défaut</button></div>
-        <p class="muted" style="margin-top:0">Change l’ordre des onglets avec les flèches. Réglages reste toujours en bas.</p>
+        <p class="muted" style="margin-top:0">Change l’ordre des onglets avec les flèches ; 👁 retire un onglet du menu ou le remet. Réglages reste toujours en bas.</p>
         <ol class="nav-order" id="nav-order"></ol>
       </section>
 
@@ -2681,13 +2715,20 @@ async function renderSettings() {
   // Ordre des onglets
   const drawNav = async (focusKey, dir) => {
     const order = await navOrder();
+    const hidden = (await db.get('settings', 'navHidden')) || [];
     $('#nav-order').innerHTML = order.map((k, i) => {
       const a = $(`#rail a[data-route="${k}"]`);
-      return `<li data-k="${k}"><span class="nav-ico">${a.querySelector('svg').outerHTML}</span><span class="nav-name">${esc(a.querySelector('span').textContent)}</span>
+      const off = hidden.includes(k);
+      return `<li data-k="${k}" class="${off ? 'off' : ''}"><span class="nav-ico">${a.querySelector('svg').outerHTML}</span><span class="nav-name">${esc(a.querySelector('span').textContent)}${off ? ' <small class="muted">(retiré)</small>' : ''}</span>
+        ${k === 'today' ? '' : `<button class="nav-mv nav-eye" data-eye="${k}" aria-pressed="${!off}" title="${off ? 'Remettre dans le menu' : 'Retirer du menu'}" aria-label="${off ? 'Remettre' : 'Retirer'} ${esc(a.querySelector('span').textContent)}">${off ? '🙈' : '👁'}</button>`}
         <button class="nav-mv" data-dir="-1" aria-label="Monter ${esc(a.querySelector('span').textContent)}" ${i === 0 ? 'disabled' : ''}>↑</button>
         <button class="nav-mv" data-dir="1" aria-label="Descendre ${esc(a.querySelector('span').textContent)}" ${i === order.length - 1 ? 'disabled' : ''}>↓</button></li>`;
     }).join('');
-    $$('#nav-order .nav-mv').forEach((b) => (b.onclick = async () => {
+    $$('#nav-order [data-eye]').forEach((b) => (b.onclick = async () => {
+      await usageApply({ type: hidden.includes(b.dataset.eye) ? 'navShow' : 'navHide', key: b.dataset.eye });
+      drawNav();
+    }));
+    $$('#nav-order .nav-mv[data-dir]').forEach((b) => (b.onclick = async () => {
       const k = b.closest('li').dataset.k, d = Number(b.dataset.dir);
       const o = await navOrder();
       const i = o.indexOf(k);
@@ -2947,11 +2988,50 @@ const PHONE_TABS = 4; // sur cellulaire : les 4 premiers onglets dans la barre d
 async function applyNavOrder() {
   const rail = $('#rail');
   const end = rail.querySelector('#rail-more'); // « Plus » puis Réglages restent en bas
-  (await navOrder()).forEach((k, i) => {
+  const hidden = (await db.get('settings', 'navHidden')) || []; // pages retirées du menu (toujours accessibles dans Réglages → Menu)
+  let i = 0;
+  (await navOrder()).forEach((k) => {
     const a = rail.querySelector(`a[data-route="${k}"]`);
     if (!a) return;
     rail.insertBefore(a, end);
+    a.classList.toggle('nav-hidden', hidden.includes(k));
+    if (hidden.includes(k)) return;
     a.classList.toggle('nav-extra', i >= PHONE_TABS);
+    i++;
+  });
+}
+
+/* ---------- Suivi d'utilisation : état et actions des suggestions (voir usage.js) ---------- */
+async function usageState() {
+  return {
+    navOrder: await navOrder(),
+    navHidden: (await db.get('settings', 'navHidden')) || [],
+    todayHidden: (await db.get('settings', 'todayHidden')) || [],
+    folded: foldedSet(),
+    startPage: (await db.get('settings', 'startPage')) || 'today',
+  };
+}
+async function usageApply(a) {
+  const list = async (key, add, k) => {
+    const cur = new Set((await db.get('settings', key)) || []);
+    add ? cur.add(k) : cur.delete(k);
+    await db.put('settings', [...cur], key);
+  };
+  if (a.type === 'navOrder') await db.put('settings', a.order, 'navOrder');
+  else if (a.type === 'navHide') await list('navHidden', true, a.key);
+  else if (a.type === 'navShow') await list('navHidden', false, a.key);
+  else if (a.type === 'cardHide') await list('todayHidden', true, a.key);
+  else if (a.type === 'cardShow') await list('todayHidden', false, a.key);
+  else if (a.type === 'cardFold') { const s = foldedSet(); s.add(a.key); try { localStorage.setItem(FOLD_KEY, JSON.stringify([...s])); } catch { /* ignore */ } }
+  else if (a.type === 'startPage') await db.put('settings', a.key, 'startPage');
+  await applyNavOrder();
+}
+const USAGE_SYSTEM = 'Tu es un expert UX qui aide une personne à simplifier son application personnelle de planification. Réponds en français québécois, de façon concrète et brève.';
+async function renderUsage() {
+  await usage.renderPage(pageCtx(), {
+    state: usageState, apply: usageApply, hasKey: await assistant.hasKey(), device: alarms.DEVICE,
+    ask: (text) => assistant.askPlain(USAGE_SYSTEM, text),
+    addMission: (title) => addTask(title, null),
   });
 }
 
@@ -3046,9 +3126,15 @@ onDbChange(({ store }) => {
 });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 gcal.preload();
-game.init().catch(console.error).finally(() => {
+game.init().catch(console.error).finally(async () => {
   refreshRail();
+  // Page d'ouverture choisie (suggestion « Ouvrir l'app directement sur… »)
+  if (!location.hash || location.hash === '#' || location.hash === '#/') {
+    const sp = await db.get('settings', 'startPage').catch(() => null);
+    if (sp && sp !== 'today' && routes[sp]) history.replaceState(null, '', '#/' + sp);
+  }
   router();
+  usage.start().catch(console.error);
   timer.mount();
   // Synchro : des changements arrivent d'un autre appareil -> on rafraîchit la vue (sauf pendant une saisie)
   sync.start((stores, n) => {
