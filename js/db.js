@@ -2,9 +2,9 @@
 // ce qui permet de synchroniser plusieurs appareils (voir sync.js) sans écraser les changements.
 
 const DB_NAME = 'lifeplanner';
-const VERSION = 7;
-export const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'settings', 'cache', 'xp', 'notes', 'habits', 'study', 'workouts', 'files'];
-const KEYPATH = { tasks: 'id', journal: 'date', pages: 'id', ink: 'id', goals: 'id', xp: 'key', notes: 'id', habits: 'id', study: 'id', workouts: 'id', files: 'id' }; // settings/cache : clé séparée
+const VERSION = 8;
+export const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'settings', 'cache', 'xp', 'notes', 'habits', 'study', 'workouts', 'files', 'money'];
+const KEYPATH = { tasks: 'id', journal: 'date', pages: 'id', ink: 'id', goals: 'id', xp: 'key', notes: 'id', habits: 'id', study: 'id', workouts: 'id', files: 'id', money: 'id' }; // settings/cache : clé séparée
 const UNTRACKED = new Set(['cache', 'blobs']); // jamais synchronisé ici (les documents ont leur propre envoi, voir docs.js)
 
 let dbp = null;
@@ -33,6 +33,7 @@ function open() {
       }
       if (e.oldVersion < 6) d.createObjectStore('files', { keyPath: 'id' }); // images des notes (photos, captures)
       if (e.oldVersion < 7) d.createObjectStore('blobs'); // contenu des documents joints (PDF, Word, EPUB…), clé = id du document
+      if (e.oldVersion < 8) d.createObjectStore('money', { keyPath: 'id' }); // finances : transactions importées des relevés (.csv)
     };
     r.onsuccess = () => {
       const d = r.result;
@@ -97,6 +98,11 @@ export const db = {
     });
     notify(s)();
   },
+  /** Enregistre plusieurs éléments d'un coup (une seule transaction : import d'un relevé). */
+  putMany: (s, vals) => run([s, 'meta'], 'readwrite', (t) => {
+    const st = t.objectStore(s), meta = t.objectStore('meta'), now = Date.now();
+    for (const v of vals) { st.put(v); meta.put({ at: now }, metaKey(s, keyOf(s, v))); }
+  }).then(notify(s)),
   async entries(s) {
     const [keys, vals] = await Promise.all([this.keys(s), this.all(s)]);
     return keys.map((k, i) => [k, vals[i]]);
