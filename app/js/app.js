@@ -860,7 +860,7 @@ async function renderHero() {
 /* =========================================================
    Vue : Cerveau (second cerveau)
    ========================================================= */
-const brainState = { q: '', f: 'all', tag: '', arch: false };
+const brainState = { q: '', f: 'all', tag: '', arch: false, order: [] }; // order : la liste affichée (pour ‹ › dans une note)
 const skipRediscover = [];
 
 async function evoCard() {
@@ -1094,6 +1094,7 @@ async function renderBrain() {
       const hay = brain.norm(`${n.title} ${n.body} ${(n.tags || []).join(' ')}`);
       return words.every((w) => hay.includes(w));
     }).sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
+    brainState.order = list.map((x) => x.id);
     $('#ng').innerHTML = list.map((x) => noteCard(x, projStats(x))).join('') || (notes.length || brainState.arch
       ? `<p class="empty">${brainState.arch ? 'Aucune note archivée ne correspond.' : 'Aucune note ne correspond.'}</p>`
       : `<div class="card brain-empty"><h2>Bienvenue dans ton second cerveau 🧠</h2>
@@ -1148,11 +1149,26 @@ async function renderNote(id) {
   let deleted = false;
   let pending = Promise.resolve();
   const today = iso(new Date());
+  // Élément précédent / suivant : dans l'ordre de la liste du Cerveau telle qu'elle était affichée
+  // (filtre, étiquette, recherche) ; sinon toutes les notes du même groupe (actives ou archivées).
+  if (!brainState.order.includes(id)) {
+    brainState.order = (await brain.allNotes()).filter((x) => !!x.archived === !!n.archived)
+      .sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt)).map((x) => x.id);
+  }
+  const pos = brainState.order.indexOf(id);
+  const prevId = brainState.order[pos - 1], nextId = brainState.order[pos + 1];
 
   view.innerHTML = `
     <header class="page-head note-head">
       <div class="grow"><a href="#/brain" class="eyebrow">← Cerveau</a>
-        <input id="n-title" class="note-title" value="${esc(n.title)}" placeholder="Titre de la note" maxlength="80" autocomplete="off"></div>
+        <div class="note-title-row">
+          <input id="n-title" class="note-title" value="${esc(n.title)}" placeholder="Titre de la note" maxlength="80" autocomplete="off">
+          ${brainState.order.length > 1 ? `<nav class="note-nav" aria-label="Autres éléments du Cerveau">
+            <button class="btn" id="n-prev" ${prevId ? '' : 'disabled'} title="Élément précédent (Alt + ←)" aria-label="Élément précédent">‹</button>
+            <small class="muted">${pos + 1}/${brainState.order.length}</small>
+            <button class="btn" id="n-next" ${nextId ? '' : 'disabled'} title="Élément suivant (Alt + →)" aria-label="Élément suivant">›</button>
+          </nav>` : ''}
+        </div></div>
       <div class="head-actions">
         <select id="n-type" style="width:auto" aria-label="Type">${brain.TYPES.map((t) => `<option value="${t.id}" ${t.id === n.type ? 'selected' : ''}>${t.icon} ${t.name}</option>`).join('')}</select>
         <button class="btn" id="n-pin">${n.pinned ? '📌 Épinglée' : '📌 Épingler'}</button>
@@ -1457,6 +1473,19 @@ async function renderNote(id) {
       renderNote(n.id);
     }
   };
+  // ‹ › : enregistre puis passe à l'élément voisin
+  const goTo = async (to) => { if (!to) return; await flush(); location.hash = '#/note/' + to; };
+  $('#n-prev')?.addEventListener('click', () => goTo(prevId));
+  $('#n-next')?.addEventListener('click', () => goTo(nextId));
+  const here = location.hash;
+  const onKey = (e) => {
+    if (location.hash !== here) { document.removeEventListener('keydown', onKey); return; }
+    if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    e.preventDefault(); // Alt + ← est aussi « page précédente » du navigateur
+    goTo(e.key === 'ArrowLeft' ? prevId : nextId);
+  };
+  document.addEventListener('keydown', onKey);
+
   $('#n-del').onclick = async () => {
     if (!(await confirmBox(`Supprimer la note « ${n.title || 'Sans titre'} » ? Ses points seront retirés.`))) return;
     deleted = true;
@@ -2775,7 +2804,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'quest', 'workout', 'rbq', 'news']; // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'quest', 'workout', 'rbq']; // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
