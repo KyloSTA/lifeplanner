@@ -664,9 +664,9 @@ async function heroCard() {
 }
 
 /* ---------- Logo personnel (menu + onglet du navigateur) ---------- */
-const LOGO_COLORS = ['#4f46e5', '#0ea5e9', '#0c8484', '#16a34a', '#ca8a04', '#f97316', '#e11d48', '#a855f7', '#1d1d1f'];
+const LOGO_COLORS = ['#0f3d2e', '#1f6b4a', '#d4a646', '#4f46e5', '#0ea5e9', '#0c8484', '#16a34a', '#ca8a04', '#f97316', '#e11d48', '#a855f7', '#1d1d1f'];
 async function getLogo() {
-  return { mode: 'avatar', text: '', color: '#4f46e5', emoji: '🦁', title: 'Life Planner', ...((await db.get('settings', 'logo')) || {}) };
+  return { mode: 'avatar', text: '', color: '#0f3d2e', emoji: '🦁', title: 'Life Planner', ...((await db.get('settings', 'logo')) || {}) };
 }
 const initialsOf = (name) => (name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'LP';
 function shade(hex, k) { // assombrit une couleur #rrggbb (k < 0) ou l'éclaircit (k > 0)
@@ -676,7 +676,7 @@ function shade(hex, k) { // assombrit une couleur #rrggbb (k < 0) ou l'éclairci
 }
 function logoSVG(cfg, av, size = 34) {
   const uidg = 'lg' + Math.random().toString(36).slice(2, 7);
-  const c = /^#[0-9a-f]{6}$/i.test(cfg.color) ? cfg.color : '#4f46e5';
+  const c = /^#[0-9a-f]{6}$/i.test(cfg.color) ? cfg.color : '#0f3d2e';
   const head = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">`;
   if (cfg.mode === 'mono') {
     const t = esc((cfg.text || initialsOf(av?.name)).slice(0, 3).toUpperCase());
