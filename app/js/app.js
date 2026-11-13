@@ -1023,6 +1023,17 @@ document.addEventListener('click', (e) => {
 });
 docs.setRemoteFetcher(sync.fetchDoc);
 
+/** Texte d'une carte du Cerveau : sans les longs liens (un lien YouTube disparaît, les autres deviennent
+ *  « 🔗 site.com ») ni les #étiquettes, déjà affichées en bas de la carte. */
+function cardText(body = '') {
+  return body
+    .replace(/^⏱[^\n]*$/gm, '') // « ⏱ Rendu à 12:59 : lien » : le moment est sur la miniature
+    .replace(/(?:🔗\s*)?https?:\/\/(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\/\S+/g, '')
+    .replace(/(?:(🔗|↗[^:\n]*:)\s*)?https?:\/\/(?:www\.)?([^/\s]+)\S*/g, (m, pre, host) => `🔗 ${host}`)
+    .replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, '$1')
+    .replace(/^\s*🔗\s*$/gm, '');
+}
+
 function noteCard(n, proj) {
   const t = brain.typeOf(n.type);
   return `<a class="note-card ${n.pinned ? 'pinned' : ''}" href="#/note/${n.id}">
@@ -1030,8 +1041,17 @@ function noteCard(n, proj) {
     ${n.inbox ? '<span class="chip warn">📥 À classer</span>' : ''}
     ${proj?.goals.length ? `<div class="nc-proj"><span class="muted">🎯 ${proj.goals.length} objectif${proj.goals.length > 1 ? 's' : ''}${proj.missions ? ` · ${proj.done}/${proj.missions} missions` : ''}</span><b>${proj.pct} %</b>
       <div class="bar"><i style="width:${proj.pct}%"></i></div></div>` : ''}
-    ${(() => { const im = images.refsIn(n.body); return im.length ? `<div class="nc-img"><img data-img="${im[0]}" alt="" loading="lazy">${im.length > 1 ? `<span>+${im.length - 1}</span>` : ''}</div>` : ''; })()}
-    <p>${esc(brain.excerpt(n.body)) || (n.title ? '' : '<span class="muted">Vide</span>')}</p>
+    ${(() => {
+      const im = images.refsIn(n.body);
+      if (im.length) return `<div class="nc-img"><img data-img="${im[0]}" alt="" loading="lazy">${im.length > 1 ? `<span>+${im.length - 1}</span>` : ''}</div>`;
+      // Vidéo YouTube : sa miniature plutôt que le lien
+      const v = youtubeVideos(n.body);
+      if (!v.length) return '';
+      const at = v[0].start ? `${Math.floor(v[0].start / 60)}:${String(v[0].start % 60).padStart(2, '0')}` : '';
+      return `<div class="nc-img nc-yt ${v[0].short ? 'is-short' : ''}"><img src="https://i.ytimg.com/vi/${v[0].id}/hqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">
+        <i class="nc-play" aria-hidden="true">▶</i>${at ? `<span title="Où tu étais rendu">⏱ ${at}</span>` : v.length > 1 ? `<span>+${v.length - 1}</span>` : ''}</div>`;
+    })()}
+    <p>${esc(brain.excerpt(cardText(n.body))) || (n.title ? '' : '<span class="muted">Vide</span>')}</p>
     <div class="nc-foot">${(n.tags || []).slice(0, 3).map((tg) => `<span class="tag">#${esc(tg)}</span>`).join('')}
       <span class="grow"></span>${(n.links || []).length ? `<span class="muted" title="Liens">🔗 ${n.links.length}</span>` : ''}<span class="muted">${U.fmtShort(new Date(n.updatedAt))}</span></div>
   </a>`;
