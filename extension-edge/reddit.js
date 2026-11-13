@@ -13,6 +13,9 @@
     // Le Lanceur nomme ses fenêtres « lp-reddit » ; l'extension retient aussi les onglets
     // dont l'ouvreur est Life Planner (si Reddit efface le nom de la fenêtre).
     let yes = /^lp-/.test(window.name || '');
+    // Reddit installé comme application dans Edge (mode « App installée » du Lanceur) : la fenêtre
+    // de l'app n'a ni nom ni ouvreur, mais elle s'affiche sans barre d'adresse (mode « standalone »).
+    if (!yes) yes = ['standalone', 'minimal-ui', 'window-controls-overlay', 'fullscreen'].some((m) => matchMedia(`(display-mode: ${m})`).matches);
     if (!yes) {
       try { yes = !!(await chrome.runtime.sendMessage({ type: 'lp-is-launcher' }))?.yes; } catch { /* ignore */ }
     }
