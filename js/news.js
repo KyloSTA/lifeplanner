@@ -7,6 +7,7 @@
 import { db } from './db.js';
 import * as U from './util.js';
 import * as brain from './brain.js';
+import * as habs from './habs.js';
 
 const { esc } = U;
 // cat : 'general' (onglet Actualités) ou 'lnh' (onglet 🏒 LNH)
@@ -140,6 +141,28 @@ function bindSave(root, items, byId, toast) {
 
 let filter = 'all';
 let section = 'general'; // onglet ouvert : Actualités ou LNH
+let lnhView = 'habs'; // dans LNH : 'habs' (Canadiens de Montréal) ou 'all' (toute la LNH)
+
+/** LNH › Canadiens : résultat, classement, stats (ESPN) et articles de tes sources LNH sur le Canadien. */
+async function drawHabs(view, force, toast, byId) {
+  const list = view.querySelector('#nw-list');
+  view.querySelector('#nw-filters').innerHTML = '';
+  let d;
+  try { d = await habs.load(force); } catch {
+    list.innerHTML = '<div class="card empty-card"><p>Impossible de charger les données du Canadien (connexion ?).</p></div>';
+  }
+  const news = await load(false, 'lnh').catch(() => ({ items: [] }));
+  const items = news.items.filter(habs.isHabs).slice(0, 12);
+  if (!d) return;
+  list.innerHTML = habs.render(d, items);
+  const saved = await savedLinks();
+  const box = view.querySelector('#habs-news');
+  if (items.length) box.innerHTML = `<div class="habs-news-list">${items.map((x) => `<article class="habs-art">
+      ${x.img ? `<a class="nw-img" href="${esc(x.link)}" target="_blank" rel="noopener"><img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>` : ''}
+      <div><p class="nw-meta"><i class="nw-dot" style="--c:${esc(byId[x.src]?.color || '#888')}"></i>${esc(byId[x.src]?.name || '')} · ${ago(x.date)}</p>
+      <a class="nw-title" href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a>${saveBtn(x, saved, true)}</div></article>`).join('')}</div>`;
+  bindSave(view, items, byId, toast);
+}
 export async function renderPage(ctx, force = false) {
   const { view, toast, modal } = ctx;
   const fl = (await feeds()).filter((f) => f.cat === section);
@@ -147,15 +170,19 @@ export async function renderPage(ctx, force = false) {
   let shown = 23; // 1 à la une + 23 titres, puis « Voir plus »
   view.innerHTML = `
     <header class="page-head">
-      <div><p class="eyebrow">Ce qui se passe</p><h1>${section === 'lnh' ? '🏒 Nouvelles LNH' : 'Actualités'}</h1></div>
+      <div><p class="eyebrow">Ce qui se passe</p><h1>${section === 'lnh' ? (lnhView === 'habs' ? '🏒 Canadiens de Montréal' : '🏒 Nouvelles LNH') : 'Actualités'}</h1></div>
       <div class="head-actions">
         <div class="seg nw-tabs" role="tablist">${SECTIONS.map(([k, l]) => `<button role="tab" data-sec="${k}" class="${section === k ? 'on' : ''}" aria-selected="${section === k}">${l}</button>`).join('')}</div>
         <button class="btn" id="nw-src">⚙ Sources</button><button class="btn" id="nw-ref">↻ Actualiser</button>
       </div>
     </header>
+    ${section === 'lnh' ? `<div class="seg lnh-tabs" role="tablist" aria-label="LNH">
+      <button role="tab" data-lv="habs" class="${lnhView === 'habs' ? 'on' : ''}" aria-selected="${lnhView === 'habs'}"><img src="https://a.espncdn.com/i/teamlogos/nhl/500/mtl.png" alt="" referrerpolicy="no-referrer"> Canadiens</button>
+      <button role="tab" data-lv="all" class="${lnhView === 'all' ? 'on' : ''}" aria-selected="${lnhView === 'all'}">Toute la LNH</button></div>` : ''}
     <div class="nw-filters filters" id="nw-filters"></div>
     <div id="nw-list"><div class="card empty-card"><p>Chargement des titres…</p></div></div>`;
   const draw = async (f) => {
+    if (section === 'lnh' && lnhView === 'habs') return drawHabs(view, f, toast, byId);
     const data = await load(f, section);
     const counts = {};
     data.items.forEach((x) => (counts[x.src] = (counts[x.src] || 0) + 1));
@@ -188,6 +215,7 @@ export async function renderPage(ctx, force = false) {
   $('#nw-ref').onclick = () => { $('#nw-list').innerHTML = '<div class="card empty-card"><p>Actualisation…</p></div>'; draw(true); };
   $('#nw-src').onclick = () => sourcesModal(modal, toast, () => renderPage(ctx, true));
   $$('[data-sec]').forEach((b) => (b.onclick = () => { if (section === b.dataset.sec) return; section = b.dataset.sec; filter = 'all'; renderPage(ctx); }));
+  $$('[data-lv]').forEach((b) => (b.onclick = () => { if (lnhView === b.dataset.lv) return; lnhView = b.dataset.lv; filter = 'all'; renderPage(ctx); }));
   draw(force);
 }
 
