@@ -272,7 +272,13 @@ auteur, date, texte du post et étiquettes `#reddit #nomdusubreddit`. Sauvegarde
 même post met la note à jour (pas de doublon). Si Life Planner est fermé, le post attend et
 arrive à sa prochaine ouverture.
 
-Une page web ne peut pas modifier Reddit : le bouton vient d'une petite extension Edge, dans
+### YouTube → Cerveau (bouton « 🧠 Cerveau » à côté de J'aime / Partager)
+Quand YouTube est ouvert depuis le Lanceur (ou dans l'app YouTube installée), un bouton
+**🧠 Cerveau** apparaît dans la rangée de boutons sous la vidéo. Un clic l'enregistre comme note
+**Ressource** : titre, lien, chaîne, le moment où tu étais rendu (lien qui reprend à cet endroit),
+description et étiquettes `#youtube #video #nomdelachaine`.
+
+Une page web ne peut pas modifier Reddit ni YouTube : le bouton vient d'une petite extension Edge, dans
 le dossier `extension-edge`. À installer une seule fois :
 1. Dans Edge, ouvre `edge://extensions`.
 2. Active **Mode développeur** (en bas à gauche).
