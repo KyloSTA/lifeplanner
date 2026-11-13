@@ -17,7 +17,7 @@ function youtubeNote(c) {
   if (c.at > 0) lines.push(`⏱ Rendu à ${hms(c.at)} : ${c.url}&t=${c.at}s`);
   if (c.text) lines.push('', ...c.text.split('\n').map((l) => (l.trim() ? '> ' + l : '')));
   const tag = tagOf(c.sub);
-  lines.push('', '#youtube #video' + (tag ? ' #' + tag : ''));
+  lines.push('', '#youtube ' + (c.short ? '#short' : '#video') + (tag ? ' #' + tag : ''));
   return lines.join('\n');
 }
 
@@ -49,6 +49,7 @@ export async function saveClip(raw) {
     created: str(raw.created, 40),
     text: str(raw.text, 4000),
     at: Math.max(0, Math.min(86_400, Math.floor(Number(raw.at) || 0))),
+    short: raw.short === true,
   };
   if (!c.url) throw new Error('Adresse invalide');
   if (kind === 'youtube' && !/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{6,20}$/.test(c.url)) throw new Error('Adresse YouTube invalide');
