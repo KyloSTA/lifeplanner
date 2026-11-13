@@ -100,7 +100,7 @@
     pill: 'display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;margin-left:8px;border:0;border-radius:18px;'
       + 'font:500 14px/36px Roboto, Arial, sans-serif;white-space:nowrap;flex:none;',
     // Petit rond comme le menu ⋮ d'une vignette
-    round: 'display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;margin:0 8px 0 12px;border:0;border-radius:50%;'
+    round: 'display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;margin:2px 26px 0 12px;border:0;border-radius:50%;'
       + 'font:16px/1 Roboto, Arial, sans-serif;flex:none;align-self:flex-start;',
     // Grand rond comme les boutons d'un Short (J'aime, commentaires…)
     short: 'display:flex;align-items:center;justify-content:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;'
