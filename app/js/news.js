@@ -12,7 +12,8 @@ import * as habs from './habs.js';
 const { esc } = U;
 // cat : la section (onglet) de la source
 export const SECTIONS = [['general', '📰 Actualités'], ['tech', '💻 Tech'], ['inter', '🌍 International'], ['business', '💼 Business'],
-  ['finance', '💰 Finance'], ['arts', '🎭 Art & Spectacle'], ['sports', '⚽ Sports'], ['lnh', '🏒 LNH']];
+  ['finance', '💰 Finance'], ['arts', '🎭 Art & Spectacle'], ['sports', '⚽ Sports'], ['lnh', '🏒 LNH'], ['media', '🍿 Média']];
+const FEED_SECTIONS = SECTIONS.filter(([k]) => k !== 'media'); // Média n'a pas de fils RSS
 const SECTION_TAGS = { lnh: '#lnh #hockey', tech: '#tech', inter: '#international', business: '#business', finance: '#finance', arts: '#culture', sports: '#sports' };
 export const DEFAULT_FEEDS = [
   { id: 'rc', cat: 'general', name: 'Radio-Canada', url: 'https://ici.radio-canada.ca/info/rss/info/a-la-une', color: '#e11d48', on: true },
@@ -197,6 +198,57 @@ let section = 'general'; // onglet ouvert : Actualités ou LNH
 let lnhView = 'habs'; // dans LNH : 'habs' (Canadiens de Montréal) ou 'all' (toute la LNH)
 
 /** LNH › Canadiens : résultat, classement, stats (ESPN) et articles de tes sources LNH sur le Canadien. */
+/* ---------- Média : top 10 films, séries et documentaires (palmarès iTunes Canada, sans clé) ---------- */
+const MEDIA = [
+  ['films', '🎬 Films', 'https://itunes.apple.com/ca/rss/topmovies/limit=10/l=fr/json'],
+  ['series', '📺 Séries', 'https://itunes.apple.com/ca/rss/toptvseasons/limit=10/l=fr/json'],
+  ['docs', '🎞 Documentaires', 'https://itunes.apple.com/ca/rss/topmovies/limit=10/genre=4405/l=fr/json'],
+];
+const MEDIA_TTL = 6 * 3600_000;
+async function loadMedia(force) {
+  const cache = await db.get('cache', 'media');
+  if (!force && cache && Date.now() - cache.at < MEDIA_TTL) return cache;
+  const lists = {};
+  await Promise.all(MEDIA.map(async ([k, , url]) => {
+    try {
+      const d = await (await fetch(url)).json();
+      lists[k] = [].concat(d.feed?.entry || []).slice(0, 10).map((e) => ({
+        title: e['im:name']?.label || '',
+        by: e['im:artist']?.label || '',
+        genre: e.category?.attributes?.label || '',
+        year: (e['im:releaseDate']?.label || '').slice(0, 4),
+        img: ([].concat(e['im:image'] || []).pop()?.label || '').replace(/\/\d+x\d+bb\./, '/300x450bb.'),
+        link: e.link?.attributes?.href || [].concat(e.link || [])[0]?.attributes?.href || '',
+        text: (e.summary?.label || '').slice(0, 300),
+      })).filter((x) => x.title);
+    } catch { lists[k] = cache?.lists?.[k] || []; }
+  }));
+  const out = { at: Date.now(), lists };
+  if (Object.values(lists).some((l) => l.length)) await db.put('cache', out, 'media');
+  return out;
+}
+async function drawMedia(view, force) {
+  const $ = (s) => view.querySelector(s);
+  $('#nw-filters').innerHTML = '';
+  let data;
+  try { data = await loadMedia(force); } catch { data = null; }
+  if (!data || !Object.values(data.lists).some((l) => l.length)) {
+    $('#nw-list').innerHTML = '<div class="card empty-card"><p>Palmarès indisponible pour l’instant (connexion ?).</p></div>';
+    return;
+  }
+  const trailer = (x) => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${x.title.replace(/,? (Season|Saison) \d+.*$/i, '')} bande annonce`);
+  $('#nw-list').innerHTML = `<div class="md-cols">${MEDIA.map(([k, label]) => `<section class="card md-col">
+      <div class="card-head"><h2>${label}</h2><span class="muted">Top 10</span></div>
+      <ol class="md-list">${(data.lists[k] || []).map((x, i) => `<li class="md-item" title="${esc(x.text)}">
+        <span class="md-rank">${i + 1}</span>
+        ${x.img ? `<img class="md-poster" src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="md-poster"></span>'}
+        <span class="md-info"><a class="md-title" href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a>
+          <small class="muted">${esc([x.genre, x.year].filter(Boolean).join(' · '))}</small>
+          <a class="md-trailer" href="${esc(trailer(x))}" target="_blank" rel="noopener">▶ Bande-annonce</a></span>
+      </li>`).join('') || '<li class="empty-sm">Indisponible.</li>'}</ol></section>`).join('')}</div>
+    <p class="hint muted">Palmarès des achats et locations sur iTunes Canada · mis à jour ${ago(data.at)}.</p>`;
+}
+
 async function drawHabs(view, force, toast, byId) {
   const list = view.querySelector('#nw-list');
   view.querySelector('#nw-filters').innerHTML = '';
@@ -237,6 +289,7 @@ export async function renderPage(ctx, force = false) {
     <div id="nw-list"><div class="card empty-card"><p>Chargement des titres…</p></div></div>`;
   const draw = async (f) => {
     if (section === 'lnh' && lnhView === 'habs') return drawHabs(view, f, toast, byId);
+    if (section === 'media') return drawMedia(view, f);
     const data = await load(f, section);
     const counts = {};
     data.items.forEach((x) => (counts[x.src] = (counts[x.src] || 0) + 1));
@@ -278,9 +331,9 @@ function sourcesModal(modal, toast, onDone) {
     let list = await feeds();
     const draw = () => {
       const row = (f, i) => `<label class="check-line nw-src"><input type="checkbox" data-i="${i}" ${f.on ? 'checked' : ''}><i class="nw-dot" style="--c:${esc(f.color)}"></i><span>${esc(f.name)}</span>${f.custom ? `<button type="button" class="btn sm" data-rm="${i}" aria-label="Retirer">×</button>` : ''}</label>`;
-      m.querySelector('#nw-srcs').innerHTML = SECTIONS.map(([k, l]) => `<h3 class="nw-src-h">${l}</h3><div class="nw-src-list">${list.map((f, i) => (f.cat === k ? row(f, i) : '')).join('')}</div>`).join('') + `
+      m.querySelector('#nw-srcs').innerHTML = FEED_SECTIONS.map(([k, l]) => `<h3 class="nw-src-h">${l}</h3><div class="nw-src-list">${list.map((f, i) => (f.cat === k ? row(f, i) : '')).join('')}</div>`).join('') + `
         <form class="nw-add" id="nw-add"><input name="name" placeholder="Nom (ex. Le Soleil)" required autocomplete="off"><input name="url" placeholder="Adresse du fil RSS (https://…)" required autocomplete="off" spellcheck="false">
-          <select name="cat" aria-label="Section">${SECTIONS.map(([k, l]) => `<option value="${k}" ${k === section ? 'selected' : ''}>${l}</option>`).join('')}</select><button class="btn">Ajouter</button></form>
+          <select name="cat" aria-label="Section">${FEED_SECTIONS.map(([k, l]) => `<option value="${k}" ${k === section ? 'selected' : ''}>${l}</option>`).join('')}</select><button class="btn">Ajouter</button></form>
         <p class="hint muted">Astuce : la plupart des journaux ont un fil RSS (cherche « RSS » au bas de leur site).</p>
         <div class="modal-actions"><button class="btn primary" id="nw-ok">Enregistrer</button></div>`;
       m.querySelectorAll('[data-i]').forEach((c) => (c.onchange = () => { list[c.dataset.i].on = c.checked; }));

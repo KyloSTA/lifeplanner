@@ -2113,3 +2113,18 @@ h2 { font-weight: 600; }
 .seg.nw-tabs { display: flex; width: max-content; max-width: 100%; overflow-x: auto; scrollbar-width: none; margin: 0 0 12px; }
 .seg.nw-tabs::-webkit-scrollbar { display: none; }
 .seg.nw-tabs button { white-space: nowrap; flex: none; }
+/* Actualités : tous les onglets visibles (passent à la ligne au lieu de défiler) */
+.seg.nw-tabs { display: flex; flex-wrap: wrap; width: auto; max-width: none; overflow: visible; gap: 2px; }
+@media (max-width: 700px) { .seg.nw-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); } .seg.nw-tabs button { padding: 6px 4px; font-size: 13px; } }
+/* Actualités : onglet Média (top 10) */
+.md-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; align-items: start; }
+.md-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.md-item { display: grid; grid-template-columns: 22px 46px minmax(0, 1fr); gap: 10px; align-items: center; }
+.md-rank { font-weight: 800; font-size: 18px; color: var(--gold-text, var(--accent)); text-align: center; font-variant-numeric: tabular-nums; }
+.md-poster { width: 46px; height: 69px; border-radius: 6px; object-fit: cover; background: var(--surface-2); display: block; }
+.md-info { display: grid; gap: 2px; min-width: 0; }
+.md-title { color: var(--text); font-weight: 650; font-size: 14px; line-height: 1.25; text-decoration: none; overflow-wrap: anywhere; }
+.md-title:hover { color: var(--gold-text, var(--accent)); }
+.md-info small { font-size: 12px; }
+.md-trailer { font-size: 12px; color: var(--muted); text-decoration: none; justify-self: start; }
+.md-trailer:hover { color: var(--burgundy, var(--accent)); }
