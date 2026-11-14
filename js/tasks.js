@@ -197,6 +197,13 @@ export function bindTaskList(root, redraw) {
     };
     li.querySelector('.t-del').onclick = async () => { await deleteTask(id); redraw(); };
     li.querySelector('.exp').onclick = () => openTaskEditor(id, redraw);
+    // Toucher le titre ouvre la mission ; seule la case la marque accomplie
+    const title = li.querySelector('.t-title');
+    if (title) {
+      title.setAttribute('role', 'button');
+      title.title = 'Ouvrir la mission';
+      title.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openTaskEditor(id, redraw); };
+    }
     // 📷 : ouvre les photos de la mission en plein écran
     const ph = li.querySelector('.t-photos');
     if (ph) ph.onclick = async (e) => {
