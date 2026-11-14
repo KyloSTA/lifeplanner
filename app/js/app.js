@@ -1467,6 +1467,16 @@ async function renderBrain() {
   await Promise.all([evoCard(), redisc()]);
 }
 
+// Objectifs d'un projet dont les missions sont dépliées (sur cet appareil)
+const pgOpen = () => { try { return new Set(JSON.parse(localStorage.getItem('lp.pgOpen')) || []); } catch { return new Set(); } };
+function togglePgOpen(id, force) {
+  const s = pgOpen();
+  const open = force ?? !s.has(id);
+  open ? s.add(id) : s.delete(id);
+  try { localStorage.setItem('lp.pgOpen', JSON.stringify([...s])); } catch { /* ignore */ }
+  return open;
+}
+
 /** Vidéos YouTube d'un texte : [{ id, start (s), short }], sans doublon, dans l'ordre. */
 function youtubeVideos(text = '') {
   const out = new Map();
@@ -1644,7 +1654,15 @@ async function renderNote(id) {
             <button class="x pg-unlink" data-unlink="${g.id}" title="Retirer du projet" aria-label="Retirer l’objectif du projet">×</button></div>
           <div class="bar"><i style="width:${g.progress}%"></i></div>
           ${goalVerdict(g)}
-          ${ms.length ? `<ul class="tasks">${ms.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>` : ''}
+          ${ms.length ? (() => {
+            // Missions de l'objectif : repliées par défaut, avec un résumé (le choix est gardé sur cet appareil)
+            const open = pgOpen().has(g.id);
+            const md = ms.filter((t) => t.done).length;
+            const late = ms.filter((t) => !t.done && t.date && t.date < today).length;
+            return `<button type="button" class="pg-fold" data-pgfold="${g.id}" aria-expanded="${open}">
+                <span class="exp">›</span> ${md}/${ms.length} mission${ms.length > 1 ? 's' : ''} accomplie${ms.length > 1 ? 's' : ''}${late ? ` · <span class="pg-late">⚠ ${late} en retard</span>` : ''}</button>
+              <ul class="tasks" ${open ? '' : 'hidden'}>${ms.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>`;
+          })() : ''}
           <form class="add-mission pg-add" hidden><input name="t" placeholder="Mission pour cet objectif…" autocomplete="off">
             <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button>${QUICK_DATES}</form>
         </div>`;
@@ -1681,6 +1699,11 @@ async function renderNote(id) {
     // ✓ Terminer / ↺ Rouvrir un objectif du projet (vert, en bas de la liste)
     $$('[data-gdone]', el).forEach((b) => (b.onclick = () => concludeGoal(b.dataset.gdone, () => drawProject())));
     // « + » d'un objectif : affiche (ou cache) la boîte d'ajout de mission
+    $$('[data-pgfold]', el).forEach((b) => (b.onclick = () => {
+      const open = togglePgOpen(b.dataset.pgfold);
+      b.setAttribute('aria-expanded', String(open));
+      b.nextElementSibling.hidden = !open;
+    }));
     $$('.pg-plus', el).forEach((b) => (b.onclick = () => {
       const f = b.closest('.pgoal').querySelector('.pg-add');
       f.hidden = !f.hidden;
