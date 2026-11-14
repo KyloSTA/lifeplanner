@@ -2249,3 +2249,11 @@ button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0;
 .cp-form { display: grid; gap: 12px; }
 .cp-form fieldset { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px 10px; display: grid; gap: 6px; }
 .cp-form legend { font-size: 13px; color: var(--muted); padding: 0 4px; }
+/* Aujourd'hui : missions terminées regroupées dans un menu déroulant */
+.done-fold { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 4px; }
+.done-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 2px; color: var(--muted); font-weight: 650; font-size: 14px; user-select: none; }
+.done-fold > summary::-webkit-details-marker { display: none; }
+.done-fold > summary::after { content: '›'; margin-left: auto; font-size: 18px; transition: transform .15s; }
+.done-fold[open] > summary::after { transform: rotate(90deg); }
+.done-fold > summary small { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); font-weight: 700; }
+.done-fold > summary:hover { color: var(--text); }
