@@ -1096,8 +1096,7 @@ function captureForm(id) {
     <textarea name="t" rows="3" placeholder="Une idée, une citation, un truc appris… (la 1re ligne devient le titre). Colle aussi une photo ou une capture d’écran (Ctrl + V)."></textarea>
     <div class="cap-imgs" hidden></div>
     <div class="capture-foot">
-      <label class="btn cap-photo" title="Ajouter une photo ou une capture"><input type="file" accept="image/*" multiple hidden>📷 Photo</label>
-      <label class="btn cap-photo cap-doc" title="Joindre un document (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎 Fichier</label>
+      <label class="btn cap-photo" title="Joindre une photo ou un document (PDF, Word, EPUB…)"><input type="file" accept="image/*,${docs.ACCEPT}" multiple hidden>📎 Joindre</label>
       <button type="button" class="btn cap-paste" title="Coller ce que tu as copié (texte, image ou capture d’écran)">📋 Coller</button>
       <span class="muted cap-hint">Ctrl + Entrée</span>
       <button class="btn primary">💡 Capturer</button>
@@ -1174,10 +1173,14 @@ function bindCapture(form, after) {
     const imgs = images.imageFiles(e.dataTransfer), ds = docs.docFiles(e.dataTransfer?.files);
     if (imgs.length || ds.length) { e.preventDefault(); add(imgs); addDocs(ds); }
   });
-  const pick = form.querySelector('.cap-photo:not(.cap-doc) input');
-  pick.onchange = () => { add([...pick.files]); pick.value = ''; };
-  const pickD = form.querySelector('.cap-doc input');
-  pickD.onchange = () => { addDocs([...pickD.files]); pickD.value = ''; };
+  // 📎 Joindre : un seul bouton ; les photos et les documents sont triés automatiquement
+  const pick = form.querySelector('.cap-photo input');
+  pick.onchange = () => {
+    const fs = [...pick.files];
+    add(fs.filter((f) => f.type.startsWith('image/')));
+    addDocs(docs.docFiles(fs));
+    pick.value = '';
+  };
   // 📋 Coller : lit le presse-papiers (images, captures d'écran et texte)
   form.querySelector('.cap-paste').onclick = async () => {
     const insertText = (txt) => {
@@ -1586,8 +1589,7 @@ async function renderNote(id) {
       })() : ''}
       <section class="card note-main">
         <div class="note-tools"><div class="seg"><button data-mode="write">✎ Écrire</button><button data-mode="read">👁 Lire</button></div>
-          <span class="note-add"><label class="btn" id="n-photo" title="Ajouter une photo ou une capture (tu peux aussi la coller avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden>📷 Photo</label>
-          <label class="btn" id="n-doc" title="Joindre un document (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎 Fichier</label></span></div>
+          <span class="note-add"><label class="btn" id="n-photo" title="Joindre une photo ou un document (PDF, Word, EPUB…) — tu peux aussi coller une image avec Ctrl + V"><input type="file" accept="image/*,${docs.ACCEPT}" multiple hidden>📎 Joindre</label></span></div>
         <div id="n-write">
           <textarea id="n-body" placeholder="Écris librement…&#10;&#10;[[Titre]] relie une autre note · #étiquette classe la note · « - » fait une liste · « # » fait un titre">${esc(n.body)}</textarea>
           <div class="suggest" id="n-sug" hidden></div>
@@ -1870,8 +1872,14 @@ async function renderNote(id) {
     const f = images.imageFiles(e.dataTransfer), d = docs.docFiles(e.dataTransfer?.files);
     if (f.length || d.length) { e.preventDefault(); insertImages(f); insertDocs(d); }
   });
+  // 📎 Joindre : photos et documents par le même bouton (triés automatiquement)
   const pickN = $('#n-photo input');
-  pickN.onchange = () => { insertImages([...pickN.files]); pickN.value = ''; };
+  pickN.onchange = () => {
+    const fs = [...pickN.files];
+    insertImages(fs.filter((f) => f.type.startsWith('image/')));
+    insertDocs(docs.docFiles(fs));
+    pickN.value = '';
+  };
   // Documents : une ligne « [📎 nom](file:…) », cliquable en mode Lire
   const insertDocs = async (list) => {
     if (!list.length) return;
@@ -1887,8 +1895,6 @@ async function renderNote(id) {
       toast(`📎 ${ms.length > 1 ? ms.length + ' documents joints' : 'Document joint'} — clique-le en mode Lire pour l’ouvrir`);
     } catch (err) { toast(err.message, 'err'); }
   };
-  const pickD = $('#n-doc input');
-  pickD.onchange = () => { insertDocs([...pickD.files]); pickD.value = ''; };
   ta.onblur = () => setTimeout(() => (sug.hidden = true), 150);
   $('#n-title').oninput = (e) => { n.title = e.target.value; save(); };
   $('#n-title').onchange = async () => {
