@@ -2030,3 +2030,16 @@ h2 { font-weight: 600; }
 .act-segs { display: flex; gap: 8px; flex-wrap: wrap; }
 .act-zone { display: inline-block; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
 .act-zone.rs { background: var(--gold-soft); color: var(--gold-text); }
+/* Planificateur : en-tête qui passe à la ligne au lieu de se superposer (5 onglets) */
+.page-head:has(.planner-tabs) .head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.page-head:has(.planner-tabs) .planner-tabs { flex: none; min-width: max-content; overflow: visible; }
+.page-head:has(.planner-tabs) #sync, .page-head:has(.planner-tabs) .act-where { margin-left: auto; white-space: nowrap; }
+.page-head:has(.planner-tabs) #act-cfg { margin-left: auto; }
+@media (max-width: 700px) {
+  .page-head:has(.planner-tabs) .planner-tabs { flex: 1 1 100%; min-width: 0; overflow-x: auto; }
+  .page-head:has(.planner-tabs) #sync { margin-left: 0; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
+.page-head:has(.planner-tabs) #sync { order: 9; }
+.page-head:has(.planner-tabs) #sync + .btn { margin-left: auto; }
+@media (max-width: 700px) { .page-head:has(.planner-tabs) #sync { flex: 1 1 100%; margin-left: 0; } .page-head:has(.planner-tabs) #sync + .btn { margin-left: 0; } }
+@media (max-width: 700px) { .page-head .planner-tabs a { flex: none; padding: 0 12px; } }
