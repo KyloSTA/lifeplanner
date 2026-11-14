@@ -286,6 +286,21 @@ function eventModal(dateStr, onDone, pre = {}) {
 /* =========================================================
    Missions (stockées dans « tasks »)
    ========================================================= */
+/**
+ * Liste de missions d'un jour : celles à faire, puis les terminées repliées sous « ✓ Terminées »
+ * (Aujourd'hui, Planificateur Jour et Semaine). L'état ouvert/fermé est retenu sur l'appareil.
+ */
+const doneOpen = () => { try { return localStorage.getItem('lp.doneOpen') === '1'; } catch { return false; } };
+function tasksBlock(items, ref, empty = '') {
+  const open = items.filter((t) => !t.done), done = items.filter((t) => t.done);
+  const none = done.length ? '🎉 Tout est fait !' : empty;
+  return `<ul class="tasks">${open.map((t) => taskHTML(t, ref)).join('') || (none ? `<li class="empty-sm">${none}</li>` : '')}</ul>`
+    + (done.length ? `<details class="done-fold" ${doneOpen() ? 'open' : ''}><summary>✓ Terminées <small>${done.length}</small></summary>
+      <ul class="tasks">${done.map((t) => taskHTML(t, ref)).join('')}</ul></details>` : '');
+}
+function bindDoneFold(root) {
+  root.querySelectorAll('.done-fold').forEach((d) => d.addEventListener('toggle', () => { try { localStorage.setItem('lp.doneOpen', d.open ? '1' : '0'); } catch { /* ignore */ } }));
+}
 async function taskCard(el, date) {
   const draw = async () => {
     await loadGoals();
@@ -2264,7 +2279,7 @@ async function renderWeek(arg) {
           <a class="day-j ${journalHas(j) ? 'has' : ''}" href="#/journal/${k}" title="${journalHas(j) ? 'Journal de ce jour' : 'Écrire dans le journal'}">${m ? m.e : '📖'}</a>
           <button class="btn icon sm" data-addev title="Ajouter un événement">+</button></header>
         <ul class="evs"></ul>
-        <ul class="tasks"></ul>
+        <div class="day-tasks"></div>
         <form class="add-mini"><input name="t" placeholder="+ Mission" autocomplete="off"></form>
       </section>`;
     }).join('')}</div>`;
@@ -2273,9 +2288,10 @@ async function renderWeek(arg) {
   const drawTasks = async (dayEl) => {
     const k = dayEl.dataset.day;
     const items = (await db.all('tasks')).filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
-    const ul = dayEl.querySelector('.tasks');
-    ul.innerHTML = items.map((t) => taskHTML(t)).join('');
-    bindTaskList(ul, () => drawTasks(dayEl));
+    const box = dayEl.querySelector('.day-tasks');
+    box.innerHTML = tasksBlock(items);
+    bindDoneFold(box);
+    bindTaskList(box, () => drawTasks(dayEl));
   };
 
   const drawEvents = async () => {
@@ -2338,7 +2354,7 @@ async function renderDay(arg) {
       <div class="dayv-side">
         <section class="card">
           <div class="card-head"><h2>✅ Missions</h2><span class="muted" id="dv-count"></span></div>
-          <ul class="tasks" id="dv-tasks"></ul>
+          <div id="dv-tasks"></div>
           <form class="add-mini" id="dv-addt"><input name="t" placeholder="+ Mission pour ce jour" autocomplete="off"></form>
         </section>
         <a class="card dayv-j" href="#/journal/${k}">
@@ -2354,11 +2370,12 @@ async function renderDay(arg) {
     const all = await db.all('tasks');
     const items = all.filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     alarmTasks = all.filter((t) => !t.done && t.alarmAt && iso(new Date(t.alarmAt)) === k);
-    const ul = $('#dv-tasks');
-    if (!ul) return;
-    ul.innerHTML = items.map((t) => taskHTML(t, today)).join('') || '<li class="empty-sm">Aucune mission prévue ce jour-là.</li>';
+    const box = $('#dv-tasks');
+    if (!box) return;
+    box.innerHTML = tasksBlock(items, today, 'Aucune mission prévue ce jour-là.');
+    bindDoneFold(box);
     $('#dv-count').textContent = items.length ? `${items.filter((t) => t.done).length}/${items.length}` : '';
-    bindTaskList(ul, () => { drawTasks(); drawEvents(); });
+    bindTaskList(box, () => { drawTasks(); drawEvents(); });
   };
 
   // Horaire : une ligne par heure ; les événements qui se chevauchent se partagent la largeur
