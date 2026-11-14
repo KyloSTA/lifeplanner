@@ -2215,3 +2215,11 @@ button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0;
 .img-gallery .ig-nav:hover { background: rgba(0,0,0,.8); }
 .img-gallery .ig-count { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); padding: 4px 12px; border-radius: 999px; background: rgba(0,0,0,.6); color: #fff; font-size: 13px; font-weight: 600; }
 .task .t-title { cursor: pointer; } .task .t-title:hover { color: var(--gold-text, var(--accent)); }
+/* Missions : poignée ⋮⋮ pour glisser la mission à une autre place */
+.t-drag { flex: none; width: 26px; height: 32px; border: 0; background: none; padding: 0; color: var(--muted); opacity: .55; cursor: grab; touch-action: none; display: grid; place-items: center; border-radius: 6px; min-height: 0; }
+.t-drag svg { width: 10px; height: 16px; fill: currentColor; }
+.t-drag:hover, .t-drag:focus-visible { opacity: 1; color: var(--text); background: var(--surface-2); }
+.task.dragging { position: relative; z-index: 5; background: var(--surface); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.28); opacity: .97; }
+.task.dragging .t-drag { cursor: grabbing; opacity: 1; }
+.drag-on { user-select: none; -webkit-user-select: none; }
+.day .t-drag { display: none; } /* vue Semaine : colonnes étroites */

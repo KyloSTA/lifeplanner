@@ -88,7 +88,7 @@ export async function renderPage(ctx) {
       }
     });
     if (nq) list = list.filter((t) => `${t.title} ${t.notes || ''} ${(t.subtasks || []).map((s) => s.title).join(' ')}`.toLowerCase().includes(nq));
-    const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || a.createdAt - b.createdAt;
+    const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
     list.sort(state.f === 'done' ? (a, b) => (b.doneAt || b.createdAt) - (a.doneAt || a.createdAt) : sortM);
 
     const groups = new Map();

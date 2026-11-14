@@ -15,7 +15,7 @@ try {
   if (t) document.documentElement.dataset.theme = t;
 } catch { /* ignore */ }
 
-const sortTasks = (a, b) => a.done - b.done || (a.date || '').localeCompare(b.date || '') || a.createdAt - b.createdAt;
+const sortTasks = (a, b) => a.done - b.done || (a.date || '').localeCompare(b.date || '') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
 
 function pop(amount, reason) {
   if (!amount) return;
