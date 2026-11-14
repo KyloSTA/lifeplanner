@@ -1209,7 +1209,7 @@ function cardText(body = '') {
 
 function noteCard(n, proj) {
   const t = brain.typeOf(n.type);
-  const media = n.source?.kind === 'news' || youtubeVideos(n.body).length > 0; // titre complet sur 2 lignes
+  const media = n.source?.kind === 'news' || !!n.source?.img || youtubeVideos(n.body).length > 0; // titre complet sur 2 lignes
   return `<a class="note-card ${n.pinned ? 'pinned' : ''} ${media ? 'has-media' : ''}" href="#/note/${n.id}">
     <div class="nc-head"><span class="nc-type" title="${t.name}">${t.icon}</span><b>${esc((n.source?.kind === 'news' && n.source.title) || n.title || 'Sans titre')}</b>${n.pinned ? '<span title="Épinglée">📌</span>' : ''}</div>
     ${n.inbox ? '<span class="chip warn">📥 À classer</span>' : ''}
@@ -1219,7 +1219,7 @@ function noteCard(n, proj) {
       const im = images.refsIn(n.body);
       if (im.length) return `<div class="nc-img"><img data-img="${im[0]}" alt="" loading="lazy">${im.length > 1 ? `<span>+${im.length - 1}</span>` : ''}</div>`;
       // Article d'actualité : son image
-      if (n.source?.kind === 'news' && n.source.img) return `<div class="nc-img nc-news"><img src="${esc(n.source.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>`;
+      if (n.source?.img) return `<div class="nc-img nc-news"><img src="${esc(n.source.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>`;
       // Vidéo YouTube : sa miniature plutôt que le lien
       const v = youtubeVideos(n.body);
       if (!v.length) return '';
@@ -1256,7 +1256,7 @@ async function quickTriage(onDone = () => {}) {
       const tags = new Set(n.tags || []);
       const yt = youtubeVideos(n.body)[0];
       const img = images.refsIn(n.body)[0];
-      const media = n.source?.kind === 'news' && n.source.img ? `<img src="${esc(n.source.img)}" alt="" referrerpolicy="no-referrer">`
+      const media = n.source?.img ? `<img src="${esc(n.source.img)}" alt="" referrerpolicy="no-referrer">`
         : yt ? `<img src="https://i.ytimg.com/vi/${yt.id}/mqdefault.jpg" alt="" referrerpolicy="no-referrer">`
         : img ? `<img data-img="${img}" alt="">` : '';
       root.innerHTML = `
@@ -1524,10 +1524,11 @@ async function renderNote(id) {
       <div class="note-left">
       <section class="card project-panel" id="n-proj" hidden></section>
       <section class="card note-video" id="n-video" hidden></section>
-      ${n.source?.kind === 'news' && n.source.img ? (() => {
+      ${(n.source?.kind === 'news' || n.source?.kind === 'reddit') && n.source.img ? (() => {
         let host = ''; try { host = new URL(n.source.url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+        const reddit = n.source.kind === 'reddit';
         return `<section class="card note-article"><a href="${esc(n.source.url)}" target="_blank" rel="noopener" class="na-img"><img src="${esc(n.source.img)}" alt="" referrerpolicy="no-referrer" onerror="this.closest('.note-article').remove()"></a>
-          <div class="na-bar"><span class="muted">📰 ${esc(host)}</span><a class="btn sm-text" href="${esc(n.source.url)}" target="_blank" rel="noopener">Lire l’article ↗</a></div></section>`;
+          <div class="na-bar"><span class="muted">${reddit ? '👽 Reddit' : '📰 ' + esc(host)}</span><a class="btn sm-text" href="${esc(n.source.url)}" target="_blank" rel="noopener">${reddit ? 'Voir le post ↗' : 'Lire l’article ↗'}</a></div></section>`;
       })() : ''}
       <section class="card note-main">
         <div class="note-tools"><div class="seg"><button data-mode="write">✎ Écrire</button><button data-mode="read">👁 Lire</button></div>
