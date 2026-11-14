@@ -111,7 +111,7 @@ const routes = {
   // Habitudes : onglet de la section Corps (elles restent aussi dans la page du héros)
   habits: () => habits.renderPage(pageCtx()),
   missions: () => missions.renderPage(pageCtx()),
-  month: renderMonth, year: renderYear,
+  month: renderMonth, year: renderYear, day: renderDay,
   news: () => news.renderPage(pageCtx()),
   finance: (tab) => finance.renderPage(pageCtx(), tab),
   usage: renderUsage,
@@ -122,7 +122,7 @@ const routes = {
 };
 const NAV_PARENT = {
   page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', habits: 'workout',
-  setup: 'settings', usage: 'settings', activities: 'week', quest: 'hero', month: 'week', year: 'week', journal: 'week',
+  setup: 'settings', usage: 'settings', activities: 'week', quest: 'hero', day: 'week', month: 'week', year: 'week', journal: 'week',
 };
 // Onglets en haut des sections qui regroupent plusieurs pages (le menu n'a qu'une entrée par section)
 const SECTION_TABS = {
@@ -2055,7 +2055,7 @@ async function renderLauncher() {
 /* ---------- Planificateur : onglets Semaine / Mois / Année / Journal ---------- */
 function plannerTabs(active, d = new Date()) {
   const day = iso(d);
-  const tabs = [['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${day}`], ['activities', '🎟 Activités', '#/activities']];
+  const tabs = [['day', 'Jour', `#/day/${day}`], ['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${day}`], ['activities', '🎟 Activités', '#/activities']];
   return `<nav class="seg planner-tabs" aria-label="Vues du planificateur">${tabs.map(([k, l, h]) => `<a href="${h}" class="${k === active ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
 }
 const moodOf = (j) => MOODS.find((m) => m.v === j?.mood);
@@ -2255,6 +2255,119 @@ async function renderWeek(arg) {
       drawTasks(dayEl);
     };
   });
+  drawEvents();
+}
+
+/* =========================================================
+   Vue : Jour (horaire heure par heure + missions du jour)
+   ========================================================= */
+const DAY_H = 48; // hauteur d'une heure (px)
+async function renderDay(arg) {
+  const d = arg ? U.parseISO(arg) : new Date();
+  d.setHours(0, 0, 0, 0);
+  const k = iso(d), today = iso(new Date());
+  const isToday = k === today;
+  const j = await db.get('journal', k), m = moodOf(j);
+
+  view.innerHTML = `
+    <header class="page-head">
+      <div><p class="eyebrow">Planificateur${isToday ? ' · Aujourd’hui' : ''}</p><h1>${cap(U.fmtLong(d))}${d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''}</h1></div>
+      <div class="head-actions">
+        ${plannerTabs('day', d)}
+        <span id="sync"></span>
+        <span class="pl-nav"><a class="btn icon" href="#/day/${iso(U.addDays(d, -1))}" aria-label="Jour précédent">‹</a>
+        <a class="btn" href="#/day">Aujourd’hui</a>
+        <a class="btn icon" href="#/day/${iso(U.addDays(d, 1))}" aria-label="Jour suivant">›</a></span>
+      </div>
+    </header>
+    <div class="dayv">
+      <section class="card dayv-cal">
+        <div class="card-head"><h2>🕒 Horaire</h2><button class="btn sm" id="dv-add" type="button">+ Événement</button></div>
+        <ul class="evs dayv-allday" hidden></ul>
+        <div class="dayv-grid" id="dv-grid"></div>
+      </section>
+      <div class="dayv-side">
+        <section class="card">
+          <div class="card-head"><h2>✅ Missions</h2><span class="muted" id="dv-count"></span></div>
+          <ul class="tasks" id="dv-tasks"></ul>
+          <form class="add-mini" id="dv-addt"><input name="t" placeholder="+ Mission pour ce jour" autocomplete="off"></form>
+        </section>
+        <a class="card dayv-j" href="#/journal/${k}">
+          <span class="dayv-j-ico">${m ? m.e : '📖'}</span>
+          <span><b>Journal</b><br><small class="muted">${journalHas(j) ? esc((j.intention || j.text || 'Entrée écrite').slice(0, 90)) : 'Écrire dans le journal de ce jour'}</small></span>
+        </a>
+      </div>
+    </div>`;
+
+  await loadGoals();
+  let alarmTasks = [];
+  const drawTasks = async () => {
+    const all = await db.all('tasks');
+    const items = all.filter((t) => t.date === k).sort((a, b) => a.done - b.done || a.createdAt - b.createdAt);
+    alarmTasks = all.filter((t) => !t.done && t.alarmAt && iso(new Date(t.alarmAt)) === k);
+    const ul = $('#dv-tasks');
+    if (!ul) return;
+    ul.innerHTML = items.map((t) => taskHTML(t, today)).join('') || '<li class="empty-sm">Aucune mission prévue ce jour-là.</li>';
+    $('#dv-count').textContent = items.length ? `${items.filter((t) => t.done).length}/${items.length}` : '';
+    bindTaskList(ul, () => { drawTasks(); drawEvents(); });
+  };
+
+  // Horaire : une ligne par heure ; les événements qui se chevauchent se partagent la largeur
+  const drawEvents = async () => {
+    const ds = +d, de = +U.addDays(d, 1);
+    const { events, source } = await getEvents(d, U.addDays(d, 1));
+    if (!$('#dv-grid')) return;
+    $('#sync').innerHTML = await syncBadge(source);
+    const list = events.filter((e) => e.start < de && e.end > ds);
+    const allDay = list.filter((e) => e.allDay);
+    const timed = list.filter((e) => !e.allDay).map((e) => ({ ...e, s: Math.max(e.start, ds), e2: Math.min(e.end, de) }));
+    const marks = alarmTasks.map((t) => ({ t, s: t.alarmAt }));
+    const hr = (ms) => (ms - ds) / 3_600_000;
+    const from = Math.min(7, ...timed.map((e) => Math.floor(hr(e.s))), ...marks.map((x) => Math.floor(hr(x.s))));
+    const to = Math.max(22, ...timed.map((e) => Math.ceil(hr(e.e2))), ...marks.map((x) => Math.ceil(hr(x.s)) + 1));
+    // Colonnes pour les chevauchements
+    timed.sort((a, b) => a.s - b.s || b.e2 - a.e2);
+    let group = [], groupEnd = 0;
+    const flush = () => { const n = Math.max(...group.map((e) => e.col)) + 1; group.forEach((e) => (e.cols = n)); group = []; };
+    for (const e of timed) {
+      if (group.length && e.s >= groupEnd) flush();
+      const used = new Set(group.filter((x) => x.e2 > e.s).map((x) => x.col));
+      e.col = 0; while (used.has(e.col)) e.col++;
+      group.push(e); groupEnd = Math.max(groupEnd, e.e2);
+    }
+    if (group.length) flush();
+    const top = (ms) => (hr(ms) - from) * DAY_H;
+    const hours = [];
+    for (let h = from; h < to; h++) hours.push(`<button type="button" class="dayv-slot" data-h="${h}" style="top:${(h - from) * DAY_H}px" aria-label="Ajouter un événement à ${h} h"><span>${U.pad(h)}:00</span></button>`);
+    const now = Date.now();
+    $('#dv-grid').style.height = `${(to - from) * DAY_H}px`;
+    $('#dv-grid').innerHTML = hours.join('')
+      + timed.map((e) => {
+        const h = Math.max(top(e.e2) - top(e.s), 22);
+        return `<div class="ev dayv-ev ${e.end < now ? 'past' : ''} ${h < 40 ? 'short' : ''}" data-ev="${esc(e.id)}" style="--c:${esc(e.color)};top:${top(e.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${e.col} / ${e.cols});width:calc((100% - 60px) / ${e.cols} - 4px)">
+          <span class="ev-title">${esc(e.title)}</span><span class="ev-time">${U.fmtTime(new Date(e.start))} – ${U.fmtTime(new Date(e.end))}</span></div>`;
+      }).join('')
+      + marks.map(({ t, s }) => `<a class="dayv-alarm" href="#/missions" style="top:${top(s) - 11}px" title="Alarme de mission">⏰ ${U.fmtTime(new Date(s))} · ${esc(t.title)}</a>`).join('')
+      + (isToday && hr(now) >= from && hr(now) <= to ? `<div class="dayv-now" style="top:${top(now)}px"></div>` : '');
+    const ad = $('.dayv-allday');
+    ad.hidden = !allDay.length;
+    ad.innerHTML = allDay.map((e) => evItem(e, true)).join('');
+    bindEvents($('.dayv-cal'), list, drawEvents);
+    $$('.dayv-slot').forEach((b) => (b.onclick = () => eventModal(k, drawEvents, { start: `${U.pad(+b.dataset.h)}:00`, end: `${U.pad(Math.min(+b.dataset.h + 1, 23))}:00` })));
+    // Aujourd'hui : on fait défiler jusqu'à l'heure actuelle (une heure avant)
+    if (isToday && !drawEvents.scrolled) { drawEvents.scrolled = true; $('.dayv-now')?.scrollIntoView({ block: 'center' }); }
+  };
+
+  $('#dv-add').onclick = () => eventModal(k, drawEvents);
+  $('#dv-addt').onsubmit = async (e) => {
+    e.preventDefault();
+    const v = e.target.t.value.trim();
+    if (!v) return;
+    await addTask(v, k);
+    e.target.t.value = '';
+    drawTasks();
+  };
+  await drawTasks();
   drawEvents();
 }
 
