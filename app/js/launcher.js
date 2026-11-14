@@ -29,14 +29,33 @@ const ICONS = {
     + '<path d="M20.5 8l-4.1 3V5.9l1.6-1.2c1-.7 2.5 0 2.5 1.3z" fill="#fbbc04"/><path d="M3.5 8l4.1 3V5.9L6 4.7c-1-.7-2.5 0-2.5 1.3z" fill="#c5221f"/>'
     + '<path d="M7.6 11V5.9L12 9.2l4.4-3.3V11L12 14.3z" fill="#ea4335"/>'),
   spotify: svg('<g fill="none" stroke="#191414" stroke-width="2" stroke-linecap="round"><path d="M5.8 9.4c4.1-1.3 8.8-1 12.4 1"/><path d="M6.8 12.8c3.4-1 7.2-.7 10 .9"/><path d="M7.8 16c2.6-.7 5.4-.5 7.6.8"/></g>'),
+  // NHL : écusson blanc et argent, lettres « NHL »
+  nhl: svg('<path d="M12 2.6c2.6 1.4 5.4 1.6 8 .9.3 6.8-1.9 13.9-8 17.9-6.1-4-8.3-11.1-8-17.9 2.6.7 5.4.5 8-.9z" fill="#fff"/>'
+    + '<path d="M12 4.2c2.2 1.1 4.5 1.3 6.6.8 0 5.8-1.9 11.8-6.6 15.2-4.7-3.4-6.6-9.4-6.6-15.2 2.1.5 4.4.3 6.6-.8z" fill="#0b0b0b"/>'
+    + '<text x="12" y="13.6" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="6.2" fill="#fff" letter-spacing="-.2">NHL</text>'),
   amazon: svg('<text x="12" y="13.2" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="12.5" fill="#fff">a</text>'
     + '<path d="M4.8 15.6c4.3 2.7 10.1 2.7 14 .1" fill="none" stroke="#ff9900" stroke-width="1.9" stroke-linecap="round"/><path d="M16.6 14.6l2.4.9-.5 2.4" fill="none" stroke="#ff9900" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
   edge: svg('<path d="M20.4 15.6c-1.6 3-4.8 4.9-8.3 4.9-4.9 0-8.6-3.7-8.6-8.3 0-4.9 4-8.7 8.8-8.7 4.6 0 8.2 3.1 8.2 7 0 2.6-2 4.3-4.6 4.3-1.6 0-2.7-.6-2.7-1.4 0-.4.4-.8.4-1.6 0-1.8-1.6-3.2-3.8-3.2-2.6 0-4.3 2.2-4.3 4.7" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>'),
 };
 
 /** Contenu de la pastille d'une app : icône dessinée, sinon l'icône du site (favicon), avec la lettre en secours. */
+// Sites reconnus par leur adresse (raccourcis ajoutés à la main) : icône et couleur de l'app
+const BY_HOST = [[/(^|\.)nhl\.com$/, 'nhl', '#0b0b0b'], [/(^|\.)amazon\./, 'amazon', '#232f3e'], [/(^|\.)youtube\.com$/, 'youtube', '#e62117'],
+  [/(^|\.)reddit\.com$/, 'reddit', '#ff4500'], [/(^|\.)facebook\.com$/, 'facebook', '#1877f2'], [/(^|\.)messenger\.com$/, 'messenger', '#7b5cff'],
+  [/^mail\.google\.com$/, 'gmail', '#ffffff'], [/spotify\.com$/, 'spotify', '#1db954']];
+function known(it) {
+  if (ICONS[it.id]) return null;
+  let host = '';
+  try { host = new URL(it.url).hostname; } catch { return null; }
+  return BY_HOST.find(([re]) => re.test(host)) || null;
+}
+/** Couleur de la pastille (celle de l'app si le site est reconnu). */
+export const colorOf = (it) => known(it)?.[2] || it.color || '#4f46e5';
+
 export function iconHTML(it) {
   if (ICONS[it.id]) return ICONS[it.id];
+  const k = known(it);
+  if (k) return ICONS[k[1]];
   const letter = String(it.icon || it.name?.[0] || '★').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   let fav = '';
   try { const u = new URL(it.url); if (u.protocol === 'https:') fav = `<img class="ico-fav" src="${u.origin}/favicon.ico" alt="" loading="lazy" onerror="this.remove()" onload="if(this.naturalWidth<16)this.remove()">`; } catch { /* lien d'application */ }
@@ -74,8 +93,22 @@ export function makeItem({ name, url, icon }) {
   return { id: uid(), name: name.trim(), url: normalizeUrl(url), icon: (icon || name.trim()[0] || '★').slice(0, 2), color: colors[Math.floor(Math.random() * colors.length)], mode: 'window', custom: true };
 }
 
+const onWindows = /Windows/i.test(navigator.userAgent) && !/Mobile|Android/i.test(navigator.userAgent);
+export const pcLink = (item) => 'lpapp:' + encodeURIComponent(item.appName || item.name);
+
 /** Ouvre un élément. Renvoie false si le navigateur a bloqué la fenêtre. */
-export function open(item) {
+export function open(item, onMissing = () => {}) {
+  // 'pc' : application Windows du menu Démarrer (ex. NHL installée depuis Edge), ouverte par le lien « lpapp: »
+  // (voir « Installer apps Windows.bat »). Sur cellulaire, ou si rien ne s'ouvre, on se rabat sur le site.
+  if (item.mode === 'pc') {
+    if (!onWindows) return openWindow(item);
+    let left = false;
+    const mark = () => { left = true; };
+    addEventListener('blur', mark, { once: true });
+    location.href = pcLink(item);
+    setTimeout(() => { removeEventListener('blur', mark); if (!left && document.hasFocus()) onMissing(item); }, 1800);
+    return true;
+  }
   if (item.mode === 'app' && item.app) {
     // Application Windows (Edge peut demander « Ouvrir … ? » la première fois). La version web
     // reste accessible par le petit bouton 🌐 de la tuile.
@@ -96,7 +129,7 @@ function followLink(url) {
   document.body.appendChild(a); a.click(); a.remove();
 }
 
-export const MODES = { window: 'Fenêtre', installed: 'App installée', tab: 'Onglet' };
+export const MODES = { window: 'Fenêtre', installed: 'App installée', pc: 'App Windows', tab: 'Onglet' };
 
 export function openWindow(item) {
   const w = Math.min(1280, screen.availWidth - 80), h = Math.min(900, screen.availHeight - 80);
