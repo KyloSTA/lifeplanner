@@ -950,14 +950,14 @@ async function renderHero() {
       <div class="hero-right">
         <a class="card rpg-banner" id="hero-rpg" href="#/quest"></a>
         <section class="hero-habits" id="hero-habits"></section>
-        <section class="card">
-          <div class="card-head"><h2>Évolution du savoir</h2><a href="#/brain">Ouvrir le Cerveau →</a></div>
-          <p class="muted" style="margin-top:0">Chaque note, lien et révision dans ton second cerveau donne des points de <b>Savoir</b> qui font évoluer ton avatar.</p>
-          ${evoBar(s)}<p class="muted hc-sub" style="margin:6px 0 14px">${evoLine(s)}</p>
+        <details class="card hero-fold evo-fold">
+          <summary><h2>🧠 Évolution du savoir</h2><span class="muted">${evoLine(s)}</span></summary>
+          ${evoBar(s)}
+          <p class="muted" style="margin:10px 0 14px">Chaque note, lien et révision dans ton second cerveau donne des points de <b>Savoir</b> qui font évoluer ton avatar. <a href="#/brain">Ouvrir le Cerveau →</a></p>
           <div class="evo-steps">${game.EVO.map((st, i) => `<div class="evo-step ${i <= s.evo ? 'on' : ''} ${i === s.evo ? 'cur' : ''}">
             ${AV.avatarSVG({ ...av, evoFx: true, evo: i }, 64)}<b>${st.icon} ${esc(st.name)}</b><small>${i <= s.evo ? esc(st.desc) : `${st.k} Savoir`}</small></div>`).join('')}</div>
           <label class="check-line"><input type="checkbox" id="evo-fx" ${av.evoFx === false ? '' : 'checked'}> Afficher les effets d’évolution sur mon avatar</label>
-        </section>
+        </details>
         <details class="card hero-fold">
           <summary><h2>🎨 Personnalisation</h2><span class="muted">Monte de niveau pour débloquer plus d’options</span></summary>
           <div id="custom"></div>
