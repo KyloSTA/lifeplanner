@@ -556,6 +556,37 @@ async function quoteCard() {
   restart();
 }
 
+/* ---------- Dates préprogrammées sous les boîtes « + Mission » (objectifs, projets) ---------- */
+const QUICK_DATES = `<div class="quick-dates" role="group" aria-label="Date rapide">
+  <button type="button" class="chip-btn" data-qd="today">Aujourd’hui</button>
+  <button type="button" class="chip-btn" data-qd="tomorrow">Demain</button>
+  <button type="button" class="chip-btn" data-qd="weekend" title="Samedi qui vient (aujourd’hui si on est déjà la fin de semaine)">Week-end</button>
+  <button type="button" class="chip-btn" data-qd="none">Sans date</button></div>`;
+function quickDate(kind) {
+  const d = new Date();
+  if (kind === 'tomorrow') return iso(U.addDays(d, 1));
+  if (kind === 'weekend') { const dow = d.getDay(); return iso(dow === 6 || dow === 0 ? d : U.addDays(d, 6 - dow)); }
+  if (kind === 'none') return '';
+  return iso(d);
+}
+const syncQuickDates = (form) => {
+  const v = form.querySelector('input[type="date"]')?.value || '';
+  form.querySelectorAll('[data-qd]').forEach((b) => b.classList.toggle('on', quickDate(b.dataset.qd) === v));
+};
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-qd]');
+  const form = b?.closest('form');
+  const input = form?.querySelector('input[type="date"]');
+  if (!input) return;
+  input.value = quickDate(b.dataset.qd);
+  syncQuickDates(form);
+  form.querySelector('input[name="t"]')?.focus();
+});
+document.addEventListener('input', (e) => { if (e.target.matches?.('.add-mission input[type="date"]')) syncQuickDates(e.target.closest('form')); });
+// Le bouton qui correspond à la date déjà inscrite s'allume quand la boîte apparaît
+new MutationObserver(() => document.querySelectorAll('form.add-mission:not([hidden]):not([data-qd-sync])').forEach((f) => { f.dataset.qdSync = '1'; syncQuickDates(f); }))
+  .observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] });
+
 /* =========================================================
    Assistant (boîte de dialogue qui modifie le planner)
    ========================================================= */
@@ -1451,7 +1482,7 @@ async function renderNote(id) {
           ${goalVerdict(g)}
           ${ms.length ? `<ul class="tasks">${ms.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>` : ''}
           <form class="add-mission pg-add" hidden><input name="t" placeholder="Mission pour cet objectif…" autocomplete="off">
-            <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
+            <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button>${QUICK_DATES}</form>
         </div>`;
       }).join('')}
       <div class="pgoal pdirect">
@@ -1460,7 +1491,7 @@ async function renderNote(id) {
         ${st.direct.length ? `<ul class="tasks">${st.direct.sort(sortM).map((t) => taskHTML(t, today, { showDate: true, hideProject: true })).join('')}</ul>`
           : '<p class="empty-sm">Des missions directement liées au projet, sans objectif. Touche + pour en ajouter.</p>'}
         <form class="add-mission pd-add" hidden><input name="t" placeholder="Nouvelle mission du projet…" autocomplete="off">
-          <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
+          <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button>${QUICK_DATES}</form>
         ${(() => { const free = tasks.filter((t) => !t.done && !t.projectId && !t.goalId); return free.length ? `<select class="pd-link" aria-label="Lier une mission existante"><option value="">🔗 Lier une mission existante…</option>${free.map((t) => `<option value="${t.id}">${esc(t.title)}</option>`).join('')}</select>` : ''; })()}
       </div>
       <form class="proj-new">
@@ -2477,7 +2508,7 @@ async function renderGoals() {
         <form class="add-mission" hidden>
           <input name="t" placeholder="Nouvelle mission…" autocomplete="off">
           <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)" title="Date prévue (laisse vide pour « sans date »)">
-          <button class="btn icon" aria-label="Ajouter la mission">+</button>
+          <button class="btn icon" aria-label="Ajouter la mission">+</button>${QUICK_DATES}
         </form>
         ${free.length ? `<select class="link-mission" aria-label="Lier une mission existante"><option value="">🔗 Lier une mission existante…</option>
           ${free.map((t) => `<option value="${t.id}">${esc(t.title)}${t.date ? ' · ' + U.fmtShort(U.parseISO(t.date)) : ''}</option>`).join('')}</select>` : ''}

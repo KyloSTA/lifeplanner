@@ -1938,3 +1938,6 @@ h2 { font-weight: 600; }
 .view-grid .note-card:not(:has(> .nc-img)) p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; }
 .view-grid .nc-foot { font-size: 12px; }
 @media (max-width: 600px) { .note-grid.view-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .view-list .note-card { grid-template-columns: 64px minmax(0, 1fr) auto; } .view-list .note-card .nc-img img { height: 48px; } }
+/* Dates préprogrammées sous « + Mission » */
+.quick-dates { flex: 1 1 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+.quick-dates .chip-btn { padding: 4px 10px; font-size: 13px; }
