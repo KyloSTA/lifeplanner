@@ -1887,10 +1887,12 @@ h2 { font-weight: 600; }
 .tm-img-add { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tm-img-add label.btn { cursor: pointer; }
 .warn-text { color: var(--warn) !important; }
-/* Résumé du jour (héros, missions, habitudes, workout, série) : dans la cellule Agenda */
-.today-summary.ag-summary { grid-template-columns: 1fr; gap: 12px; margin-top: 14px; padding: 14px 0 0; border-top: 1px solid var(--border); background: none; box-shadow: none; border-radius: 0; }
-.ag-summary .sum-hero { border-right: 0; padding-right: 0; padding-bottom: 0; border-bottom: 0; }
-.ag-summary .sum-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-@container (max-width: 420px) { .ag-summary .sum-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.t-agenda { container-type: inline-size; }
-@media (max-width: 1180px) { .ag-summary .sum-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Haut d'Aujourd'hui : résumé du jour (héros + tuiles) avec l'agenda et l'humeur du jour dans la même carte */
+.today-top { display: grid; gap: 14px; }
+.today-top .today-summary { padding: 0; }
+.top-agenda { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; padding-top: 14px; border-top: 1px solid var(--border); align-items: start; }
+.top-agenda .ag-journal { margin-top: 0; padding-top: 0; border-top: 0; padding-left: 18px; border-left: 1px solid var(--border); }
+@media (max-width: 900px) {
+  .top-agenda { grid-template-columns: 1fr; }
+  .top-agenda .ag-journal { padding-left: 0; border-left: 0; padding-top: 14px; border-top: 1px solid var(--border); }
+}
