@@ -112,8 +112,30 @@ const ago = (t) => {
 async function saveToBrain(it, feed) {
   const notes = await brain.allNotes();
   if (notes.some((n) => (n.body || '').includes(it.link))) return false;
-  await brain.createNote({ title: it.title.slice(0, 80), body: `🔗 ${it.link}\n${feed?.name || ''}${it.date ? ' · ' + U.fmtShort(new Date(it.date)) : ''}\n\n${it.text ? '> ' + it.text : ''}\n\n#actualite${feed?.cat === 'lnh' ? ' #lnh #hockey' : ''}`, type: 'ressource', inbox: true });
+  const n = await brain.createNote({ title: it.title.slice(0, 80), body: `🔗 ${it.link}\n${feed?.name || ''}${it.date ? ' · ' + U.fmtShort(new Date(it.date)) : ''}\n\n${it.text ? '> ' + it.text : ''}\n\n#actualite${feed?.cat === 'lnh' ? ' #lnh #hockey' : ''}`, type: 'ressource', inbox: true });
+  // Image et titre complet de l'article : la carte du Cerveau les affiche (au lieu du lien)
+  n.source = { kind: 'news', url: it.link, img: /^https:\/\//.test(it.img || '') ? it.img : '', title: it.title.slice(0, 300) };
+  await brain.saveNote(n, { touch: false });
   return true;
+}
+
+/** Articles déjà gardés avant que l'image soit enregistrée : on la retrouve dans les titres en cache. */
+export async function recoverImages(notes) {
+  const todo = notes.filter((n) => !n.source && (n.tags || []).includes('actualite'));
+  if (!todo.length) return 0;
+  const caches = await Promise.all(['news', 'news-lnh'].map((k) => db.get('cache', k).catch(() => null)));
+  const byLink = new Map();
+  for (const c of caches) for (const it of c?.items || []) byLink.set(it.link, it);
+  let fixed = 0;
+  for (const n of todo) {
+    const link = (n.body || '').match(/https?:\/\/\S+/)?.[0];
+    const it = link && byLink.get(link);
+    if (!it?.img) continue;
+    n.source = { kind: 'news', url: link, img: it.img, title: it.title.slice(0, 300) };
+    await brain.saveNote(n, { touch: false });
+    fixed++;
+  }
+  return fixed;
 }
 
 /** Liens d'articles déjà gardés dans le Cerveau. */
