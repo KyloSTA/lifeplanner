@@ -2264,6 +2264,8 @@ async function renderWeek(arg) {
     };
   });
   drawEvents();
+  // Semaine en cours : la journée d'aujourd'hui est centrée à l'écran à l'ouverture
+  setTimeout(() => $('.day.is-today')?.scrollIntoView({ block: 'center', inline: 'center' }), 350);
 }
 
 /* =========================================================
