@@ -1136,6 +1136,9 @@ function noteCard(n, proj) {
   </a>`;
 }
 
+// Affichage du Cerveau (gardé sur cet appareil) : 'list', 'grid' ou 'cards'
+const brainView = () => { try { return ['list', 'grid', 'cards'].includes(localStorage.getItem('lp.brainView')) ? localStorage.getItem('lp.brainView') : 'cards'; } catch { return 'cards'; } };
+
 async function renderBrain() {
   let everything = await brain.allNotes();
   if (await news.recoverImages(everything).catch(() => 0)) everything = await brain.allNotes(); // images des articles déjà gardés
@@ -1179,14 +1182,26 @@ async function renderBrain() {
       }).join('')}</div>
     </section>` : ''}
     <div class="brain-bar">
-      <label class="brain-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <input type="search" id="bq" placeholder="Rechercher dans tes notes…" value="${esc(brainState.q)}" autocomplete="off" aria-label="Rechercher dans tes notes"></label>
+      <div class="brain-search-row">
+        <label class="brain-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input type="search" id="bq" placeholder="Rechercher dans tes notes…" value="${esc(brainState.q)}" autocomplete="off" aria-label="Rechercher dans tes notes"></label>
+        <div class="seg brain-views" role="group" aria-label="Affichage">${[
+          ['list', 'Liste', '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>'],
+          ['grid', 'Grille', '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'],
+          ['cards', 'Cartes', '<rect x="3" y="3" width="8" height="18" rx="2"/><rect x="13" y="3" width="8" height="18" rx="2"/>'],
+        ].map(([k, l, svg]) => `<button type="button" data-bview="${k}" class="${brainView() === k ? 'on' : ''}" aria-pressed="${brainView() === k}" title="${l}" aria-label="Affichage ${l}"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg></button>`).join('')}</div>
+      </div>
       ${brainState.arch ? `<div class="arch-banner">🗄 <b>Archives</b> · ${archivedCount} note${archivedCount > 1 ? 's' : ''} archivée${archivedCount > 1 ? 's' : ''}, rangée${archivedCount > 1 ? 's' : ''} par catégorie d’origine. <button class="btn" id="arch-exit">← Retour aux notes</button></div>` : ''}
       <div class="brain-filters">${filters.map(([id, l, c]) => `<button class="chip-btn ${brainState.f === id ? 'on' : ''}" data-f="${id}">${l} <small>${c}</small></button>`).join('')}
         ${archivedCount && !brainState.arch ? `<button class="chip-btn arch-chip" id="arch-open" title="Notes archivées">🗄 Archives <small>${archivedCount}</small></button>` : ''}</div>
       ${topTags.length ? `<div class="brain-tags"><span>Étiquettes</span>${topTags.map(([t, c]) => `<button class="chip-btn tagf ${brainState.tag === t ? 'on' : ''}" data-tag="${esc(t)}">#${esc(t)} <small>${c}</small></button>`).join('')}</div>` : ''}
     </div>
-    <div class="note-grid" id="ng"></div>`;
+    <div class="note-grid view-${brainView()}" id="ng"></div>`;
+  $$('[data-bview]').forEach((b) => (b.onclick = () => {
+    try { localStorage.setItem('lp.brainView', b.dataset.bview); } catch { /* ignore */ }
+    $$('[data-bview]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+    $('#ng').className = 'note-grid view-' + b.dataset.bview;
+  }));
 
   const drawList = () => {
     const words = brain.norm(brainState.q).split(/\s+/).filter(Boolean);
