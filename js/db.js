@@ -1,7 +1,9 @@
 // Stockage local (IndexedDB). Chaque écriture est aussi horodatée dans « meta »,
 // ce qui permet de synchroniser plusieurs appareils (voir sync.js) sans écraser les changements.
 
-const DB_NAME = 'lifeplanner';
+import { APP } from './config.js';
+
+const DB_NAME = APP.db; // « lifeplanner », ou la base d'une autre édition (ex. app couple)
 const VERSION = 8;
 export const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'settings', 'cache', 'xp', 'notes', 'habits', 'study', 'workouts', 'files', 'money'];
 const KEYPATH = { tasks: 'id', journal: 'date', pages: 'id', ink: 'id', goals: 'id', xp: 'key', notes: 'id', habits: 'id', study: 'id', workouts: 'id', files: 'id', money: 'id' }; // settings/cache : clé séparée
@@ -58,7 +60,7 @@ async function run(stores, mode, fn) {
 }
 
 // Prévient les autres fenêtres (app principale <-> widget) quand les données changent.
-const bc = 'BroadcastChannel' in self ? new BroadcastChannel('lifeplanner') : null;
+const bc = 'BroadcastChannel' in self ? new BroadcastChannel(APP.db) : null;
 const listeners = new Set();
 export const onDbChange = (fn) => { listeners.add(fn); bc?.addEventListener('message', (e) => fn(e.data)); };
 const notify = (store, fromSync = false) => (r) => {

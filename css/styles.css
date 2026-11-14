@@ -2243,3 +2243,9 @@ button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0;
 .nw-img.nw-logo span { font-weight: 700; font-size: 14px; color: var(--muted); text-align: center; padding: 0 12px; }
 .nw-top .nw-img.nw-logo { min-height: 200px; }
 .nw-img.nw-logo img.sm { width: 36px !important; height: 36px !important; padding: 8px; image-rendering: auto; }
+/* App couple : pastille « pour qui » et fenêtre « Vous deux » */
+.who-chip { display: inline-flex; align-items: center; gap: 5px; background: color-mix(in srgb, var(--wc) 16%, transparent); color: var(--text); }
+.who-chip i { font-style: normal; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--wc); color: #fff; font-size: 10px; font-weight: 800; }
+.cp-form { display: grid; gap: 12px; }
+.cp-form fieldset { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px 10px; display: grid; gap: 6px; }
+.cp-form legend { font-size: 13px; color: var(--muted); padding: 0 4px; }

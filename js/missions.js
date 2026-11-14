@@ -4,6 +4,7 @@
 import { db } from './db.js';
 import * as U from './util.js';
 import { taskHTML, bindTaskList, addTask, loadGoals, deleteTask, trashList, restoreTask, purgeTasks } from './tasks.js';
+import * as couple from './couple.js';
 
 const { esc, iso } = U;
 const FILTERS = [
@@ -64,6 +65,7 @@ export async function renderPage(ctx) {
     <form class="card ms-add" id="ms-add">
       <input name="t" placeholder="Nouvelle mission…" autocomplete="off" required>
       <input name="d" type="date" value="${today}" aria-label="Date prévue" title="Date prévue (vide = sans date)">
+      ${couple.ON ? `<select name="w" aria-label="Pour qui">${couple.whoOptions('')}</select>` : ''}
       <select name="g" aria-label="Objectif"><option value="">Sans objectif</option>${goals.map((g) => `<option value="${g.id}">🎯 ${esc(g.title)}</option>`).join('')}</select>
       <button class="btn primary">Ajouter</button>
     </form>
@@ -71,6 +73,7 @@ export async function renderPage(ctx) {
       <div class="filters">${FILTERS.map(([v, l]) => `<button class="chip-btn ${state.f === v ? 'on' : ''}" data-f="${v}">${l} <small>${counts[v]}</small></button>`).join('')}</div>
       <div class="ms-right">
         <input type="search" id="ms-q" placeholder="🔍 Rechercher…" value="${q}" autocomplete="off">
+        ${couple.ON ? `<select id="ms-who" aria-label="Missions de qui"><option value="">👫 Tout le monde</option><option value="me" ${state.who === 'me' ? 'selected' : ''}>🙋 Mes missions</option>${['a', 'b'].map((k) => `<option value="${k}" ${state.who === k ? 'selected' : ''}>👤 ${esc(couple.nameOf(k))}</option>`).join('')}<option value="both" ${state.who === 'both' ? 'selected' : ''}>👫 Communes</option></select>` : ''}
         <select id="ms-by" aria-label="Regrouper par"><option value="date" ${state.by === 'date' ? 'selected' : ''}>Par date</option><option value="goal" ${state.by === 'goal' ? 'selected' : ''}>Par objectif</option></select>
       </div>
     </div>
@@ -126,6 +129,8 @@ export async function renderPage(ctx) {
         default: return true;
       }
     });
+    // App couple : missions de qui
+    if (couple.ON && state.who) list = list.filter((t) => (state.who === 'me' ? couple.isMine(t) : state.who === 'both' ? !t.who : t.who === state.who));
     if (nq) list = list.filter((t) => `${t.title} ${t.notes || ''} ${(t.subtasks || []).map((s) => s.title).join(' ')}`.toLowerCase().includes(nq));
     const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
     list.sort(state.f === 'done' ? (a, b) => (b.doneAt || b.createdAt) - (a.doneAt || a.createdAt) : sortM);
@@ -169,11 +174,13 @@ export async function renderPage(ctx) {
   view.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { state.f = b.dataset.f; redraw(); }));
   view.querySelector('#ms-q').oninput = U.debounce((e) => { state.q = e.target.value; drawList(); }, 150);
   view.querySelector('#ms-by').onchange = (e) => { state.by = e.target.value; drawList(); };
+  view.querySelector('#ms-who')?.addEventListener('change', (e) => { state.who = e.target.value; drawList(); });
   view.querySelector('#ms-add').onsubmit = async (e) => {
     e.preventDefault();
     const f = e.target, v = f.t.value.trim();
     if (!v) return;
-    await addTask(v, f.d.value || null, f.g.value || null);
+    const nt = await addTask(v, f.d.value || null, f.g.value || null);
+    if (f.w?.value) { nt.who = f.w.value; await db.put('tasks', nt); }
     toast('✅ Mission ajoutée');
     if (state.f === 'done') state.f = 'todo';
     await redraw();

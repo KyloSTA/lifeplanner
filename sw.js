@@ -1,11 +1,17 @@
 // Service worker : permet à l'app installée de fonctionner hors ligne
 // (même quand le petit serveur local n'est pas lancé).
-const CACHE = 'lifeplanner-v116';
-const ASSETS = [
-  './', 'index.html', 'widget.html', 'css/styles.css', 'manifest.webmanifest',
-  'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js', 'js/habits.js', 'js/rbq.js', 'js/workout.js', 'js/images.js', 'js/missions.js', 'js/docs.js', 'js/assoc.js', 'js/news.js', 'js/reminders.js', 'js/rpg.js', 'js/rpg-data.js', 'js/habs.js', 'js/finance.js', 'js/usage.js', 'js/activities.js',
-  'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
+// Une autre édition (ex. couple/sw.js) définit self.LP_SW puis charge ce fichier : son propre cache,
+// sa propre base, ses propres fichiers (page, manifeste, icônes) et le code commun via « base » (« ../ »).
+const CFG = self.LP_SW || {};
+const PREFIX = CFG.cache || 'lifeplanner';
+const CACHE = 'lifeplanner-v117'.replace('lifeplanner', PREFIX);
+const BASE = CFG.base || '';
+const OWN = CFG.own || ['./', 'index.html', 'widget.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
+const SHARED = [
+  'css/styles.css',
+  'js/config.js', 'js/couple.js', 'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js', 'js/habits.js', 'js/rbq.js', 'js/workout.js', 'js/images.js', 'js/missions.js', 'js/docs.js', 'js/assoc.js', 'js/news.js', 'js/reminders.js', 'js/rpg.js', 'js/rpg-data.js', 'js/habs.js', 'js/finance.js', 'js/usage.js', 'js/activities.js',
 ];
+const ASSETS = [...OWN, ...SHARED.map((a) => BASE + a)];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -14,7 +20,8 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      // Seulement les anciennes versions de CETTE app (l'autre édition, sur le même site, garde son cache)
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIX + '-v') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -24,7 +31,7 @@ self.addEventListener('activate', (e) => {
 const localDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 function markHabitDone(id) {
   return new Promise((resolve, reject) => {
-    const open = indexedDB.open('lifeplanner');
+    const open = indexedDB.open(CFG.db || 'lifeplanner');
     open.onerror = () => reject(open.error);
     open.onsuccess = () => {
       const db = open.result;
