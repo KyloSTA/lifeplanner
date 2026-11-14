@@ -2051,3 +2051,9 @@ h2 { font-weight: 600; }
 .fi-auto-sec p { margin: 4px 0 8px; }
 .fi-auto-sec .row { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
 .fi-auto-sec .row label { display: grid; gap: 4px; font-size: 13px; }
+/* Projet : missions d'un objectif repliables */
+.pg-fold { display: flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; padding: 4px 0; cursor: pointer; min-height: 30px; }
+.pg-fold:hover, .pg-fold[aria-expanded="true"] { color: var(--accent); }
+.pg-fold .exp { display: inline-block; transition: transform .15s; font-size: 15px; }
+.pg-fold[aria-expanded="true"] .exp { transform: rotate(90deg); }
+.pg-late { color: var(--warn); }
