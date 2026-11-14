@@ -2056,7 +2056,14 @@ async function renderLauncher() {
 /* ---------- Planificateur : onglets Semaine / Mois / Année / Journal ---------- */
 function plannerTabs(active, d = new Date()) {
   const day = iso(d);
-  const tabs = [['day', 'Jour', `#/day/${day}`], ['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${day}`], ['activities', '🎟 Activités', '#/activities']];
+  // Jour : aujourd'hui si la période affichée le contient (semaine, mois, année en cours), sinon son premier jour
+  const now = new Date(), t = iso(now);
+  const hasToday = active === 'week' ? t >= day && t < iso(U.addDays(d, 7))
+    : active === 'month' ? t.slice(0, 7) === day.slice(0, 7)
+    : active === 'year' ? now.getFullYear() === d.getFullYear()
+    : active === 'activities';
+  const dayLink = hasToday ? t : day;
+  const tabs = [['day', 'Jour', `#/day/${dayLink}`], ['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${day}`], ['activities', '🎟 Activités', '#/activities']];
   return `<nav class="seg planner-tabs" aria-label="Vues du planificateur">${tabs.map(([k, l, h]) => `<a href="${h}" class="${k === active ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
 }
 const moodOf = (j) => MOODS.find((m) => m.v === j?.mood);
@@ -2283,7 +2290,7 @@ async function renderDay(arg) {
     </header>
     <div class="dayv">
       <section class="card dayv-cal">
-        <div class="card-head"><h2>🕒 Horaire</h2><button class="btn sm" id="dv-add" type="button">+ Événement</button></div>
+        <div class="card-head"><h2>🕒 Horaire</h2><button class="btn primary dv-add-btn" id="dv-add" type="button"><span aria-hidden="true">＋</span> Événement</button></div>
         <ul class="evs dayv-allday" hidden></ul>
         <div class="dayv-grid" id="dv-grid"></div>
       </section>
