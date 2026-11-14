@@ -2109,3 +2109,7 @@ h2 { font-weight: 600; }
 .ico-fav { position: absolute; inset: 20%; width: 60%; height: 60%; object-fit: contain; }
 .lt-ico:has(.ico-fav), .lp-ico:has(.ico-fav) { background: #fff; color: transparent; } /* icône du site sur fond blanc (lisible) */
 .ev-desc a { color: var(--gold-text, var(--accent)); overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; }
+/* Actualités : rangée d'onglets de sections (8), qui défile au besoin */
+.seg.nw-tabs { display: flex; width: max-content; max-width: 100%; overflow-x: auto; scrollbar-width: none; margin: 0 0 12px; }
+.seg.nw-tabs::-webkit-scrollbar { display: none; }
+.seg.nw-tabs button { white-space: nowrap; flex: none; }

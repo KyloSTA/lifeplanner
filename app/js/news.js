@@ -10,14 +10,41 @@ import * as brain from './brain.js';
 import * as habs from './habs.js';
 
 const { esc } = U;
-// cat : 'general' (onglet Actualités) ou 'lnh' (onglet 🏒 LNH)
-export const SECTIONS = [['general', '📰 Actualités'], ['lnh', '🏒 LNH']];
+// cat : la section (onglet) de la source
+export const SECTIONS = [['general', '📰 Actualités'], ['tech', '💻 Tech'], ['inter', '🌍 International'], ['business', '💼 Business'],
+  ['finance', '💰 Finance'], ['arts', '🎭 Art & Spectacle'], ['sports', '⚽ Sports'], ['lnh', '🏒 LNH']];
+const SECTION_TAGS = { lnh: '#lnh #hockey', tech: '#tech', inter: '#international', business: '#business', finance: '#finance', arts: '#culture', sports: '#sports' };
 export const DEFAULT_FEEDS = [
   { id: 'rc', cat: 'general', name: 'Radio-Canada', url: 'https://ici.radio-canada.ca/info/rss/info/a-la-une', color: '#e11d48', on: true },
   { id: 'devoir', cat: 'general', name: 'Le Devoir', url: 'https://www.ledevoir.com/rss/manchettes.xml', color: '#94a3b8', on: true },
   { id: 'presse', cat: 'general', name: 'La Presse', url: 'https://www.lapresse.ca/actualites/rss', color: '#0c4a6e', on: true },
   { id: 'tva', cat: 'general', name: 'TVA Nouvelles', url: 'https://www.tvanouvelles.ca/rss.xml', color: '#2563eb', on: true },
   { id: 'gnews', cat: 'general', name: 'Google Actualités', url: 'https://news.google.com/rss?hl=fr-CA&gl=CA&ceid=CA:fr', color: '#16a34a', on: false },
+  // Tech
+  { id: 'rc-techno', cat: 'tech', name: 'Radio-Canada Techno', url: 'https://ici.radio-canada.ca/info/rss/info/techno/en-continu', color: '#e11d48', on: true },
+  { id: 'presse-techno', cat: 'tech', name: 'La Presse Techno', url: 'https://www.lapresse.ca/affaires/techno/rss', color: '#0c4a6e', on: true },
+  { id: 'gnews-tech', cat: 'tech', name: 'Google Actualités Techno', url: 'https://news.google.com/rss/search?q=technologie&hl=fr-CA&gl=CA&ceid=CA:fr', color: '#16a34a', on: false },
+  // International
+  { id: 'rc-inter', cat: 'inter', name: 'Radio-Canada International', url: 'https://ici.radio-canada.ca/info/rss/info/international/en-continu', color: '#e11d48', on: true },
+  { id: 'devoir-monde', cat: 'inter', name: 'Le Devoir Monde', url: 'https://www.ledevoir.com/rss/section/monde.xml', color: '#94a3b8', on: true },
+  { id: 'presse-inter', cat: 'inter', name: 'La Presse International', url: 'https://www.lapresse.ca/international/rss', color: '#0c4a6e', on: true },
+  // Business
+  { id: 'rc-eco', cat: 'business', name: 'Radio-Canada Économie', url: 'https://ici.radio-canada.ca/info/rss/info/economie/en-continu', color: '#e11d48', on: true },
+  { id: 'presse-affaires', cat: 'business', name: 'La Presse Affaires', url: 'https://www.lapresse.ca/affaires/rss', color: '#0c4a6e', on: true },
+  { id: 'devoir-eco', cat: 'business', name: 'Le Devoir Économie', url: 'https://www.ledevoir.com/rss/section/economie.xml', color: '#94a3b8', on: true },
+  // Finance (finances personnelles, placements)
+  { id: 'jdm-argent', cat: 'finance', name: 'Journal de Montréal Argent', url: 'https://www.journaldemontreal.com/argent/rss.xml', color: '#f97316', on: true },
+  { id: 'presse-finances', cat: 'finance', name: 'La Presse Finances personnelles', url: 'https://www.lapresse.ca/affaires/finances-personnelles/rss', color: '#0c4a6e', on: true },
+  { id: 'gnews-finance', cat: 'finance', name: 'Google Actualités Bourse', url: 'https://news.google.com/rss/search?q=bourse+OR+placements&hl=fr-CA&gl=CA&ceid=CA:fr', color: '#16a34a', on: false },
+  // Art & Spectacle
+  { id: 'rc-culture', cat: 'arts', name: 'Radio-Canada Culture', url: 'https://ici.radio-canada.ca/info/rss/culture/en-continu', color: '#e11d48', on: true },
+  { id: 'devoir-culture', cat: 'arts', name: 'Le Devoir Culture', url: 'https://www.ledevoir.com/rss/section/culture.xml', color: '#94a3b8', on: true },
+  { id: 'presse-arts', cat: 'arts', name: 'La Presse Arts', url: 'https://www.lapresse.ca/arts/rss', color: '#0c4a6e', on: true },
+  { id: 'jdm-spectacles', cat: 'arts', name: 'Journal de Montréal Spectacles', url: 'https://www.journaldemontreal.com/spectacles/rss.xml', color: '#f97316', on: false },
+  // Sports
+  { id: 'rc-sports', cat: 'sports', name: 'Radio-Canada Sports', url: 'https://ici.radio-canada.ca/info/rss/sports/en-continu', color: '#e11d48', on: true },
+  { id: 'presse-sports', cat: 'sports', name: 'La Presse Sports', url: 'https://www.lapresse.ca/sports/rss', color: '#0c4a6e', on: true },
+  { id: 'jdm-sports', cat: 'sports', name: 'Journal de Montréal Sports', url: 'https://www.journaldemontreal.com/sports/rss.xml', color: '#f97316', on: true },
   // Nouvelles de la LNH (hockey)
   { id: 'rc-hockey', cat: 'lnh', name: 'Radio-Canada Hockey', url: 'https://ici.radio-canada.ca/info/rss/sports/hockey', color: '#e11d48', on: true },
   { id: 'presse-hockey', cat: 'lnh', name: 'La Presse Hockey', url: 'https://www.lapresse.ca/sports/hockey/rss', color: '#0c4a6e', on: true },
@@ -58,7 +85,9 @@ function parseXML(text, feed) {
 }
 
 // Sources qui refusent la lecture directe : on va directement au convertisseur (pas d'erreur inutile)
-const NEEDS_PROXY = new Set(['devoir', 'presse', 'tva', 'gnews', 'presse-hockey', 'jdm-hockey', 'gnews-lnh']);
+const NEEDS_PROXY = new Set(['devoir', 'presse', 'tva', 'gnews', 'presse-hockey', 'jdm-hockey', 'gnews-lnh',
+  'presse-techno', 'gnews-tech', 'devoir-monde', 'presse-inter', 'presse-affaires', 'devoir-eco', 'jdm-argent', 'presse-finances',
+  'gnews-finance', 'devoir-culture', 'presse-arts', 'jdm-spectacles', 'presse-sports', 'jdm-sports']);
 const blocked = new Set(); // sources ajoutées qui ont refusé (pour la session)
 async function fetchFeed(feed) {
   // 1) Lecture directe (si le site le permet)
@@ -87,7 +116,9 @@ export async function load(force = false, cat = 'general') {
   const ckey = cat === 'general' ? 'news' : 'news-' + cat;
   const cache = (await db.get('cache', ckey)) || { at: 0, items: [], errors: [], key: '' };
   const key = list.map((f) => f.id + f.url).join('|');
-  if (!force && cache.key === key && Date.now() - cache.at < TTL && cache.items.length) return cache;
+  // Une source a échoué (souvent : trop de fils convertis d'un coup) : on réessaie après 2 min au lieu de 20
+  const ttl = cache.errors?.length ? 2 * 60_000 : TTL;
+  if (!force && cache.key === key && Date.now() - cache.at < ttl && cache.items.length) return cache;
   const errors = [];
   const results = await Promise.all(list.map((f) => fetchFeed(f).catch((e) => { errors.push(`${f.name} : ${e.message}`); return []; })));
   const seen = new Set();
@@ -112,7 +143,7 @@ const ago = (t) => {
 async function saveToBrain(it, feed) {
   const notes = await brain.allNotes();
   if (notes.some((n) => (n.body || '').includes(it.link))) return false;
-  const n = await brain.createNote({ title: it.title.slice(0, 80), body: `🔗 ${it.link}\n${feed?.name || ''}${it.date ? ' · ' + U.fmtShort(new Date(it.date)) : ''}\n\n${it.text ? '> ' + it.text : ''}\n\n#actualite${feed?.cat === 'lnh' ? ' #lnh #hockey' : ''}`, type: 'ressource', inbox: true });
+  const n = await brain.createNote({ title: it.title.slice(0, 80), body: `🔗 ${it.link}\n${feed?.name || ''}${it.date ? ' · ' + U.fmtShort(new Date(it.date)) : ''}\n\n${it.text ? '> ' + it.text : ''}\n\n#actualite${SECTION_TAGS[feed?.cat] ? ' ' + SECTION_TAGS[feed.cat] : ''}`, type: 'ressource', inbox: true });
   // Image et titre complet de l'article : la carte du Cerveau les affiche (au lieu du lien)
   n.source = { kind: 'news', url: it.link, img: /^https:\/\//.test(it.img || '') ? it.img : '', title: it.title.slice(0, 300) };
   await brain.saveNote(n, { touch: false });
@@ -192,12 +223,13 @@ export async function renderPage(ctx, force = false) {
   let shown = 23; // 1 à la une + 23 titres, puis « Voir plus »
   view.innerHTML = `
     <header class="page-head">
-      <div><p class="eyebrow">Ce qui se passe</p><h1>${section === 'lnh' ? (lnhView === 'habs' ? '🏒 Canadiens de Montréal' : '🏒 Nouvelles LNH') : 'Actualités'}</h1></div>
+      <div><p class="eyebrow">Ce qui se passe</p><h1>${section === 'lnh' ? (lnhView === 'habs' ? '🏒 Canadiens de Montréal' : '🏒 Nouvelles LNH')
+        : section === 'general' ? 'Actualités' : esc(SECTIONS.find(([k]) => k === section)?.[1] || 'Actualités')}</h1></div>
       <div class="head-actions">
-        <div class="seg nw-tabs" role="tablist">${SECTIONS.map(([k, l]) => `<button role="tab" data-sec="${k}" class="${section === k ? 'on' : ''}" aria-selected="${section === k}">${l}</button>`).join('')}</div>
         <button class="btn" id="nw-src">⚙ Sources</button><button class="btn" id="nw-ref">↻ Actualiser</button>
       </div>
     </header>
+    <div class="seg nw-tabs" role="tablist" aria-label="Sections des actualités">${SECTIONS.map(([k, l]) => `<button role="tab" data-sec="${k}" class="${section === k ? 'on' : ''}" aria-selected="${section === k}">${l}</button>`).join('')}</div>
     ${section === 'lnh' ? `<div class="seg lnh-tabs" role="tablist" aria-label="LNH">
       <button role="tab" data-lv="habs" class="${lnhView === 'habs' ? 'on' : ''}" aria-selected="${lnhView === 'habs'}"><img src="https://a.espncdn.com/i/teamlogos/nhl/500/mtl.png" alt="" referrerpolicy="no-referrer"> Canadiens</button>
       <button role="tab" data-lv="all" class="${lnhView === 'all' ? 'on' : ''}" aria-selected="${lnhView === 'all'}">Toute la LNH</button></div>` : ''}
