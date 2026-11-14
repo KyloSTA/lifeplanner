@@ -1983,7 +1983,7 @@ async function renderLauncher() {
     <div class="launch-grid ${launcherEdit ? 'editing' : ''}">${items.map((it, i) => `
       <div class="lt-wrap" data-i="${i}">
         <button class="lt" data-open="${i}" title="${esc(it.mode === 'app' ? `Ouvrir l’application ${it.name}` : it.mode === 'installed' ? `Ouvrir ${it.name} dans son application installée` : `Ouvrir ${it.name} dans une nouvelle fenêtre`)}">
-          <span class="lt-ico" style="--c:${esc(it.color || '#4f46e5')}">${esc(it.icon || it.name[0])}</span>
+          <span class="lt-ico" style="--c:${esc(it.color || '#4f46e5')}">${launcher.iconHTML(it)}</span>
           <span class="lt-name">${esc(it.name)}</span>
           <small class="muted">${it.mode === 'app' ? 'Application' : launcher.MODES[it.mode] || 'Fenêtre'}</small>
         </button>
@@ -3509,7 +3509,7 @@ $('#brand-launch').onclick = async (e) => {
   pop.className = 'launch-pop';
   pop.setAttribute('role', 'menu');
   pop.innerHTML = `<div class="lp-grid">${items.map((it, i) => `<button class="lp-item" role="menuitem" data-i="${i}" title="${esc(it.name)}">
-      <span class="lp-ico" style="--c:${esc(it.color)}">${esc(it.icon)}</span><span class="lp-name">${esc(it.name)}</span></button>`).join('')}</div>
+      <span class="lp-ico" style="--c:${esc(it.color)}">${launcher.iconHTML(it)}</span><span class="lp-name">${esc(it.name)}</span></button>`).join('')}</div>
     <a class="lp-manage" href="#/launcher">✎ Gérer le Lanceur</a>`;
   document.body.appendChild(pop);
   const r = btn.getBoundingClientRect();
