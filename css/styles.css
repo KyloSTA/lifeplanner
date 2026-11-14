@@ -1902,3 +1902,7 @@ h2 { font-weight: 600; }
 .as-modal .assist { box-shadow: none; }
 .as-modal .as-log { max-height: 50vh; overflow-y: auto; }
 .as-modal .hint { margin: 0; }
+/* Image d'un article d'actualité, en haut de sa note */
+.note-article { padding: 10px; }
+.na-img img { display: block; width: 100%; max-height: 360px; object-fit: cover; border-radius: 12px; background: var(--surface-2); }
+.na-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }

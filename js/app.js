@@ -1315,6 +1315,11 @@ async function renderNote(id) {
       <div class="note-left">
       <section class="card project-panel" id="n-proj" hidden></section>
       <section class="card note-video" id="n-video" hidden></section>
+      ${n.source?.kind === 'news' && n.source.img ? (() => {
+        let host = ''; try { host = new URL(n.source.url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+        return `<section class="card note-article"><a href="${esc(n.source.url)}" target="_blank" rel="noopener" class="na-img"><img src="${esc(n.source.img)}" alt="" referrerpolicy="no-referrer" onerror="this.closest('.note-article').remove()"></a>
+          <div class="na-bar"><span class="muted">📰 ${esc(host)}</span><a class="btn sm-text" href="${esc(n.source.url)}" target="_blank" rel="noopener">Lire l’article ↗</a></div></section>`;
+      })() : ''}
       <section class="card note-main">
         <div class="note-tools"><div class="seg"><button data-mode="write">✎ Écrire</button><button data-mode="read">👁 Lire</button></div>
           <span class="note-add"><label class="btn" id="n-photo" title="Ajouter une photo ou une capture (tu peux aussi la coller avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden>📷 Photo</label>
