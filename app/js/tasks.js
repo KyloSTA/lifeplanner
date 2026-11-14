@@ -250,6 +250,13 @@ export function bindTaskList(root, redraw) {
       title.title = 'Ouvrir la mission';
       title.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openTaskEditor(id, redraw); };
     }
+    // L'espace vide de la ligne (après le titre, autour des pastilles) ouvre aussi la mission, sans la cocher
+    const main = li.querySelector('.t-main');
+    if (main) main.onclick = (e) => {
+      if (e.target.closest('.t-cb, a, button, input, select')) return;
+      e.preventDefault();
+      openTaskEditor(id, redraw);
+    };
     // ⋮⋮ : glisser pour changer la place de la mission dans sa liste (souris ou doigt), ou flèches ↑ ↓ au clavier
     const handle = li.querySelector('.t-drag');
     if (handle) {

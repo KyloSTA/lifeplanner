@@ -2223,3 +2223,4 @@ button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0;
 .task.dragging .t-drag { cursor: grabbing; opacity: 1; }
 .drag-on { user-select: none; -webkit-user-select: none; }
 .day .t-drag { display: none; } /* vue Semaine : colonnes étroites */
+.task .t-main { cursor: pointer; } .task .t-main .t-cb { cursor: default; }
