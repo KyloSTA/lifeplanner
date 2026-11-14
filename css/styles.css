@@ -2130,3 +2130,81 @@ h2 { font-weight: 600; }
 .md-trailer:hover { color: var(--burgundy, var(--accent)); }
 @media (max-width: 700px) { .seg.nw-tabs button { white-space: normal; line-height: 1.15; min-height: 38px; overflow-wrap: anywhere; } }
 .chip-link { text-decoration: none; cursor: pointer; } .chip-link:hover { filter: brightness(1.12); text-decoration: underline; text-underline-offset: 2px; }
+/* =========================================================
+   Objectifs : cartes redessinées (anneau, résumé, menu ⋯) et focus
+   ========================================================= */
+.gc-ring { --p: 0%; --ring: var(--burgundy, var(--accent)); flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; display: grid; place-items: center; position: relative;
+  background: conic-gradient(var(--ring) var(--p), color-mix(in srgb, var(--text) 10%, transparent) 0); }
+.gc-ring::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--surface); }
+.gc-ring > span { position: relative; font-size: 12px; font-weight: 750; color: var(--text); font-variant-numeric: tabular-nums; }
+.gc-ring.big { width: 64px; height: 64px; cursor: default; } .gc-ring.big::before { inset: 6px; } .gc-ring.big > span { font-size: 16px; }
+.gc-ring.sm { width: 34px; height: 34px; cursor: inherit; } .gc-ring.sm::before { inset: 3px; } .gc-ring.sm > span { font-size: 10px; }
+.gcard { position: relative; border-radius: 14px; padding: 10px; margin: 0 -10px; transition: background .15s; }
+.gcard + .gcard { margin-top: 2px; }
+.gcard:hover, .gcard.open, .gcard.menu-open { background: var(--surface-2); }
+.gcard.menu-open { z-index: 20; }
+.gc-row { display: flex; align-items: center; gap: 12px; }
+.gc-body { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.gc-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 650; font-size: 15px; line-height: 1.3; }
+.gc-title .g-name { cursor: text; overflow-wrap: anywhere; }
+.gc-title .g-name:hover { color: var(--gold-text, var(--accent)); }
+.gc-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--gold-soft, var(--accent-soft)); color: var(--gold-text, var(--accent)); border: 1px solid var(--gold-border, transparent); }
+.gc-sub { justify-self: start; display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 2px 0; min-height: 0; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.gc-sub:hover { color: var(--text); }
+.gc-sub .exp { font-size: 15px; transition: transform .15s; display: inline-block; }
+.gcard.open .gc-sub .exp { transform: rotate(90deg); }
+.gc-late { color: var(--warn); font-weight: 600; }
+.gc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.gcard .g-verdict { margin: 2px 0 0; font-size: 12px; }
+.gc-more { position: relative; flex: none; align-self: flex-start; }
+.gc-menu-btn { width: 32px; height: 32px; border-radius: 9px; border: 1px solid transparent; background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; min-height: 0; }
+.gcard:hover .gc-menu-btn, .gc-menu-btn[aria-expanded="true"] { border-color: var(--border); color: var(--text); }
+.gc-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 210px; display: grid; gap: 2px; padding: 6px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--gold-border, var(--border)); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.gc-menu[hidden] { display: none; }
+.gc-menu button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; padding: 9px 10px; border-radius: 8px; cursor: pointer; min-height: 0; }
+.gc-menu button:hover:not(:disabled) { background: var(--surface-2); }
+.gc-menu button:disabled { opacity: .35; cursor: default; }
+.gc-menu .g-done { color: var(--ok); }
+.gc-menu .gc-danger { color: var(--danger, #e57373); }
+.gcard .goal-missions { padding: 10px 0 2px 58px; }
+@media (max-width: 600px) { .gcard .goal-missions { padding-left: 0; } }
+.gc-manual { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.gc-manual input[type="range"] { width: 100%; height: 28px; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; }
+.gc-manual input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 99px; background: linear-gradient(to right, var(--burgundy, var(--accent)) var(--v, 0%), var(--border) var(--v, 0%)); }
+.gc-manual input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--burgundy, var(--accent)); border: 3px solid var(--surface); cursor: grab; }
+.gc-manual input[type="range"]::-moz-range-track { height: 6px; border-radius: 99px; background: var(--border); }
+.gc-manual input[type="range"]::-moz-range-progress { height: 6px; border-radius: 99px; background: var(--burgundy, var(--accent)); }
+.gc-manual input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--burgundy, var(--accent)); border: 3px solid var(--surface); }
+/* Atteints : vert ; abandonnés : gris */
+.gcard.is-done { background: none; }
+.gcard.is-done .gc-ring { --ring: var(--ok); }
+.gcard.is-done .gc-ring > span { color: var(--ok); font-size: 16px; }
+.gcard.is-done .g-name { color: var(--muted); }
+.gcard.is-dropped .gc-ring { --ring: var(--muted); }
+.gcard.is-dropped { opacity: .75; }
+/* En focus : liseré doré */
+.gcard.is-focus { box-shadow: inset 3px 0 0 var(--gold, var(--accent)); }
+/* Carte focus en haut de la page */
+.gfocus { border: 1px solid var(--gold-border, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, var(--gold, #c9a24a) 10%, var(--surface)), var(--surface) 60%); margin-bottom: 18px; display: grid; gap: 10px; }
+.gf-head { display: flex; align-items: center; gap: 16px; }
+.gf-head .gc-ring { --ring: var(--gold, var(--accent)); }
+.gf-txt { flex: 1; min-width: 0; }
+.gf-txt .eyebrow { margin: 0 0 2px; }
+.gf-txt h2 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
+.gf-txt p.muted { margin: 2px 0 0; font-size: 13px; }
+.gf-label { margin: 4px 0 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.gf-add { display: flex; gap: 8px; }
+.gf-add input[name="t"] { flex: 1; min-width: 0; }
+.gf-add input[type="date"] { width: auto; }
+@media (max-width: 600px) { .gf-head { flex-wrap: wrap; } .gf-head .gf-off { margin-left: auto; } .gf-add input[type="date"] { display: none; } }
+/* Aujourd'hui : rappel du focus */
+.sum-focus { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 12px; border-radius: 12px; text-decoration: none; color: var(--text);
+  background: color-mix(in srgb, var(--gold, #c9a24a) 9%, var(--surface-2)); border: 1px solid var(--gold-border, var(--border)); }
+.sum-focus .gc-ring { --ring: var(--gold, var(--accent)); }
+.sum-focus .gc-ring::before { background: var(--surface-2); }
+.sum-focus-txt { display: grid; min-width: 0; line-height: 1.25; }
+.sum-focus-txt b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sum-focus-txt small:first-child { color: var(--gold-text, var(--accent)); font-weight: 700; font-size: 11px; }
+.sum-focus-txt small.muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sum-focus:hover { border-color: var(--gold, var(--accent)); }
