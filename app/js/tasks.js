@@ -155,7 +155,7 @@ export function taskHTML(t, ref, opts = {}) {
     dateChip,
     subs.length ? `<span class="chip ${sd === subs.length ? 'ok' : ''}" title="Étapes faites">✓ ${sd}/${subs.length}</span>` : '',
     t.notes ? '<span class="chip" title="Contient des notes">✎</span>' : '',
-    t.images?.length ? `<span class="chip" title="Photos jointes">📷${t.images.length > 1 ? ' ' + t.images.length : ''}</span>` : '',
+    t.images?.length ? `<button type="button" class="chip chip-link t-photos" title="Voir ${t.images.length > 1 ? `les ${t.images.length} photos` : 'la photo'}" aria-label="Voir les photos de la mission">📷${t.images.length > 1 ? ' ' + t.images.length : ''}</button>` : '',
   ].join('');
   return `<li class="task ${t.done ? 'done' : ''}" data-id="${t.id}">
     <div class="task-row">
@@ -197,6 +197,14 @@ export function bindTaskList(root, redraw) {
     };
     li.querySelector('.t-del').onclick = async () => { await deleteTask(id); redraw(); };
     li.querySelector('.exp').onclick = () => openTaskEditor(id, redraw);
+    // 📷 : ouvre les photos de la mission en plein écran
+    const ph = li.querySelector('.t-photos');
+    if (ph) ph.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const t = await db.get('tasks', id);
+      if (!(await images.gallery(t?.images || []))) openTaskEditor(id, redraw); // photo pas encore synchronisée : on ouvre la mission
+    };
   });
 }
 

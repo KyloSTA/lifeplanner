@@ -2208,3 +2208,9 @@ h2 { font-weight: 600; }
 .sum-focus-txt small:first-child { color: var(--gold-text, var(--accent)); font-weight: 700; font-size: 11px; }
 .sum-focus-txt small.muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sum-focus:hover { border-color: var(--gold, var(--accent)); }
+/* Photos d'une mission : pastille 📷 cliquable et galerie */
+button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0; }
+.img-gallery .ig-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0 0 4px; }
+.img-gallery .ig-prev { left: 16px; } .img-gallery .ig-next { right: 16px; }
+.img-gallery .ig-nav:hover { background: rgba(0,0,0,.8); }
+.img-gallery .ig-count { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); padding: 4px 12px; border-radius: 999px; background: rgba(0,0,0,.6); color: #fff; font-size: 13px; font-weight: 600; }
