@@ -1571,11 +1571,11 @@ async function renderNote(id) {
       <div class="note-left">
       <section class="card project-panel" id="n-proj" hidden></section>
       <section class="card note-video" id="n-video" hidden></section>
-      ${(n.source?.kind === 'news' || n.source?.kind === 'reddit') && n.source.img ? (() => {
+      ${['news', 'reddit', 'amazon'].includes(n.source?.kind) && n.source.img ? (() => {
         let host = ''; try { host = new URL(n.source.url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
-        const reddit = n.source.kind === 'reddit';
+        const reddit = n.source.kind === 'reddit', amz = n.source.kind === 'amazon';
         return `<section class="card note-article"><a href="${esc(n.source.url)}" target="_blank" rel="noopener" class="na-img"><img src="${esc(n.source.img)}" alt="" referrerpolicy="no-referrer" onerror="this.closest('.note-article').remove()"></a>
-          <div class="na-bar"><span class="muted">${reddit ? '👽 Reddit' : '📰 ' + esc(host)}</span><a class="btn sm-text" href="${esc(n.source.url)}" target="_blank" rel="noopener">${reddit ? 'Voir le post ↗' : 'Lire l’article ↗'}</a></div></section>`;
+          <div class="na-bar"><span class="muted">${reddit ? '👽 Reddit' : amz ? '🛒 Amazon' : '📰 ' + esc(host)}</span><a class="btn sm-text" href="${esc(n.source.url)}" target="_blank" rel="noopener">${reddit ? 'Voir le post ↗' : amz ? 'Voir l’article ↗' : 'Lire l’article ↗'}</a></div></section>`;
       })() : ''}
       <section class="card note-main">
         <div class="note-tools"><div class="seg"><button data-mode="write">✎ Écrire</button><button data-mode="read">👁 Lire</button></div>
@@ -3714,7 +3714,7 @@ game.init().catch(console.error).finally(async () => {
     refreshRail();
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
     if (route === 'brain' && !$('#modal-root').children.length) router();
-    const what = kind === 'youtube' ? 'Vidéo YouTube' : 'Post Reddit';
-    toast(updated ? `🧠 ${what} mis${kind === 'youtube' ? 'e' : ''} à jour : « ${note.title} »` : `🧠 ${what} ajouté${kind === 'youtube' ? 'e' : ''} au Cerveau : « ${note.title} »`);
+    const what = kind === 'youtube' ? 'Vidéo YouTube' : kind === 'amazon' ? 'Article Amazon' : 'Post Reddit';
+    toast(updated ? `🧠 ${what} mis à jour : « ${note.title} »` : `🧠 ${what} ajouté au Cerveau : « ${note.title} »`);
   });
 });
