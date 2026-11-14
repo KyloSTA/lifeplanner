@@ -337,13 +337,12 @@ async function renderToday() {
       </div>
     </header>
     <div class="today">
-      <section class="card today-summary" id="c-hero"></section>
       <section class="card capture-card" id="c-brain"></section>
       <section class="card assist" id="c-assist"></section>
       <div class="today-cols">
         <div class="today-col col-main">
           <section class="card t-tasks" id="c-tasks"></section>
-          <section class="card t-agenda"><div id="c-agenda"><div class="skeleton"></div></div><div class="ag-journal" id="c-journal"></div></section>
+          <section class="card t-agenda"><div id="c-agenda"><div class="skeleton"></div></div><div class="today-summary ag-summary" id="c-hero"></div><div class="ag-journal" id="c-journal"></div></section>
           <section class="card t-goals" id="c-goals"></section>
         </div>
         <div class="today-col col-side">
