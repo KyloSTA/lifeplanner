@@ -332,6 +332,7 @@ async function renderToday() {
     <header class="page-head">
       <div><p class="eyebrow">${greeting()}</p><h1>${cap(U.fmtLong(now))}</h1></div>
       <div class="head-actions">
+        <button class="btn" id="as-open" title="Demander à l’assistant (ajouter, déplacer, cocher…)">✨ Assistant</button>
         <button class="btn" id="add-ev">+ Événement</button>
         <a class="btn primary" href="#/page/day-${today}">✎ Écrire à la main</a>
       </div>
@@ -342,7 +343,6 @@ async function renderToday() {
         <div class="top-agenda"><div id="c-agenda"><div class="skeleton"></div></div><div class="ag-journal" id="c-journal"></div></div>
       </section>
       <section class="card capture-card" id="c-brain"></section>
-      <section class="card assist" id="c-assist"></section>
       <div class="today-cols">
         <div class="today-col col-main">
           <section class="card t-tasks" id="c-tasks"></section>
@@ -361,6 +361,7 @@ async function renderToday() {
       </div>
     </div>`;
   $('#add-ev').onclick = () => eventModal(today, renderToday);
+  $('#as-open').onclick = openAssistant;
   // Le résumé du haut suit les cases cochées (missions, habitudes…)
   const refreshSummary = U.debounce(() => heroCard(), 800);
   // clic (cocher), Entrée (ajouter une mission) ou changement : le résumé suit
@@ -449,7 +450,7 @@ async function renderToday() {
   news.todayCard($('#c-news'), toast); // en parallèle (réseau) : ne retarde pas le reste de la page
   finance.todayCard($('#c-money')).catch(console.error);
   usageState().then((st) => usage.todayHint($('#c-hint'), st)).catch(console.error);
-  await Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard(), assistCard()]);
+  await Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard()]);
   agenda();
 }
 
@@ -560,6 +561,18 @@ async function quoteCard() {
    ========================================================= */
 const chat = { history: [], log: [], busy: false }; // conservé tant que l'app est ouverte
 
+/** Ouvre l'assistant dans une fenêtre (bouton ✨ Assistant de la page Aujourd'hui). */
+function openAssistant() {
+  modal(`<div class="as-modal">
+      <div class="card-head"><h2>✨ Assistant</h2><button class="tm-close" data-close aria-label="Fermer" title="Fermer (Échap)">×</button></div>
+      <section class="assist" id="c-assist"></section>
+      <p class="hint muted">Ex. « ajoute appeler maman demain 18 h », « déplace la cuisine à vendredi », « coche budget ».</p>
+    </div>`, async (m) => {
+    await assistCard();
+    m.querySelector('#c-assist textarea')?.focus();
+  });
+}
+
 async function assistCard() {
   const el = $('#c-assist');
   if (!el) return;
@@ -613,7 +626,8 @@ async function assistCard() {
     let changed = false;
     const opts = {
       action: (icon, t) => { chat.log.push({ role: 'action', icon, text: t }); changed = true; draw(); },
-      confirm: (msg) => confirmBox(msg),
+      // La confirmation prend la place de la fenêtre : on rouvre l'assistant juste après
+      confirm: async (msg) => { const ok = await confirmBox(msg); openAssistant(); return ok; },
     };
     try {
       const r = await assistant.send(chat.history, text, opts);
@@ -622,13 +636,12 @@ async function assistCard() {
       chat.log.push({ role: 'error', text: err.message });
     } finally {
       chat.busy = false;
-      if (!document.body.contains(el)) return;
-      draw();
       if (changed) refreshToday();
-      ta.focus();
+      chat.redraw?.(); // la fenêtre ouverte (elle a pu être rouverte entre-temps)
     }
   };
   $('#as-reset', el).onclick = () => { chat.history = []; chat.log = []; showAll = false; draw(); ta.focus(); };
+  chat.redraw = () => { if (!document.body.contains(el)) return; draw(); ta.focus(); };
   draw();
 }
 

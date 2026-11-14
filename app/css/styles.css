@@ -1896,3 +1896,9 @@ h2 { font-weight: 600; }
   .top-agenda { grid-template-columns: 1fr; }
   .top-agenda .ag-journal { padding-left: 0; border-left: 0; padding-top: 14px; border-top: 1px solid var(--border); }
 }
+/* Assistant en fenêtre (bouton ✨ Assistant d'Aujourd'hui) */
+.as-modal { display: grid; gap: 10px; width: min(620px, 100%); }
+.as-modal .card-head { margin-bottom: 0; }
+.as-modal .assist { box-shadow: none; }
+.as-modal .as-log { max-height: 50vh; overflow-y: auto; }
+.as-modal .hint { margin: 0; }
