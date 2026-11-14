@@ -120,7 +120,18 @@ export async function load(force = false) {
 /* =========================================================
    Page
    ========================================================= */
-let state = { cat: 'all', period: 'week', q: '' };
+let state = { cat: 'all', period: 'week', q: '', zone: 'rs' };
+let gpsPos = null; // position GPS (mode « Près de moi »), demandée seulement quand tu choisis ce mode
+const ZONES = [['rs', 'Rive-Sud d’abord'], ['mtl', 'Montréal'], ['gps', '📍 Près de moi']];
+/** Rive-Sud (à l'est ou au sud du fleuve), île de Montréal, ou ailleurs. */
+function zoneOf(x) {
+  if (x.src === 'mtl' || x.src === 'habs') return 'mtl'; // données de la Ville de Montréal et Centre Bell : toujours Montréal
+  const g = x.geo;
+  if (!g?.lat) return 'other';
+  if (g.lon > -73.515 || g.lat < 45.405) return 'rs';
+  if (g.lat > 45.705) return 'other'; // Laval, Rive-Nord
+  return 'mtl';
+}
 const SRC = { mtl: ['🏛', 'Ville de Montréal'], tm: ['🎫', 'Ticketmaster'], habs: ['🏒', 'Canadiens'] };
 
 function inPeriod(x, period) {
@@ -146,7 +157,10 @@ export async function renderPage(ctx, hooks) {
       </div>
     </header>
     <div class="act-bar">
-      <div class="seg" role="group" aria-label="Période">${PERIODS.map(([k, l]) => `<button data-period="${k}" class="${state.period === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <div class="act-segs">
+        <div class="seg" role="group" aria-label="Où">${ZONES.map(([k, l]) => `<button data-zone="${k}" class="${state.zone === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <div class="seg" role="group" aria-label="Période">${PERIODS.map(([k, l]) => `<button data-period="${k}" class="${state.period === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      </div>
       <div class="filters">${CATS.map(([k, l]) => `<button class="chip-btn ${state.cat === k ? 'on' : ''}" data-cat="${k}">${l}</button>`).join('')}</div>
       <div class="act-search"><input type="search" id="act-q" placeholder="Rechercher (ex. hockey, marché, enfants)…" value="${esc(state.q)}" autocomplete="off"><span class="muted act-where" id="act-where"></span></div>
     </div>
@@ -155,15 +169,21 @@ export async function renderPage(ctx, hooks) {
   let data = null;
   const PER_DAY = 10;
   const expanded = new Set();
-  const near = (a, b) => (a.km ?? 999) - (b.km ?? 999) || (a.time || '99').localeCompare(b.time || '99');
+  // Distance affichée et tri : depuis ta position en mode « Près de moi », sinon depuis la Rive-Sud
+  const dist = (x) => (state.zone === 'gps' && gpsPos ? km(gpsPos, x.geo) : x.km);
+  const near = (a, b) => (dist(a) ?? 999) - (dist(b) ?? 999) || (a.time || '99').localeCompare(b.time || '99');
+  // Rive-Sud en priorité, puis spectacles et matchs, puis les plus proches
+  const rank = (a, b) => (state.zone === 'rs' ? (zoneOf(a) !== 'rs') - (zoneOf(b) !== 'rs') : 0) || (a.src === 'mtl') - (b.src === 'mtl') || near(a, b);
 
   const draw = () => {
     if (!data) return;
-    $('#act-where').textContent = `📍 ${data.cfg.label} · ${data.cfg.radius} km`;
+    $('#act-where').textContent = state.zone === 'gps' ? (gpsPos ? `📍 Autour de ta position · ${data.cfg.radius} km` : '📍 Position en cours…') : `📍 ${data.cfg.label} · ${data.cfg.radius} km`;
     const q = state.q.toLowerCase().trim();
     const today = iso(new Date());
     const list = data.items.filter((x) => inPeriod(x, state.period) && (state.cat === 'all' || x.cats.includes(state.cat))
-      && (!q || `${x.title} ${x.type} ${x.place}`.toLowerCase().includes(q)));
+      && (!q || `${x.title} ${x.type} ${x.place}`.toLowerCase().includes(q))
+      && (state.zone !== 'mtl' || zoneOf(x) === 'mtl')
+      && (state.zone !== 'gps' || !gpsPos || (dist(x) ?? 0) <= data.cfg.radius));
     const ongoing = list.filter((x) => x.start < today && x.end >= today);
     const byDay = {};
     for (const x of list.filter((y) => !ongoing.includes(y))) (byDay[x.start] ||= []).push(x);
@@ -176,7 +196,7 @@ export async function renderPage(ctx, hooks) {
         <div class="act-body">
           <small class="act-when">${x.time ? `🕒 ${esc(x.time.replace(':', ' h '))}` : 'Toute la journée'}${when ? ' · ' + esc(when) : ''}</small>
           <b>${esc(x.title)}</b>
-          <small class="muted">${x.place ? '📍 ' + esc(x.place) : ''}${x.km !== null && x.km !== undefined ? ` · ${x.km} km` : ''}${x.cost ? ' · ' + esc(x.cost) : ''}</small>
+          <small class="muted">${zoneOf(x) === 'rs' ? '<span class="act-zone rs">Rive-Sud</span> ' : zoneOf(x) === 'mtl' ? '<span class="act-zone">Montréal</span> ' : ''}${x.place ? '📍 ' + esc(x.place) : ''}${dist(x) !== null && dist(x) !== undefined ? ` · ${dist(x)} km` : ''}${x.cost ? ' · ' + esc(x.cost) : ''}</small>
           <small class="act-src">${ico} ${esc(src)}${x.type ? ' · ' + esc(x.type) : ''}</small>
         </div>
         <div class="act-acts">
@@ -188,9 +208,9 @@ export async function renderPage(ctx, hooks) {
       + (!data.hasKey ? `<div class="card act-tm-tip"><b>🎫 Concerts, spectacles et sports</b><p class="muted">Ajoute ta clé Ticketmaster gratuite pour voir aussi les spectacles et matchs autour de toi.</p><button class="btn" id="act-tm">Ajouter ma clé</button></div>` : '')
       // Expositions et activités de plusieurs jours : repliées, les plus proches d'abord
       + (ongoing.length ? `<details class="act-day act-ongoing"><summary><h3>En cours</h3><small class="muted">${ongoing.length} exposition${ongoing.length > 1 ? 's' : ''} et activité${ongoing.length > 1 ? 's' : ''} sur plusieurs jours</small></summary>
-          ${[...ongoing].sort(near).slice(0, 40).map(card).join('')}</details>` : '')
+          ${[...ongoing].sort(rank).slice(0, 40).map(card).join('')}</details>` : '')
       + Object.entries(byDay).map(([d, xs]) => {
-        const sorted = [...xs].sort((a, b) => (a.src === 'mtl') - (b.src === 'mtl') || near(a, b)); // spectacles et matchs d'abord, puis les plus proches
+        const sorted = [...xs].sort(rank);
         const open = expanded.has(d);
         const shown = open ? sorted : sorted.slice(0, PER_DAY);
         return `<section class="act-day"><h3>${esc(dayLabel(d))} <small class="muted">${xs.length}</small></h3>${shown.map(card).join('')}
@@ -213,6 +233,22 @@ export async function renderPage(ctx, hooks) {
     data = await load(force);
     draw();
   };
+  $$('[data-zone]').forEach((b) => (b.onclick = async () => {
+    state.zone = b.dataset.zone;
+    $$('[data-zone]').forEach((x) => x.classList.toggle('on', x === b));
+    if (state.zone === 'gps' && !gpsPos) {
+      draw();
+      try {
+        const p = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 10000, maximumAge: 600000 }));
+        gpsPos = { lat: p.coords.latitude, lon: p.coords.longitude };
+      } catch {
+        ctx.toast('Position non disponible : autorise la localisation pour Life Planner', 'err');
+        state.zone = 'rs';
+        $$('[data-zone]').forEach((x) => x.classList.toggle('on', x.dataset.zone === 'rs'));
+      }
+    }
+    draw();
+  }));
   $$('[data-period]').forEach((b) => (b.onclick = () => { state.period = b.dataset.period; $$('[data-period]').forEach((x) => x.classList.toggle('on', x === b)); draw(); }));
   $$('[data-cat]').forEach((b) => (b.onclick = () => { state.cat = b.dataset.cat; $$('[data-cat]').forEach((x) => x.classList.toggle('on', x === b)); draw(); }));
   $('#act-q').oninput = (e) => { state.q = e.target.value; draw(); };

@@ -2027,3 +2027,6 @@ h2 { font-weight: 600; }
 .planner-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .planner-tabs a { white-space: nowrap; }
 .page-head .head-actions > #act-cfg { justify-self: end; }
+.act-segs { display: flex; gap: 8px; flex-wrap: wrap; }
+.act-zone { display: inline-block; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
+.act-zone.rs { background: var(--gold-soft); color: var(--gold-text); }
