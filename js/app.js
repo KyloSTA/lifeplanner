@@ -304,8 +304,14 @@ async function taskCard(el, date) {
           <button type="button" class="btn sm-text" data-late="none" title="Retirer la date (elles restent dans Missions)">Sans date</button>
         </div></div>` : ''}
       <form class="add-row"><input name="t" placeholder="Ajouter une mission…" autocomplete="off"><button class="btn icon" aria-label="Ajouter">+</button></form>
-      <ul class="tasks">${items.map((t) => taskHTML(t, date)).join('') || '<li class="empty-sm">Rien de prévu pour l’instant.</li>'}</ul>
-      <p class="hint muted">Astuce : touche › sur une mission pour l’ouvrir : étapes, notes, date et objectif.</p>`;
+      <ul class="tasks">${items.filter((t) => !t.done).map((t) => taskHTML(t, date)).join('')
+        || `<li class="empty-sm">${done ? '🎉 Tout est fait pour aujourd’hui !' : 'Rien de prévu pour l’instant.'}</li>`}</ul>
+      ${done ? `<details class="done-fold" ${localStorage.getItem('lp.doneOpen') === '1' ? 'open' : ''}>
+        <summary>✓ Terminées <small>${done}</small></summary>
+        <ul class="tasks">${items.filter((t) => t.done).map((t) => taskHTML(t, date)).join('')}</ul></details>` : ''}
+      <p class="hint muted">Astuce : touche une mission pour l’ouvrir (étapes, notes, date et objectif) ; la case la marque terminée.</p>`;
+    // Les missions terminées restent repliées (ou ouvertes) comme tu les as laissées
+    el.querySelector('.done-fold')?.addEventListener('toggle', (e) => { try { localStorage.setItem('lp.doneOpen', e.target.open ? '1' : '0'); } catch { /* ignore */ } });
     el.querySelector('form').onsubmit = async (e) => {
       e.preventDefault();
       const v = e.target.t.value.trim();
