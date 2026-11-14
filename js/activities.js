@@ -33,6 +33,65 @@ function km(a, b) {
 }
 const clean = (s) => (s && s !== 'nan' ? String(s).trim() : '');
 
+/* ---------- Événements Facebook (envoyés par le bouton « 🎟 Activités » de l'extension) ----------
+   Gardés dans un réglage synchronisé « fbEvents ». La date est lue dans le texte affiché par Facebook. */
+const FB = 'fbEvents';
+const MON = [['janv', 0], ['jan', 0], ['fevr', 1], ['feb', 1], ['mars', 2], ['mar', 2], ['avr', 3], ['apr', 3], ['mai', 4], ['may', 4], ['juin', 5], ['jun', 5],
+  ['juil', 6], ['jul', 6], ['aout', 7], ['aug', 7], ['sept', 8], ['sep', 8], ['oct', 9], ['nov', 10], ['dec', 11]];
+const monthOf = (w) => MON.find(([p]) => w.startsWith(p))?.[1];
+/** « Samedi 22 novembre 2026 de 19:00 à 22:00 », « SAM. 22 NOV. À 19 H », « Saturday, November 22 at 7 PM » -> { start, time } */
+export function parseFbWhen(s, now = new Date()) {
+  const t = (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  let day, mon;
+  let m = t.match(/\b(\d{1,2})(?:er)?\.?\s+([a-z]{3,})/); // 22 novembre
+  if (m && monthOf(m[2]) !== undefined) { day = +m[1]; mon = monthOf(m[2]); }
+  else if ((m = t.match(/\b([a-z]{3,})\.?\s+(\d{1,2})\b/)) && monthOf(m[1]) !== undefined) { day = +m[2]; mon = monthOf(m[1]); } // november 22
+  if (day === undefined || day < 1 || day > 31) return null;
+  let year = +(t.match(/\b(20\d\d)\b/)?.[1] || now.getFullYear());
+  let d = new Date(year, mon, day);
+  if (!t.match(/\b20\d\d\b/) && d < U.addDays(now, -31)) d = new Date(++year, mon, day); // pas d'année : la prochaine occurrence
+  let time = '';
+  const hm = t.match(/\b(\d{1,2})\s*[:h]\s*(\d{2})\b/), ap = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/), hh = t.match(/\b(?:a|at|de)\s+(\d{1,2})\s*h\b/);
+  if (ap) { let h = +ap[1] % 12; if (ap[3] === 'pm') h += 12; time = `${String(h).padStart(2, '0')}:${ap[2] || '00'}`; }
+  else if (hm && +hm[1] < 24) time = `${String(+hm[1]).padStart(2, '0')}:${hm[2]}`;
+  else if (hh && +hh[1] < 24) time = `${String(+hh[1]).padStart(2, '0')}:00`;
+  return { start: iso(d), time };
+}
+export async function addFacebookEvent(raw) {
+  const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
+  const url = str(raw.url, 300);
+  if (!/^https:\/\/(www\.|m\.)?facebook\.com\/events\/\d+/.test(url)) throw new Error('Adresse Facebook invalide');
+  const when = parseFbWhen(str(raw.when, 120));
+  const ev = {
+    id: 'fb-' + (url.match(/events\/(\d+)/)?.[1] || Date.now()), title: str(raw.title, 200) || 'Événement Facebook', url,
+    img: /^https:\/\//.test(raw.img || '') ? str(raw.img, 1000) : '', place: str(raw.place, 120), text: str(raw.text, 400),
+    whenText: str(raw.when, 120), start: when?.start || '', time: when?.time || '', addedAt: Date.now(),
+  };
+  const list = ((await db.get('settings', FB)) || []).filter((x) => x.id !== ev.id);
+  const updated = list.length !== ((await db.get('settings', FB)) || []).length;
+  await db.put('settings', [ev, ...list].slice(0, 200), FB);
+  return { ev, updated };
+}
+export async function removeFacebookEvent(id) {
+  await db.put('settings', ((await db.get('settings', FB)) || []).filter((x) => x.id !== id), FB);
+}
+function catsOf(text) {
+  const cats = [];
+  if (/sport|plein air|vélo|patin|ski|course|yoga|danse|hockey|soccer|match/i.test(text)) cats.push('sport');
+  if (/spectacle|concert|musique|théâtre|cinéma|film|humour|festival|show|dj/i.test(text)) cats.push('show');
+  if (/famille|enfant|gratuit|free|kids/i.test(text)) cats.push('family');
+  if (/atelier|conférence|exposition|formation|cours|visite|workshop|talk/i.test(text)) cats.push('learn');
+  return cats;
+}
+async function fromFacebook(today) {
+  return ((await db.get('settings', FB)) || []).map((e) => {
+    const start = e.start || today;
+    return { id: e.id, src: 'fb', title: e.title, url: e.url, img: e.img, place: e.place, cost: '', geo: null,
+      start, end: e.start ? start : iso(U.addDays(new Date(), 30)), time: e.time, type: e.start ? 'Événement Facebook' : 'Date à vérifier sur Facebook',
+      cats: catsOf(`${e.title} ${e.text}`) };
+  }).filter((x) => x.end >= today);
+}
+
 /* ---------- Sources ---------- */
 async function fromMontreal(today, until) {
   const r = await fetch(MTL);
@@ -100,7 +159,14 @@ export async function load(force = false) {
   const key = await db.get('settings', 'ticketmasterKey');
   const sig = `${cfg.lat},${cfg.lon},${cfg.radius},${key ? 'k' : ''}`;
   const cache = await db.get('cache', 'activities');
-  if (!force && cache && cache.sig === sig && Date.now() - cache.at < TTL) return { ...cache, cfg, hasKey: !!key };
+  // Les événements Facebook ajoutés par toi ne passent pas par le cache : ils apparaissent tout de suite
+  const withFb = async (o) => {
+    const fb = await fromFacebook(iso(new Date())).catch(() => []);
+    if (!fb.length) return o;
+    const items = [...o.items.filter((x) => x.src !== 'fb'), ...fb].sort((a, b) => (a.start + (a.time || '99')).localeCompare(b.start + (b.time || '99')));
+    return { ...o, items };
+  };
+  if (!force && cache && cache.sig === sig && Date.now() - cache.at < TTL) return withFb({ ...cache, cfg, hasKey: !!key });
   const today = iso(new Date()), until = iso(U.addDays(new Date(), 30));
   const errors = [];
   const results = await Promise.all([
@@ -114,7 +180,7 @@ export async function load(force = false) {
     .sort((a, b) => (a.start + (a.time || '99')).localeCompare(b.start + (b.time || '99')));
   const out = { at: Date.now(), sig, items, errors };
   if (items.length) await db.put('cache', out, 'activities');
-  return { ...out, cfg, hasKey: !!key };
+  return withFb({ ...out, cfg, hasKey: !!key });
 }
 
 /* =========================================================
@@ -126,13 +192,41 @@ const ZONES = [['rs', 'Rive-Sud d’abord'], ['mtl', 'Montréal'], ['gps', '📍
 /** Rive-Sud (à l'est ou au sud du fleuve), île de Montréal, ou ailleurs. */
 function zoneOf(x) {
   if (x.src === 'mtl' || x.src === 'habs') return 'mtl'; // données de la Ville de Montréal et Centre Bell : toujours Montréal
+  if (x.src === 'fb') { // Facebook : d'après le lieu affiché
+    if (/longueuil|brossard|boucherville|saint-bruno|st-bruno|sainte-julie|ste-julie|chambly|saint-lambert|varennes|la prairie|laprairie|candiac|saint-hubert|beloeil|belœil|mont-saint-hilaire|saint-jean-sur|greenfield park|delson|saint-constant|châteauguay|chateauguay/i.test(x.place || '')) return 'rs';
+    if (/montr[ée]al|plateau|rosemont|verdun|villeray|hochelaga|outremont|griffintown|vieux-port/i.test(`${x.place} ${x.title}`)) return 'mtl';
+    return 'other';
+  }
   const g = x.geo;
   if (!g?.lat) return 'other';
   if (g.lon > -73.515 || g.lat < 45.405) return 'rs';
   if (g.lat > 45.705) return 'other'; // Laval, Rive-Nord
   return 'mtl';
 }
-const SRC = { mtl: ['🏛', 'Ville de Montréal'], tm: ['🎫', 'Ticketmaster'], habs: ['🏒', 'Canadiens'] };
+const SRC = { mtl: ['🏛', 'Ville de Montréal'], tm: ['🎫', 'Ticketmaster'], habs: ['🏒', 'Canadiens'], fb: ['📘', 'Facebook'] };
+
+/* ---------- Vignette générée (activités sans image) ----------
+   Un pictogramme selon le genre d'activité, sur une couleur propre à chaque activité, avec son genre en dessous. */
+const THEMES = [
+  [/conte|lecture|livre|biblioth|poésie|auteur/i, '📚', 'Lecture'], [/théâtre|theatre|marionnette|improvisation/i, '🎭', 'Théâtre'],
+  [/cinéma|cinema|film|projection/i, '🎬', 'Cinéma'], [/humour|stand-up/i, '😂', 'Humour'], [/danse|ballet|bal /i, '💃', 'Danse'],
+  [/concert|musique|chorale|chant|jazz|orchestre|piano|dj/i, '🎵', 'Musique'], [/exposition|expo |galerie|œuvre|oeuvre|art visuel|peinture|photo/i, '🖼', 'Exposition'],
+  [/yoga|méditation|meditation|zumba|pilates|mise en forme|entraînement/i, '🧘', 'Bien-être'], [/vélo|velo|cyclis/i, '🚴', 'Vélo'],
+  [/patin|hockey|glace/i, '⛸', 'Patin'], [/ski|raquette|neige/i, '🎿', 'Hiver'], [/natation|piscine|baignade/i, '🏊', 'Baignade'],
+  [/course|marathon|marche|randonn/i, '🏃', 'Course'], [/soccer|basket|tennis|volley|sport/i, '⚽', 'Sport'],
+  [/festival|fête|fete|carnaval|célébration|noël|noel|halloween/i, '🎪', 'Fête'], [/nature|jardin|parc|plein air|ornitho|arbre|horticult/i, '🌳', 'Nature'], [/cuisine|culinaire|dégustation|marché|nourriture/i, '🍳', 'Cuisine'],
+  [/science|robot|techno|code|astronom|numérique/i, '🔬', 'Science'], [/jeu|jeux|ludothèque|échecs|carte/i, '🎲', 'Jeux'],
+  [/bricol|atelier|création|tricot|couture|dessin|fabrication/i, '✂️', 'Atelier'], [/conférence|causerie|discussion|table ronde/i, '🎤', 'Conférence'],
+  [/visite|patrimoine|histoire|musée|circuit/i, '🏛', 'Visite'], [/festival|fête|fete|carnaval|célébration|noël|halloween/i, '🎪', 'Fête'],
+  [/enfant|famille|tout-petit|bébé|parent/i, '🧸', 'Famille'], [/cours|initiation|formation|apprendre/i, '🎓', 'Cours'],
+];
+const hue = (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+function thumb(x) {
+  const txt = `${x.type || ''} ${x.title || ''}`;
+  const [, ico, label] = THEMES.find(([re]) => re.test(txt)) || [null, SRC[x.src]?.[0] || '📅', x.type || 'Activité'];
+  const h = hue(x.title || x.id || '');
+  return `<div class="act-media act-gen" style="--h:${h}"><span>${ico}</span><small>${esc(label)}</small></div>`;
+}
 
 function inPeriod(x, period) {
   const t = new Date(), today = iso(t);
@@ -192,7 +286,7 @@ export async function renderPage(ctx, hooks) {
       const [ico, src] = SRC[x.src];
       const when = x.start === x.end || !x.end ? '' : `jusqu’au ${U.fmtShort(U.parseISO(x.end))}`;
       return `<article class="act ${x.src}">
-        <div class="act-media">${x.img ? `<img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="${x.logo ? 'logo' : ''}">` : `<span>${ico}</span>`}</div>
+        ${x.img ? `<div class="act-media"><img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="${x.logo ? 'logo' : ''}"></div>` : thumb(x)}
         <div class="act-body">
           <small class="act-when">${x.time ? `🕒 ${esc(x.time.replace(':', ' h '))}` : 'Toute la journée'}${when ? ' · ' + esc(when) : ''}</small>
           <b>${esc(x.title)}</b>
@@ -202,10 +296,12 @@ export async function renderPage(ctx, hooks) {
         <div class="act-acts">
           <button class="btn primary act-btn" data-add="${esc(x.id)}" title="Ajouter à ton agenda">+ Agenda</button>
           ${x.url ? `<a class="btn act-btn" href="${esc(x.url)}" target="_blank" rel="noopener">Voir ↗</a>` : ''}
+          ${x.src === 'fb' ? `<button class="btn act-btn act-fb-del" data-fbdel="${esc(x.id)}" title="Retirer cet événement Facebook des Activités" aria-label="Retirer">×</button>` : ''}
         </div></article>`;
     };
     $('#act-list').innerHTML = (data.errors.length ? `<p class="hint muted">⚠ ${data.errors.map(esc).join(' · ')}</p>` : '')
       + (!data.hasKey ? `<div class="card act-tm-tip"><b>🎫 Concerts, spectacles et sports</b><p class="muted">Ajoute ta clé Ticketmaster gratuite pour voir aussi les spectacles et matchs autour de toi.</p><button class="btn" id="act-tm">Ajouter ma clé</button></div>` : '')
+      + (!data.items.some((x) => x.src === 'fb') ? `<p class="hint muted act-fb-tip">📘 <b>Événements Facebook</b> : ouvre Facebook depuis le Lanceur, va sur un événement et touche <b>🎟 Activités</b> (extension Edge) : il apparaît ici.</p>` : '')
       // Expositions et activités de plusieurs jours : repliées, les plus proches d'abord
       + (ongoing.length ? `<details class="act-day act-ongoing"><summary><h3>En cours</h3><small class="muted">${ongoing.length} exposition${ongoing.length > 1 ? 's' : ''} et activité${ongoing.length > 1 ? 's' : ''} sur plusieurs jours</small></summary>
           ${[...ongoing].sort(rank).slice(0, 40).map(card).join('')}</details>` : '')
@@ -217,6 +313,11 @@ export async function renderPage(ctx, hooks) {
           ${sorted.length > PER_DAY ? `<button class="btn sm-text act-more" data-more="${d}">${open ? 'Voir moins' : `Voir les ${sorted.length - PER_DAY} autres`}</button>` : ''}</section>`;
       }).join('')
       || '<div class="card empty-card"><p>Aucune activité pour ces filtres. Essaie « 30 jours » ou une autre catégorie.</p></div>';
+    $$('[data-fbdel]').forEach((b) => (b.onclick = async () => {
+      await removeFacebookEvent(b.dataset.fbdel);
+      data = await load(false);
+      draw();
+    }));
     $$('[data-add]').forEach((b) => (b.onclick = () => {
       const x = data.items.find((y) => y.id === b.dataset.add);
       if (!x) return;
