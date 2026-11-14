@@ -211,6 +211,14 @@ function bindEvents(root, events, refresh) {
   });
 }
 
+/** Texte échappé dont les adresses web deviennent des liens (ouverts dans un nouvel onglet). */
+function linkify(text) {
+  return esc(text).replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"»]/g, (u) => {
+    const href = u.replace(/&amp;/g, '&');
+    return `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${u}</a>`;
+  });
+}
+
 function eventDetails(ev, refresh) {
   const when = ev.allDay
     ? cap(U.fmtLong(new Date(ev.start))) + ' · toute la journée'
@@ -218,7 +226,7 @@ function eventDetails(ev, refresh) {
   modal(`<h2>${esc(ev.title)}</h2>
     <p class="muted" style="margin-top:-8px">${esc(when)}<br>${esc(ev.calName || '')}</p>
     ${ev.location ? `<p>📍 ${esc(ev.location)}</p>` : ''}
-    ${ev.description ? `<p style="white-space:pre-wrap">${esc(ev.description)}</p>` : ''}
+    ${ev.description ? `<p class="ev-desc" style="white-space:pre-wrap">${linkify(ev.description)}</p>` : ''}
     <div class="modal-actions">
       <button class="btn danger" id="ev-del">Supprimer</button>
       ${ev.link ? `<a class="btn" href="${esc(ev.link)}" target="_blank" rel="noopener">Ouvrir dans Google</a>` : ''}
