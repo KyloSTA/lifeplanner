@@ -28,6 +28,22 @@
   const clean = (s) => (s || '').replace(/\n{3,}/g, '\n\n').trim();
   const isReddit = (u) => /^https?:\/\/([a-z0-9-]+\.)?(reddit\.com|redd\.it)\//i.test(u);
 
+  // Image d'un post (pour la miniature dans le Cerveau) : l'image elle-même, l'aperçu d'une vidéo ou d'un lien.
+  // On évite avatars, icônes et récompenses.
+  const IMG_EXT = /\.(jpe?g|png|webp|gif)(\?|$)/i;
+  const isPostImg = (s) => s && /(redd\.it|redditmedia\.com)/i.test(s) && !/avatar|icon|emoji|award|snoo|communityIcon|styles\//i.test(s);
+  function imageOf(p, href) {
+    if (href && (IMG_EXT.test(href) || /\/\/i\.redd\.it\//i.test(href))) return href;
+    for (const r of [p, p.shadowRoot].filter(Boolean)) {
+      const v = r.querySelector('shreddit-player, shreddit-player-2, [poster]');
+      const poster = v?.getAttribute('poster') || v?.getAttribute('preview');
+      if (poster && !/^data:/.test(poster)) return abs(poster);
+      const src = [...r.querySelectorAll('img, faceplate-img')].map((e) => e.getAttribute('src') || e.currentSrc).find(isPostImg);
+      if (src) return abs(src);
+    }
+    return '';
+  }
+
   function fromShreddit(p) {
     const permalink = abs(p.getAttribute('permalink') || '');
     const href = abs(p.getAttribute('content-href') || '');
@@ -41,6 +57,7 @@
       author: p.getAttribute('author') || '',
       created: p.getAttribute('created-timestamp') || '',
       text: body?.innerText || '',
+      img: imageOf(p, href),
     };
   }
 
@@ -56,6 +73,7 @@
       author: t.dataset.author || '',
       created: t.dataset.timestamp ? new Date(Number(t.dataset.timestamp)).toISOString() : '',
       text: t.querySelector('.expando .usertext-body .md')?.innerText || '',
+      img: IMG_EXT.test(href) ? href : abs(t.querySelector('a.thumbnail img')?.getAttribute('src') || ''),
     };
   }
 
@@ -76,6 +94,7 @@
       author: post.author,
       created: post.created,
       text: clean(post.text).slice(0, 4000),
+      img: /^https:\/\//.test(post.img || '') ? post.img : '',
       savedAt: Date.now(),
     };
     btn.disabled = true;

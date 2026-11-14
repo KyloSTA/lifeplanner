@@ -50,6 +50,7 @@ export async function saveClip(raw) {
     text: str(raw.text, 4000),
     at: Math.max(0, Math.min(86_400, Math.floor(Number(raw.at) || 0))),
     short: raw.short === true,
+    img: kind === 'reddit' ? httpUrl(raw.img) : '', // image du post (miniature de la carte)
   };
   if (!c.url) throw new Error('Adresse invalide');
   if (kind === 'youtube' && !/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{6,20}$/.test(c.url)) throw new Error('Adresse YouTube invalide');
@@ -59,11 +60,12 @@ export async function saveClip(raw) {
   if (existing) {
     existing.body = body;
     if (existing.archived) existing.archived = false;
+    if (c.img) existing.source = { ...existing.source, img: c.img }; // réenregistrer un post ajoute son image
     await brain.saveNote(existing);
     return { note: existing, updated: true, kind };
   }
   const n = await brain.createNote({ title, body, type: 'ressource' });
-  n.source = { kind, url: c.url };
+  n.source = { kind, url: c.url, ...(c.img ? { img: c.img } : {}) };
   await brain.saveNote(n, { touch: false });
   return { note: n, updated: false, kind };
 }
