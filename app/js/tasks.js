@@ -5,6 +5,7 @@ import * as U from './util.js';
 import * as game from './game.js';
 import * as alarms from './alarms.js';
 import * as timer from './timer.js';
+import * as images from './images.js';
 
 const { esc } = U;
 
@@ -60,6 +61,7 @@ export async function deleteTask(id) {
   const t = await db.get('tasks', id);
   await db.del('tasks', id);
   if (t?.goalId) await syncGoalProgress(t.goalId);
+  if (t?.images?.length) await images.removeUnused(t.images); // ses photos, si rien d'autre ne les utilise
 }
 
 export async function setTaskDone(id, done) {
@@ -152,6 +154,7 @@ export function taskHTML(t, ref, opts = {}) {
     dateChip,
     subs.length ? `<span class="chip ${sd === subs.length ? 'ok' : ''}" title="Étapes faites">✓ ${sd}/${subs.length}</span>` : '',
     t.notes ? '<span class="chip" title="Contient des notes">✎</span>' : '',
+    t.images?.length ? `<span class="chip" title="Photos jointes">📷${t.images.length > 1 ? ' ' + t.images.length : ''}</span>` : '',
   ].join('');
   return `<li class="task ${t.done ? 'done' : ''}" data-id="${t.id}">
     <div class="task-row">
@@ -283,6 +286,15 @@ export async function openTaskEditor(id, onChange = () => {}) {
         <h3>Notes</h3>
         <textarea class="notes" placeholder="Notes, détails, liens…">${esc(t.notes || '')}</textarea>
       </section>
+      <section class="tm-sec tm-photos">
+        <h3>📷 Photos ${(t.images || []).length ? `<span class="muted">${t.images.length}</span>` : ''}</h3>
+        ${(t.images || []).length ? `<div class="tm-imgs">${t.images.map((im) => `<figure class="tm-img"><img data-img="${im}" alt="Photo de la mission" title="Agrandir"><button class="x" data-rmimg="${im}" aria-label="Retirer la photo">×</button></figure>`).join('')}</div>` : ''}
+        <div class="tm-img-add">
+          <label class="btn"><input type="file" accept="image/*" multiple hidden class="tm-img-file">📷 Ajouter une photo</label>
+          <button type="button" class="btn tm-img-paste" title="Coller une image copiée">📋 Coller</button>
+          <small class="muted">ou Ctrl + V n’importe où dans cette fenêtre</small>
+        </div>
+      </section>
       ${linked.length ? `<section class="tm-sec"><h3>🧠 Notes du Cerveau <span class="muted">${linked.length}</span></h3>
         <div class="assoc-list">${linked.map((x) => `<a class="assoc-chip" href="#/note/${x.id}" data-go="${x.id}">${esc(x.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
       <div class="modal-actions tm-actions">
@@ -355,6 +367,31 @@ export async function openTaskEditor(id, onChange = () => {}) {
     notes.oninput = () => saveNotes(notes.value);
     notes.onblur = () => saveNotes.flush();
 
+    // Photos : bouton, Coller, Ctrl + V (géré une fois pour la fenêtre, plus bas) ; clic = agrandir
+    images.hydrate(box);
+    box.querySelectorAll('.tm-img img').forEach((img) => (img.onclick = () => img.src && images.zoom(img.src)));
+    box.querySelectorAll('[data-rmimg]').forEach((b) => (b.onclick = async () => {
+      await flush();
+      await editTask(id, (x) => { x.images = (x.images || []).filter((m) => m !== b.dataset.rmimg); });
+      await images.removeUnused([b.dataset.rmimg]);
+      changed();
+      draw();
+    }));
+    box.querySelector('.tm-img-file').onchange = (e) => addImages([...e.target.files]);
+    box.querySelector('.tm-img-paste').onclick = async () => {
+      try {
+        const files = [];
+        for (const item of await navigator.clipboard.read()) {
+          const type = item.types.find((ty) => ty.startsWith('image/'));
+          if (type) files.push(await item.getType(type));
+        }
+        if (files.length) addImages(files);
+        else alertBox('Aucune image dans le presse-papiers. Copie une image ou une capture d’écran, puis réessaie.');
+      } catch {
+        alertBox('Le navigateur n’a pas permis de lire le presse-papiers : utilise Ctrl + V dans cette fenêtre.');
+      }
+    };
+
     const del = box.querySelector('.tm-del');
     del.onclick = async () => {
       if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = 'Confirmer la suppression'; return; }
@@ -369,5 +406,35 @@ export async function openTaskEditor(id, onChange = () => {}) {
     box.querySelector('.tm-close').onclick = close;
     if (focus) box.querySelector(focus)?.focus();
   };
+
+  // Ajoute des images (réduites et compressées) à la mission
+  let adding = false;
+  const addImages = async (files) => {
+    const list = files.filter((f) => f && f.type?.startsWith('image/'));
+    if (!list.length || adding) return;
+    adding = true;
+    try {
+      await flush();
+      const ids = [];
+      for (const f of list) ids.push(await images.save(f));
+      await editTask(id, (x) => { x.images = [...(x.images || []), ...ids]; });
+      changed();
+      await draw();
+      box.querySelector('.tm-photos')?.scrollIntoView({ block: 'nearest' });
+    } catch {
+      alertBox('Cette image n’a pas pu être ajoutée (format non pris en charge ?).');
+    } finally { adding = false; }
+  };
+  const alertBox = (msg) => { const p = box.querySelector('.tm-img-add small'); if (p) { p.textContent = msg; p.classList.add('warn-text'); } };
+  // Ctrl + V : une image collée (le texte collé dans un champ reste du texte)
+  box.addEventListener('paste', (e) => {
+    const files = images.imageFiles(e.clipboardData);
+    if (!files.length) return;
+    e.preventDefault();
+    addImages(files);
+  });
+  // Glisser-déposer une image sur la fenêtre
+  box.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
+  box.addEventListener('drop', (e) => { const files = images.imageFiles(e.dataTransfer); if (files.length) { e.preventDefault(); addImages(files); } });
   await draw();
 }

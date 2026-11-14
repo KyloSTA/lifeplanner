@@ -1879,3 +1879,11 @@ h2 { font-weight: 600; }
 .nc-news img { height: 140px; object-fit: cover; }
 .note-card.has-media .nc-head { align-items: flex-start; }
 .note-card.has-media .nc-head b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+/* Photos d'une mission */
+.tm-imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.tm-img { position: relative; margin: 0; }
+.tm-img img { display: block; width: 100%; height: 96px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); cursor: zoom-in; }
+.tm-img .x { position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--text); color: var(--surface); cursor: pointer; font-size: 14px; line-height: 1; }
+.tm-img-add { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tm-img-add label.btn { cursor: pointer; }
+.warn-text { color: var(--warn) !important; }
