@@ -1947,3 +1947,9 @@ h2 { font-weight: 600; }
 .qd-menu button:hover, .qd-menu button:focus-visible { background: var(--surface-2); outline: none; }
 .qd-menu button.on { color: var(--accent); font-weight: 600; }
 .qd-menu button.on::after { content: ' ✓'; }
+/* Objectifs : titre sur toute la largeur, puis la barre avec %, ✓, ↑, ↓ et × à sa droite (plus de titre écrasé) */
+.goal-col .goal { grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; }
+.goal-col .goal > .title { grid-column: 1 / -1; grid-row: 1; line-height: 1.35; overflow-wrap: break-word; }
+.goal-col .goal > .g-tools { grid-column: 2; grid-row: 2; display: flex; align-items: center; gap: 2px; }
+.goal-col .goal > .g-tools .pct { margin-right: 4px; min-width: 38px; text-align: right; }
+.goal-col .goal > .bar, .goal-col .goal > input[type="range"] { grid-column: 1; grid-row: 2; align-self: center; }
