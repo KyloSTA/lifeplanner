@@ -2265,3 +2265,7 @@ button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0;
 .md-svc:hover { filter: brightness(1.15); text-decoration: underline; }
 a.md-where.md-none { color: var(--muted); font-size: 11.5px; text-decoration: none; }
 a.md-where.md-none:hover { text-decoration: underline; }
+/* Planificateur Semaine : « ✓ Terminées » compact dans les colonnes étroites */
+.day .done-fold { margin-top: 2px; padding-top: 0; }
+.day .done-fold > summary { padding: 5px 2px; font-size: 12px; }
+.day .done-fold > summary small { padding: 0 6px; }
