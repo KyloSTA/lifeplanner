@@ -8,7 +8,7 @@ import * as gcal from './gcal.js';
 
 const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'notes', 'xp', 'settings', 'habits', 'study', 'workouts', 'files', 'money'];
 const LOCAL_ONLY = new Set(['anthropicKey', 'clientId', 'xpInit', 'ticketmasterKey']); // réglages propres à cet appareil
-const MERGED = { lastLevel: 'max', lastEvo: 'max', badges: 'union' }; // réglages fusionnés plutôt que remplacés
+const MERGED = { lastLevel: 'max', lastEvo: 'max', badges: 'union', taskTrash: 'byId' }; // réglages fusionnés plutôt que remplacés
 const FILE = (s) => `lp-${s}.json`;
 const DRIVE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -79,6 +79,15 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function mergeSpecial(key, a, b) {
   if (MERGED[key] === 'max') return Math.max(Number(a) || 0, Number(b) || 0);
   if (MERGED[key] === 'union') return [...new Set([...(a || []), ...(b || [])])];
+  if (MERGED[key] === 'byId') {
+    // Missions supprimées : on garde, pour chaque mission, la version la plus récente (supprimée, restaurée ou purgée)
+    const by = new Map();
+    for (const x of [...(a || []), ...(b || [])]) {
+      const cur = by.get(x.id);
+      if (!cur || (x.trashAt || x.deletedAt || 0) > (cur.trashAt || cur.deletedAt || 0)) by.set(x.id, x);
+    }
+    return [...by.values()];
+  }
   return a;
 }
 

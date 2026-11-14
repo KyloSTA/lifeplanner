@@ -57,11 +57,49 @@ export async function addTask(title, date, goalId = null, projectId = null) {
   return t;
 }
 
+/* ---------- Supprimées : une mission supprimée va dans la corbeille (réglage synchronisé « taskTrash ») ---------- */
+// Chaque entrée garde la mission entière ; une mission restaurée ou supprimée pour de bon devient une
+// « pierre tombale » { id, gone, trashAt } (pour que la synchro ne la fasse pas réapparaître), effacée après 90 jours.
+const TRASH = 'taskTrash';
+const TOMB_DAYS = 90;
+const rawTrash = async () => (await db.get('settings', TRASH)) || [];
+async function saveTrash(list) {
+  const limit = Date.now() - TOMB_DAYS * 864e5;
+  await db.put('settings', list.filter((x) => !x.gone || (x.trashAt || 0) > limit), TRASH);
+}
+export const trashList = async () => (await rawTrash()).filter((x) => !x.gone).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+
+/** Supprime une mission : elle est gardée dans l'onglet « Supprimées » (on peut la restaurer). */
 export async function deleteTask(id) {
   const t = await db.get('tasks', id);
+  if (!t) return;
+  const now = Date.now();
+  await saveTrash([{ ...t, deletedAt: now, trashAt: now }, ...(await rawTrash()).filter((x) => x.id !== id)]);
   await db.del('tasks', id);
-  if (t?.goalId) await syncGoalProgress(t.goalId);
-  if (t?.images?.length) await images.removeUnused(t.images); // ses photos, si rien d'autre ne les utilise
+  if (t.goalId) await syncGoalProgress(t.goalId);
+}
+
+/** Remet une mission supprimée dans les missions. */
+export async function restoreTask(id) {
+  const raw = await rawTrash();
+  const t = raw.find((x) => x.id === id && !x.gone);
+  if (!t) return null;
+  const { deletedAt, trashAt, ...task } = t;
+  if (task.goalId && !(await db.get('goals', task.goalId))) task.goalId = null; // objectif supprimé entre-temps
+  task.updatedAt = Date.now();
+  await db.put('tasks', task);
+  await saveTrash(raw.map((x) => (x.id === id ? { id, gone: 'restored', trashAt: Date.now() } : x)));
+  if (task.goalId) await syncGoalProgress(task.goalId);
+  return task;
+}
+
+/** Supprime définitivement des missions de la corbeille (et leurs photos, si rien d'autre ne les utilise). */
+export async function purgeTasks(ids) {
+  const drop = new Set(ids);
+  const raw = await rawTrash();
+  const imgs = raw.filter((x) => drop.has(x.id) && !x.gone).flatMap((t) => t.images || []);
+  await saveTrash(raw.map((x) => (drop.has(x.id) ? { id: x.id, gone: 'purged', trashAt: Date.now() } : x)));
+  if (imgs.length) await images.removeUnused(imgs);
 }
 
 export async function setTaskDone(id, done) {
@@ -245,7 +283,12 @@ export function bindTaskList(root, redraw) {
         showUndo(`✅ « ${title} » accomplie`, async () => { await setTaskDone(id, false); redraw(); });
       }
     };
-    li.querySelector('.t-del').onclick = async () => { await deleteTask(id); redraw(); };
+    li.querySelector('.t-del').onclick = async () => {
+      const title = li.querySelector('.t-title')?.textContent || 'Mission';
+      await deleteTask(id);
+      redraw();
+      showUndo(`🗑 « ${title} » déplacée dans Supprimées`, async () => { await restoreTask(id); redraw(); }, 5000);
+    };
     li.querySelector('.exp').onclick = () => openTaskEditor(id, redraw);
     // Toucher le titre ouvre la mission ; seule la case la marque accomplie
     const title = li.querySelector('.t-title');

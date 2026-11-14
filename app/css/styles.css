@@ -2224,3 +2224,11 @@ button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0;
 .drag-on { user-select: none; -webkit-user-select: none; }
 .day .t-drag { display: none; } /* vue Semaine : colonnes étroites */
 .task .t-main { cursor: pointer; } .task .t-main .t-cb { cursor: default; }
+/* Missions : onglet « Supprimées » */
+.tr-hint { margin: -4px 0 10px; font-size: 13px; }
+.tr-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.tr-item { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.tr-item:first-child { border-top: 0; }
+.tr-main { flex: 1 1 220px; min-width: 0; display: grid; gap: 2px; }
+.tr-title { font-weight: 550; overflow-wrap: anywhere; color: var(--muted); }
+.tr-item .btn { flex: none; margin: 0; }
