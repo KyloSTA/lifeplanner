@@ -2236,3 +2236,10 @@ button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0;
 .nc-price { justify-self: start; margin-top: -2px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums;
   background: var(--gold-soft, var(--surface-2)); color: var(--gold-text, var(--accent)); border: 1px solid var(--gold-border, transparent); width: max-content; }
 .na-price { margin-left: 8px; font-size: 15px; color: var(--gold-text, var(--accent)); font-variant-numeric: tabular-nums; }
+/* Actualités : Google Actualités sans photo -> logo du journal */
+.nw-img.nw-logo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-decoration: none; min-height: 150px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--gold, #c9a24a) 14%, var(--surface-2)), var(--surface-2)); }
+.nw-img.nw-logo img { width: 56px !important; height: 56px !important; object-fit: contain !important; border-radius: 12px; background: #fff; padding: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.12); aspect-ratio: auto !important; }
+.nw-img.nw-logo span { font-weight: 700; font-size: 14px; color: var(--muted); text-align: center; padding: 0 12px; }
+.nw-top .nw-img.nw-logo { min-height: 200px; }
+.nw-img.nw-logo img.sm { width: 36px !important; height: 36px !important; padding: 8px; image-rendering: auto; }
