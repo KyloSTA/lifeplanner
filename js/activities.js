@@ -152,8 +152,8 @@ export async function renderPage(ctx, hooks) {
     <header class="page-head">
       <div><p class="eyebrow">Planificateur</p><h1>Activités autour de toi</h1></div>
       <div class="head-actions">${hooks.tabs}
-        <button class="btn" id="act-cfg" title="Lieu, rayon et Ticketmaster">⚙ Réglages</button>
-        <button class="btn" id="act-ref" title="Actualiser">↻</button>
+        <span class="pl-nav act-tools"><button class="btn" id="act-cfg" title="Lieu, rayon et Ticketmaster">⚙ Réglages</button>
+        <button class="btn icon" id="act-ref" title="Actualiser" aria-label="Actualiser">↻</button></span>
       </div>
     </header>
     <div class="act-bar">
