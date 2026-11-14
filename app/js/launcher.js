@@ -13,6 +13,10 @@ export const DEFAULTS = [
   { id: 'messenger', name: 'Messenger', icon: '💬', color: '#7b5cff', mode: 'window', url: 'https://www.messenger.com' },
   { id: 'gmail', name: 'Gmail', icon: 'M', color: '#ffffff', mode: 'window', url: 'https://mail.google.com/mail/u/0/' },
   { id: 'amazon', name: 'Amazon', icon: 'a', color: '#232f3e', mode: 'window', url: 'https://www.amazon.ca' },
+  // Stremio : app Windows (lien stremio://) ; 🌐 ouvre la version web
+  { id: 'stremio', name: 'Stremio', icon: 'S', color: '#2b1b5a', mode: 'app', app: 'stremio://', url: 'https://web.stremio.com' },
+  // Google Play Livres : installée depuis Edge, nommée « Livres » dans le menu Démarrer (mode App Windows)
+  { id: 'playbooks', name: 'Play Livres', appName: 'Livres', icon: 'L', color: '#ffffff', mode: 'pc', url: 'https://play.google.com/books' },
   { id: 'spotify', name: 'Spotify', icon: '♫', color: '#1db954', mode: 'app', app: 'spotify:', url: 'https://open.spotify.com' },
 ];
 
@@ -33,6 +37,13 @@ const ICONS = {
   nhl: svg('<path d="M12 2.6c2.6 1.4 5.4 1.6 8 .9.3 6.8-1.9 13.9-8 17.9-6.1-4-8.3-11.1-8-17.9 2.6.7 5.4.5 8-.9z" fill="#fff"/>'
     + '<path d="M12 4.2c2.2 1.1 4.5 1.3 6.6.8 0 5.8-1.9 11.8-6.6 15.2-4.7-3.4-6.6-9.4-6.6-15.2 2.1.5 4.4.3 6.6-.8z" fill="#0b0b0b"/>'
     + '<text x="12" y="13.6" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="6.2" fill="#fff" letter-spacing="-.2">NHL</text>'),
+  // Stremio : losange arrondi blanc et triangle « lecture » violet, sur fond violet foncé
+  stremio: svg('<defs><linearGradient id="lpStrem" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8a5cf6"/><stop offset="1" stop-color="#5b2fc7"/></linearGradient></defs>'
+    + '<rect x="5.2" y="5.2" width="13.6" height="13.6" rx="3" transform="rotate(45 12 12)" fill="url(#lpStrem)"/>'
+    + '<path d="M10.2 8.8v6.4l5.2-3.2z" fill="#fff"/>'),
+  // Google Play Livres : marque-page bleu en forme de triangle « Play »
+  playbooks: svg('<path d="M6 3.5h9.2c.6 0 1 .2 1.4.6l3.4 3.4c.4.4.6.8.6 1.4V19c0 .8-.7 1.5-1.5 1.5H6c-.8 0-1.5-.7-1.5-1.5V5c0-.8.7-1.5 1.5-1.5z" fill="#4285f4"/>'
+    + '<path d="M9 7.6v8.8l7.4-4.4z" fill="#fff"/><path d="M15.2 3.5v3.7c0 .6.5 1.1 1.1 1.1H20" fill="#a1c2fa"/>'),
   amazon: svg('<text x="12" y="13.2" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="12.5" fill="#fff">a</text>'
     + '<path d="M4.8 15.6c4.3 2.7 10.1 2.7 14 .1" fill="none" stroke="#ff9900" stroke-width="1.9" stroke-linecap="round"/><path d="M16.6 14.6l2.4.9-.5 2.4" fill="none" stroke="#ff9900" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
   edge: svg('<path d="M20.4 15.6c-1.6 3-4.8 4.9-8.3 4.9-4.9 0-8.6-3.7-8.6-8.3 0-4.9 4-8.7 8.8-8.7 4.6 0 8.2 3.1 8.2 7 0 2.6-2 4.3-4.6 4.3-1.6 0-2.7-.6-2.7-1.4 0-.4.4-.8.4-1.6 0-1.8-1.6-3.2-3.8-3.2-2.6 0-4.3 2.2-4.3 4.7" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>'),
@@ -42,7 +53,7 @@ const ICONS = {
 // Sites reconnus par leur adresse (raccourcis ajoutés à la main) : icône et couleur de l'app
 const BY_HOST = [[/(^|\.)nhl\.com$/, 'nhl', '#0b0b0b'], [/(^|\.)amazon\./, 'amazon', '#232f3e'], [/(^|\.)youtube\.com$/, 'youtube', '#e62117'],
   [/(^|\.)reddit\.com$/, 'reddit', '#ff4500'], [/(^|\.)facebook\.com$/, 'facebook', '#1877f2'], [/(^|\.)messenger\.com$/, 'messenger', '#7b5cff'],
-  [/^mail\.google\.com$/, 'gmail', '#ffffff'], [/spotify\.com$/, 'spotify', '#1db954']];
+  [/^mail\.google\.com$/, 'gmail', '#ffffff'], [/spotify\.com$/, 'spotify', '#1db954'], [/stremio\.com$/, 'stremio', '#2b1b5a'], [/^play\.google\.com$/, 'playbooks', '#ffffff']];
 function known(it) {
   if (ICONS[it.id]) return null;
   let host = '';
@@ -67,7 +78,8 @@ export async function list() {
   if (!saved) return DEFAULTS;
   // Une seule fois par app : ajoute les nouvelles apps (Gmail, Amazon) à une liste déjà personnalisée, avant Spotify.
   // Si tu les retires ensuite, elles ne reviennent pas.
-  for (const [id, flag, re] of [['gmail', 'launcherGmail', /mail\.google\.com/], ['amazon', 'launcherAmazon', /amazon\./]]) {
+  for (const [id, flag, re] of [['gmail', 'launcherGmail', /mail\.google\.com/], ['amazon', 'launcherAmazon', /amazon\./],
+    ['stremio', 'launcherStremio', /stremio/], ['playbooks', 'launcherPlayBooks', /play\.google\.com\/(store\/)?books/]]) {
     if (await db.get('settings', flag)) continue;
     if (!saved.some((x) => x.id === id || re.test(x.url || ''))) {
       const at = saved.findIndex((x) => x.id === 'spotify');

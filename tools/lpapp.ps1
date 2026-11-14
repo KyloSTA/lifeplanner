@@ -10,4 +10,7 @@ if ($name -notmatch "^[\p{L}\p{N} ._&'+()-]{1,60}$") { exit 1 }
 $apps = Get-StartApps
 $app = $apps | Where-Object { $_.Name -eq $name } | Select-Object -First 1
 if (-not $app) { $app = $apps | Where-Object { $_.Name -like "*$name*" } | Select-Object -First 1 }
-if ($app) { Start-Process "shell:AppsFolder\$($app.AppID)" } else { exit 2 }
+if (-not $app) { exit 2 }
+# Programme classique (AppID = chemin d'un .exe) : on le lance directement ; sinon app du Store ou installée depuis Edge
+if ($app.AppID -match '^[A-Za-z]:\\.+\.exe$' -and (Test-Path $app.AppID)) { Start-Process -FilePath $app.AppID }
+else { Start-Process "shell:AppsFolder\$($app.AppID)" }
