@@ -980,7 +980,6 @@ async function renderHero() {
         </div>
       </section>
       <div class="hero-right">
-        <a class="card rpg-banner" id="hero-rpg" href="#/quest"></a>
         <section class="hero-habits" id="hero-habits"></section>
         <details class="card hero-fold evo-fold">
           <summary><h2>🧠 Évolution du savoir</h2><span class="muted">${evoLine(s)}</span></summary>
@@ -1010,12 +1009,6 @@ async function renderHero() {
       </div>
     </div>`;
 
-  // Aventure (RPG) : énergie, or, coffres à ouvrir
-  rpg.summary().then((r) => {
-    const el = $('#hero-rpg');
-    if (el) el.innerHTML = `<span class="rpg-banner-ico">⚔️</span><span class="rpg-banner-txt"><b>Aventure · ${esc(r.where)}</b><small>Tes habitudes et missions rendent ton héros plus fort. Combats, équipement et coffres.</small></span>
-      <span class="rpg-banner-res"><span class="rpg-pill">⚡ ${r.energy}</span><span class="rpg-pill">🪙 ${r.gold}</span>${r.chests ? `<span class="rpg-pill hot">🎁 ${r.chests}</span>` : ''}</span>`;
-  });
   // Habitudes : suivi et rappels, directement dans la page du héros
   await habits.renderPage({ ...pageCtx(), view: $('#hero-habits'), embedded: true });
 
