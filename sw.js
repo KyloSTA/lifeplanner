@@ -1,6 +1,6 @@
 // Service worker : permet à l'app installée de fonctionner hors ligne
 // (même quand le petit serveur local n'est pas lancé).
-const CACHE = 'lifeplanner-v97';
+const CACHE = 'lifeplanner-v98';
 const ASSETS = [
   './', 'index.html', 'widget.html', 'css/styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js', 'js/habits.js', 'js/rbq.js', 'js/workout.js', 'js/images.js', 'js/missions.js', 'js/docs.js', 'js/assoc.js', 'js/news.js', 'js/reminders.js', 'js/rpg.js', 'js/rpg-data.js', 'js/habs.js', 'js/finance.js', 'js/usage.js', 'js/activities.js',
