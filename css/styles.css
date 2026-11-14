@@ -2232,3 +2232,7 @@ button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0;
 .tr-main { flex: 1 1 220px; min-width: 0; display: grid; gap: 2px; }
 .tr-title { font-weight: 550; overflow-wrap: anywhere; color: var(--muted); }
 .tr-item .btn { flex: none; margin: 0; }
+/* Cerveau : prix d'un article Amazon sous sa miniature */
+.nc-price { justify-self: start; margin-top: -2px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums;
+  background: var(--gold-soft, var(--surface-2)); color: var(--gold-text, var(--accent)); border: 1px solid var(--gold-border, transparent); width: max-content; }
+.na-price { margin-left: 8px; font-size: 15px; color: var(--gold-text, var(--accent)); font-variant-numeric: tabular-nums; }

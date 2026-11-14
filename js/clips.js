@@ -73,12 +73,12 @@ export async function saveClip(raw) {
   if (existing) {
     existing.body = body;
     if (existing.archived) existing.archived = false;
-    if (c.img) existing.source = { ...existing.source, img: c.img }; // réenregistrer un post ajoute son image
+    if (c.img || c.price) existing.source = { ...existing.source, ...(c.img ? { img: c.img } : {}), ...(c.price ? { price: c.price } : {}) }; // réenregistrer met à jour l'image et le prix
     await brain.saveNote(existing);
     return { note: existing, updated: true, kind };
   }
   const n = await brain.createNote({ title, body, type: 'ressource' });
-  n.source = { kind, url: c.url, ...(c.img ? { img: c.img } : {}) };
+  n.source = { kind, url: c.url, ...(c.img ? { img: c.img } : {}), ...(c.price ? { price: c.price } : {}) };
   await brain.saveNote(n, { touch: false });
   return { note: n, updated: false, kind };
 }
