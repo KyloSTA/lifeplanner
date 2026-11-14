@@ -2079,3 +2079,26 @@ h2 { font-weight: 600; }
 .pl-nav { display: inline-flex; align-items: center; gap: 6px; flex: none; }
 .page-head:has(.planner-tabs) .pl-nav { margin-left: auto; }
 @media (max-width: 700px) { .page-head:has(.planner-tabs) .pl-nav { margin-left: 0; } }
+/* Planificateur : vue Jour */
+.dayv { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
+.dayv-side { display: grid; gap: 16px; }
+.dayv-allday { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; }
+.dayv-grid { position: relative; min-height: 200px; }
+.dayv-slot { position: absolute; left: 0; right: 0; height: 48px; border: 0; border-top: 1px solid var(--border); background: none; padding: 0; text-align: left; cursor: copy; min-height: 0; }
+.dayv-slot span { position: absolute; top: -8px; left: 0; width: 48px; padding-right: 4px; font-size: 11px; color: var(--muted); background: var(--surface); font-variant-numeric: tabular-nums; }
+.dayv-slot:hover { background: color-mix(in srgb, var(--gold, var(--accent)) 6%, transparent); }
+.dayv-ev { position: absolute; display: flex; flex-direction: column; align-items: stretch; gap: 1px; padding: 4px 8px; overflow: hidden; z-index: 2; box-sizing: border-box; }
+.dayv-ev .ev-title { font-size: 13px; line-height: 1.25; }
+.dayv-ev .ev-time { min-width: 0; font-size: 11px; }
+.dayv-ev.short { flex-direction: row; gap: 6px; align-items: center; padding-block: 1px; }
+.dayv-ev.short .ev-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dayv-alarm { position: absolute; right: 4px; z-index: 3; height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  background: var(--gold-soft, var(--surface-2)); color: var(--gold-text, var(--accent)); border: 1px solid var(--gold-border, var(--border)); text-decoration: none; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dayv-now { position: absolute; left: 50px; right: 0; height: 2px; background: var(--burgundy, var(--danger)); z-index: 4; pointer-events: none; }
+.dayv-now::before { content: ''; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: inherit; }
+.dayv-j { display: flex; gap: 12px; align-items: center; color: var(--text); text-decoration: none; }
+.dayv-j:hover { border-color: var(--gold-border, var(--accent)); }
+.dayv-j-ico { font-size: 26px; }
+@media (max-width: 900px) { .dayv { grid-template-columns: 1fr; } .dayv-side { order: -1; } }
+.dayv-ev.short .ev-time { white-space: nowrap; flex: none; } .dayv-ev.short .ev-title { flex: 0 1 auto; min-width: 0; }
+.dayv-cal .card-head .btn { min-height: 32px; padding: 0 12px; font-size: 13px; flex: none; }
