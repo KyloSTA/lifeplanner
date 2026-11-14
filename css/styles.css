@@ -2102,3 +2102,8 @@ h2 { font-weight: 600; }
 @media (max-width: 900px) { .dayv { grid-template-columns: 1fr; } .dayv-side { order: -1; } }
 .dayv-ev.short .ev-time { white-space: nowrap; flex: none; } .dayv-ev.short .ev-title { flex: 0 1 auto; min-width: 0; }
 .dayv-cal .card-head .btn { min-height: 32px; padding: 0 12px; font-size: 13px; flex: none; }
+/* Lanceur : icônes des apps (dessinées ou favicon du site) */
+.lt-ico, .lp-ico { position: relative; overflow: hidden; }
+.lt-ico svg, .lp-ico svg { width: 66%; height: 66%; display: block; }
+.ico-fav { position: absolute; inset: 20%; width: 60%; height: 60%; object-fit: contain; }
+.lt-ico:has(.ico-fav), .lp-ico:has(.ico-fav) { background: #fff; color: transparent; } /* icône du site sur fond blanc (lisible) */
