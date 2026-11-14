@@ -81,6 +81,7 @@ export async function removeUnused(ids) {
   const used = new Set([
     ...(await db.all('notes')).flatMap((n) => refsIn(n.body)),
     ...(await db.all('ink')).flatMap((p) => (p.images || []).map((m) => m.id)), // images des pages du Carnet
+    ...(await db.all('tasks')).flatMap((t) => t.images || []), // photos des missions
   ]);
   for (const id of ids) if (!used.has(id)) { await db.del('files', id); cache.delete(id); }
 }
