@@ -7,7 +7,7 @@ import { db, syncDb, onLocalChange } from './db.js';
 import * as gcal from './gcal.js';
 
 const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'notes', 'xp', 'settings', 'habits', 'study', 'workouts', 'files', 'money'];
-const LOCAL_ONLY = new Set(['anthropicKey', 'clientId', 'xpInit']); // réglages propres à cet appareil
+const LOCAL_ONLY = new Set(['anthropicKey', 'clientId', 'xpInit', 'ticketmasterKey']); // réglages propres à cet appareil
 const MERGED = { lastLevel: 'max', lastEvo: 'max', badges: 'union' }; // réglages fusionnés plutôt que remplacés
 const FILE = (s) => `lp-${s}.json`;
 const DRIVE = 'https://www.googleapis.com/drive/v3';

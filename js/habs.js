@@ -48,6 +48,7 @@ async function fetchAll() {
   });
   const past = games.filter((g) => g.done);
   const next = games.filter((g) => !g.done).slice(0, 3);
+  const upcoming = games.filter((g) => !g.done).slice(0, 25).map(({ date, home, op, link, tv }) => ({ date, home, op, link, tv })); // pour l'onglet Activités
 
   // Classement : division Atlantique (et rang dans l'Est)
   const stat = (e, n) => e.stats.find((s) => s.name === n);
@@ -92,7 +93,7 @@ async function fetchAll() {
     at: Date.now(),
     record: sched.team?.recordSummary || '',
     season: sched.requestedSeason?.displayName || '',
-    past: past.slice(-5).reverse(), next, division, confRank, confName,
+    past: past.slice(-5).reverse(), next, upcoming, division, confRank, confName,
     tstat, skaters: skaters.map(withName), goalies: goalies.map(withName),
   };
 }
