@@ -86,6 +86,27 @@ export async function removeUnused(ids) {
   for (const id of ids) if (!used.has(id)) { await db.del('files', id); cache.delete(id); }
 }
 
+/** Photos d'une mission en plein écran : ‹ › (ou flèches du clavier) pour passer de l'une à l'autre, clic à côté ou Échap pour fermer. */
+export async function gallery(ids, start = 0) {
+  const srcs = (await Promise.all(ids.map(url))).filter(Boolean);
+  if (!srcs.length) return false;
+  if (srcs.length === 1) { zoom(srcs[0]); return true; }
+  let i = Math.min(start, srcs.length - 1);
+  const d = document.createElement('div');
+  d.className = 'img-zoom img-gallery';
+  d.innerHTML = `<img alt=""><button type="button" class="ig-nav ig-prev" aria-label="Photo précédente">‹</button>
+    <button type="button" class="ig-nav ig-next" aria-label="Photo suivante">›</button><span class="ig-count"></span>`;
+  const show = () => { d.querySelector('img').src = srcs[i]; d.querySelector('.ig-count').textContent = `${i + 1} / ${srcs.length}`; };
+  const go = (k) => { i = (i + k + srcs.length) % srcs.length; show(); };
+  const close = () => { d.remove(); removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1); };
+  d.onclick = (e) => { if (e.target.closest('.ig-prev')) go(-1); else if (e.target.closest('.ig-next')) go(1); else if (e.target.tagName !== 'IMG') close(); };
+  addEventListener('keydown', onKey);
+  show();
+  document.body.appendChild(d);
+  return true;
+}
+
 /** Agrandit une image en plein écran (clic pour fermer). */
 export function zoom(src) {
   const d = document.createElement('div');
