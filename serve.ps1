@@ -23,7 +23,7 @@ while ($listener.IsListening) {
   $res = $ctx.Response
   try {
     $path = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath)
-    if ($path -eq '/') { $path = '/index.html' }
+    if ($path.EndsWith('/')) { $path += 'index.html' } # dossier -> sa page (ex. /couple/)
     $file = [IO.Path]::GetFullPath((Join-Path $appDir $path.TrimStart('/')))
     if (-not $file.StartsWith($appDir) -or -not (Test-Path -LiteralPath $file -PathType Leaf)) {
       $res.StatusCode = 404

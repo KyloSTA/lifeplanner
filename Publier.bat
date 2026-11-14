@@ -4,6 +4,8 @@ REM - branche main : tout le projet ; branche gh-pages : seulement le dossier ap
 cd /d "%~dp0"
 set "PATH=%PATH%;C:\Program Files\Git\cmd"
 where git >nul 2>nul || (echo Git n'est pas installe. & pause & exit /b 1)
+REM Regenere la page de l'app couple (app\couple\index.html) a partir de app\index.html
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\make-couple.ps1"
 git add -A
 git commit -m "Mise a jour de Life Planner" >nul 2>nul
 git push origin main

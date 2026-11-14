@@ -1,3 +1,4 @@
+import { APP } from './config.js';
 import { db, STORES, onDbChange } from './db.js';
 import * as U from './util.js';
 import * as gcal from './gcal.js';
@@ -26,6 +27,7 @@ import * as usage from './usage.js';
 import * as activities from './activities.js';
 import * as reminders from './reminders.js';
 import * as rpg from './rpg.js';
+import * as couple from './couple.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -874,7 +876,7 @@ async function focusLine() {
 /* ---------- Logo personnel (menu + onglet du navigateur) ---------- */
 const LOGO_COLORS = ['#7a1e2c', '#0a0909', '#c9a24a', '#0f3d2e', '#4f46e5', '#0ea5e9', '#0c8484', '#16a34a', '#ca8a04', '#f97316', '#e11d48', '#a855f7', '#1d1d1f'];
 async function getLogo() {
-  return { mode: 'avatar', text: '', color: '#7a1e2c', emoji: '🦁', title: 'Life Planner', ...((await db.get('settings', 'logo')) || {}) };
+  return { mode: APP.couple ? 'app' : 'avatar', text: '', color: '#7a1e2c', emoji: '🦁', title: APP.name, ...((await db.get('settings', 'logo')) || {}) };
 }
 const initialsOf = (name) => (name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'LP';
 function shade(hex, k) { // assombrit une couleur #rrggbb (k < 0) ou l'éclaircit (k > 0)
@@ -908,8 +910,8 @@ async function applyLogo(s) {
   const el = $('#brand-logo');
   if (el) el.innerHTML = logoSVG(cfg, av, 34);
   const name = $('.brand-main > span');
-  if (name) name.textContent = cfg.title || 'Life Planner';
-  document.title = cfg.title || 'Life Planner';
+  if (name) name.textContent = cfg.title || APP.name;
+  document.title = cfg.title || APP.name;
   // Icône de l'onglet du navigateur
   if (cfg.mode !== 'app') {
     const svg = logoSVG(cfg, av, 64);
@@ -3175,9 +3177,12 @@ async function renderSettings() {
   const connected = gcal.isConnected();
   const aKey = await db.get('settings', 'anthropicKey');
   const aModel = (await db.get('settings', 'assistantModel')) || assistant.DEFAULT_MODEL;
+  if (couple.ON) await couple.people();
   view.innerHTML = `
     <header class="page-head"><div><p class="eyebrow">Configuration</p><h1>Réglages</h1></div></header>
     <div class="settings">
+      ${couple.ON ? `<section class="card" id="cp-card"><div class="card-head"><h2>👫 Vous deux</h2><button class="btn" id="cp-edit" type="button">Modifier</button></div>
+        <p class="muted" style="margin:0">${esc(couple.nameOf('a'))} et ${esc(couple.nameOf('b'))} · sur cet appareil : <b>${couple.me() ? esc(couple.nameOf(couple.me())) : 'à choisir'}</b>. Les deux utilisez le même compte Google : connectez-vous avec lui dans Synchronisation et Google Agenda.</p></section>` : ''}
       <section class="card">
         <div class="card-head"><h2>Google Agenda</h2>${connected ? '<span class="sync live">Connecté</span>' : ''}</div>
         <p class="muted" style="margin-top:0">Une seule fois : crée ton propre identifiant Google (gratuit, ~5 minutes).</p>
@@ -3352,7 +3357,7 @@ async function renderSettings() {
     el.innerHTML = `<div class="card-head"><h2>🎨 Mon logo</h2><span class="muted">Menu et onglet du navigateur · un clic sur le logo ouvre Aujourd’hui</span></div>
       <div class="logo-modes">${modes.map(([m, l]) => `<button type="button" class="logo-opt ${cfg.mode === m ? 'on' : ''}" data-lmode="${m}">${logoSVG({ ...cfg, mode: m }, av, 52)}<span>${l}</span></button>`).join('')}</div>
       <div class="logo-fields">
-        <label>Nom affiché<input id="lg-title" value="${esc(cfg.title)}" maxlength="24" placeholder="Life Planner" autocomplete="off"></label>
+        <label>Nom affiché<input id="lg-title" value="${esc(cfg.title)}" maxlength="24" placeholder="${esc(APP.name)}" autocomplete="off"></label>
         ${cfg.mode === 'mono' ? `<label>Initiales<input id="lg-text" value="${esc(cfg.text || initialsOf(av.name))}" maxlength="3" autocomplete="off" style="text-transform:uppercase"></label>` : ''}
         ${cfg.mode === 'emoji' ? `<label>Emoji<input id="lg-emoji" value="${esc(cfg.emoji)}" maxlength="4" autocomplete="off"></label>` : ''}
       </div>
@@ -3368,7 +3373,7 @@ async function renderSettings() {
     $$('[data-lcol]', el).forEach((b) => (b.onclick = () => set({ color: b.dataset.lcol })));
     $('#lg-color', el)?.addEventListener('change', (e) => set({ color: e.target.value }));
     const deb = U.debounce((patch) => set(patch, false), 400);
-    $('#lg-title', el).oninput = (e) => deb({ title: e.target.value.trim() || 'Life Planner' });
+    $('#lg-title', el).oninput = (e) => deb({ title: e.target.value.trim() || APP.name });
     $('#lg-text', el)?.addEventListener('input', (e) => deb({ text: e.target.value.trim().toUpperCase() }));
     $('#lg-emoji', el)?.addEventListener('input', (e) => { if (e.target.value.trim()) deb({ emoji: e.target.value.trim() }); });
   };
@@ -3401,13 +3406,13 @@ async function renderSettings() {
 
   // Sauvegarde
   $('#exp').onclick = async () => {
-    const data = { app: 'lifeplanner', version: 1, exportedAt: new Date().toISOString(), stores: {} };
+    const data = { app: APP.id, version: 1, exportedAt: new Date().toISOString(), stores: {} };
     for (const s of STORES) if (s !== 'cache') data.stores[s] = await db.entries(s);
     data.stores.settings = data.stores.settings.filter(([k]) => k !== 'anthropicKey'); // la clé API ne sort jamais de l'appareil
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `lifeplanner-sauvegarde-${iso(new Date())}.json`;
+    a.download = `${APP.id}-sauvegarde-${iso(new Date())}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 3000);
   };
@@ -3416,7 +3421,7 @@ async function renderSettings() {
     if (!file) return;
     try {
       const data = JSON.parse(await file.text());
-      if (data.app !== 'lifeplanner') throw new Error('Fichier non reconnu');
+      if (![APP.id, 'lifeplanner'].includes(data.app)) throw new Error('Fichier non reconnu');
       if (!(await confirmBox('Remplacer toutes les données actuelles par cette sauvegarde ?', 'Restaurer'))) return;
       const keepKey = await db.get('settings', 'anthropicKey');
       for (const [s, rows] of Object.entries(data.stores)) {
@@ -3703,6 +3708,9 @@ game.init().catch(console.error).finally(async () => {
   usage.start().catch(console.error);
   // Finances : rappel hebdomadaire (après la synchro, pour ne le créer qu'une fois) et import auto du dossier surveillé
   sync.firstSync().then(() => finance.checkReminder()).catch(console.error);
+  // App couple : prénoms des deux et « qui utilise cet appareil » au premier lancement
+  if (couple.ON) couple.setup(modal, { onDone: () => router() }).catch(console.error);
+  if (couple.ON) document.addEventListener('click', (e) => { if (e.target.closest('#cp-edit')) couple.setup(modal, { force: true, onDone: () => router() }); });
   finance.autoImport().then((r) => { if (r?.added) toast(`📁 ${r.files} relevé${r.files > 1 ? 's' : ''} importé${r.files > 1 ? 's' : ''} · ${r.added} nouvelle${r.added > 1 ? 's' : ''} transaction${r.added > 1 ? 's' : ''}`); }).catch(() => {});
   timer.mount();
   // Synchro : des changements arrivent d'un autre appareil -> on rafraîchit la vue (sauf pendant une saisie)
@@ -3728,8 +3736,9 @@ game.init().catch(console.error).finally(async () => {
     if (route === 'today') refreshToday();
     else if ((route === 'habits' || route === 'hero') && !$('#modal-root').children.length) router();
   });
-  // Posts Reddit et vidéos YouTube sauvegardés avec le bouton « 🧠 Cerveau » (extension extension-edge)
-  clips.start((note, updated, kind) => {
+  // Posts Reddit et vidéos YouTube sauvegardés avec le bouton « 🧠 Cerveau » (extension extension-edge).
+  // L'app couple ne les reçoit pas : ils vont dans le Cerveau de Life Planner (ou attendent son ouverture).
+  if (!APP.couple) clips.start((note, updated, kind) => {
     refreshRail();
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
     if (route === 'brain' && !$('#modal-root').children.length) router();

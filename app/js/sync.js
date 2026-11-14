@@ -5,11 +5,13 @@
 
 import { db, syncDb, onLocalChange } from './db.js';
 import * as gcal from './gcal.js';
+import { APP } from './config.js';
 
 const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'notes', 'xp', 'settings', 'habits', 'study', 'workouts', 'files', 'money'];
 const LOCAL_ONLY = new Set(['anthropicKey', 'clientId', 'xpInit', 'ticketmasterKey']); // réglages propres à cet appareil
 const MERGED = { lastLevel: 'max', lastEvo: 'max', badges: 'union', taskTrash: 'byId' }; // réglages fusionnés plutôt que remplacés
-const FILE = (s) => `lp-${s}.json`;
+const P = APP.filePrefix; // « lp- » (Life Planner) ou « cp- » (app couple) : chaque édition a ses fichiers
+const FILE = (s) => `${P}${s}.json`;
 const DRIVE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const LS = 'lp.sync';
@@ -54,7 +56,7 @@ async function drive(url, opts = {}) {
 
 async function listFiles() {
   // Seulement les fichiers de données (pas les documents joints « lp-blob-… », envoyés à part)
-  const q = new URLSearchParams({ spaces: 'appDataFolder', q: "not name contains 'lp-blob-'", fields: 'files(id,name,modifiedTime)', pageSize: '100' });
+  const q = new URLSearchParams({ spaces: 'appDataFolder', q: `not name contains '${P}blob-'`, fields: 'files(id,name,modifiedTime)', pageSize: '100' });
   const d = await (await drive(`${DRIVE}/files?${q}`)).json();
   return Object.fromEntries((d.files || []).map((f) => [f.name, f]));
 }
@@ -149,7 +151,7 @@ async function syncDocs() {
     const blob = await db.get('blobs', m.id);
     if (!blob) continue; // document ajouté sur un autre appareil, pas encore envoyé
     const b = 'lp' + Math.random().toString(36).slice(2);
-    const meta = JSON.stringify({ name: 'lp-blob-' + m.id, parents: ['appDataFolder'] });
+    const meta = JSON.stringify({ name: P + 'blob-' + m.id, parents: ['appDataFolder'] });
     const body = new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${b}\r\nContent-Type: ${m.mime || 'application/octet-stream'}\r\n\r\n`, blob, `\r\n--${b}--`]);
     const f = await (await drive(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
       method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${b}` }, body,

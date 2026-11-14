@@ -6,6 +6,7 @@ import * as game from './game.js';
 import * as alarms from './alarms.js';
 import * as timer from './timer.js';
 import * as images from './images.js';
+import * as couple from './couple.js';
 
 const { esc } = U;
 
@@ -16,6 +17,7 @@ let projectsCache = []; // notes « 🚀 Projet » du Cerveau (une mission peut 
 export async function loadGoals() {
   goalsCache = (await db.all('goals')).sort((a, b) => (a.order ?? a.createdAt) - (b.order ?? b.createdAt));
   projectsCache = (await db.all('notes')).filter((n) => n.type === 'projet').sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  if (couple.ON) await couple.people(); // prénoms pour les pastilles « pour qui »
   return goalsCache;
 }
 
@@ -185,6 +187,7 @@ export function taskHTML(t, ref, opts = {}) {
   const alarmChip = t.alarmAt && !t.done
     ? `<span class="chip alarm-chip ${t.alarmState === 'ringing' ? 'ringing' : ''}" title="Alarme">⏰ ${esc(alarms.label(t.alarmAt))}</span>` : '';
   const chips = [
+    couple.whoChip(t), // app couple : pour qui
     focusChip,
     alarmChip,
     // Pastilles cliquables : le projet ouvre sa page ; l'objectif ouvre son projet (sinon la page Objectifs)
@@ -381,6 +384,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
         <label><span>📅 Date</span><input type="date" class="tm-date" value="${t.date || ''}"></label>
         <label><span>🎯 Objectif</span><select class="tm-goal">${goalOptions(t.goalId)}</select></label>
         <label><span>🚀 Projet</span><select class="tm-proj">${projectOptions(t.projectId)}</select></label>
+        ${couple.ON ? `<label><span>👤 Pour</span><select class="tm-who">${couple.whoOptions(t.who || '')}</select></label>` : ''}
       </div>
       <section class="tm-sec tm-focus">
         <h3>⏱ Minuteur de focus ${t.focusMin ? `<span class="muted">${t.pomodoros ? `🍅 ${t.pomodoros} · ` : ''}${t.focusMin} min de focus</span>` : ''}</h3>
@@ -445,6 +449,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
     box.querySelector('.tm-date').onchange = async (e) => { await editTask(id, (x) => { x.date = e.target.value || null; }); changed(); };
     box.querySelector('.tm-goal').onchange = async (e) => { await setTaskGoal(id, e.target.value || null); changed(); };
     box.querySelector('.tm-proj').onchange = async (e) => { await setTaskProject(id, e.target.value || null); changed(); };
+    box.querySelector('.tm-who')?.addEventListener('change', async (e) => { await editTask(id, (x) => { x.who = e.target.value || null; }); changed(); });
 
     // Minuteur de focus : démarre et ferme la fenêtre
     const startFocus = async (w, b) => {

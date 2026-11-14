@@ -1,4 +1,4 @@
-# Ouvre une application Windows par son nom dans le menu Démarrer (ex. « NHL »), à partir d'un lien
+﻿# Ouvre une application Windows par son nom dans le menu Démarrer (ex. « NHL »), à partir d'un lien
 # « lpapp:NHL » cliqué dans le Lanceur de Life Planner. Fonctionne pour les apps installées depuis Edge
 # (sites installés comme application) et pour les apps du Microsoft Store.
 # Sécurité : n'ouvre qu'une app du menu Démarrer, sans arguments ; le nom est vérifié.
