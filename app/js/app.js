@@ -2093,9 +2093,9 @@ async function renderMonth(arg) {
       <div class="head-actions">
         ${plannerTabs('month', first)}
         <span id="sync"></span>
-        <a class="btn icon" href="#/month/${ym(prev)}" aria-label="Mois précédent">‹</a>
+        <span class="pl-nav"><a class="btn icon" href="#/month/${ym(prev)}" aria-label="Mois précédent">‹</a>
         <a class="btn" href="#/month">Ce mois-ci</a>
-        <a class="btn icon" href="#/month/${ym(next)}" aria-label="Mois suivant">›</a>
+        <a class="btn icon" href="#/month/${ym(next)}" aria-label="Mois suivant">›</a></span>
       </div>
     </header>
     <div class="month-layout">
@@ -2157,9 +2157,9 @@ async function renderYear(arg) {
       <div><p class="eyebrow">Planificateur</p><h1>${y}</h1></div>
       <div class="head-actions">
         ${plannerTabs('year', y === new Date().getFullYear() ? new Date() : new Date(y, 0, 1))}
-        <a class="btn icon" href="#/year/${y - 1}" aria-label="Année précédente">‹</a>
+        <span class="pl-nav"><a class="btn icon" href="#/year/${y - 1}" aria-label="Année précédente">‹</a>
         <a class="btn" href="#/year">Cette année</a>
-        <a class="btn icon" href="#/year/${y + 1}" aria-label="Année suivante">›</a>
+        <a class="btn icon" href="#/year/${y + 1}" aria-label="Année suivante">›</a></span>
       </div>
     </header>
     <div class="year-layout">
@@ -2204,9 +2204,9 @@ async function renderWeek(arg) {
       <div class="head-actions">
         ${plannerTabs('week', start)}
         <span id="sync"></span>
-        <a class="btn icon" href="#/week/${iso(U.addDays(start, -7))}" aria-label="Semaine précédente">‹</a>
+        <span class="pl-nav"><a class="btn icon" href="#/week/${iso(U.addDays(start, -7))}" aria-label="Semaine précédente">‹</a>
         <a class="btn" href="#/week">Cette semaine</a>
-        <a class="btn icon" href="#/week/${iso(end)}" aria-label="Semaine suivante">›</a>
+        <a class="btn icon" href="#/week/${iso(end)}" aria-label="Semaine suivante">›</a></span>
       </div>
     </header>
     <div class="week">${days.map((d) => {
@@ -2275,9 +2275,9 @@ async function renderJournal(date) {
       <div><p class="eyebrow">Planificateur · Journal de bord</p><h1>${cap(U.fmtLong(d))}${d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''}</h1></div>
       <div class="head-actions">
         ${plannerTabs('journal', d)}
-        <a class="btn icon" href="#/journal/${iso(U.addDays(d, -1))}" aria-label="Jour précédent">‹</a>
+        <span class="pl-nav"><a class="btn icon" href="#/journal/${iso(U.addDays(d, -1))}" aria-label="Jour précédent">‹</a>
         <input type="date" id="pick" value="${date}" style="width:auto">
-        <a class="btn icon" href="#/journal/${iso(U.addDays(d, 1))}" aria-label="Jour suivant">›</a>
+        <a class="btn icon" href="#/journal/${iso(U.addDays(d, 1))}" aria-label="Jour suivant">›</a></span>
       </div>
     </header>
     <div class="journal-layout">

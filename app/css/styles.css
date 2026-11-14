@@ -2075,3 +2075,7 @@ h2 { font-weight: 600; }
 .section-tabs { display: flex; width: max-content; max-width: 100%; overflow-x: auto; margin: 0 0 14px; scrollbar-width: none; }
 .section-tabs a { white-space: nowrap; }
 @media (max-width: 700px) { .section-tabs { width: 100%; } .section-tabs a { flex: 1; padding: 0 8px; font-size: 13px; } }
+/* Planificateur : ‹ Cette semaine › restent ensemble, sur la même ligne que les onglets si la place le permet */
+.pl-nav { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.page-head:has(.planner-tabs) .pl-nav { margin-left: auto; }
+@media (max-width: 700px) { .page-head:has(.planner-tabs) .pl-nav { margin-left: 0; } }
