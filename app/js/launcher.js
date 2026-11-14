@@ -10,6 +10,8 @@ export const DEFAULTS = [
   { id: 'youtube', name: 'YouTube', icon: '▶', color: '#e62117', mode: 'window', url: 'https://www.youtube.com' },
   { id: 'reddit', name: 'Reddit', icon: 'r', color: '#ff4500', mode: 'window', url: 'https://www.reddit.com' },
   { id: 'facebook', name: 'Facebook', icon: 'f', color: '#1877f2', mode: 'window', url: 'https://www.facebook.com' },
+  // Événements Facebook autour de toi ; le bouton « 🎟 Activités » de l'extension les envoie dans Activités
+  { id: 'fbevents', name: 'Événements FB', icon: '🎟', color: '#1877f2', mode: 'window', url: 'https://www.facebook.com/events/discover' },
   { id: 'messenger', name: 'Messenger', icon: '💬', color: '#7b5cff', mode: 'window', url: 'https://www.messenger.com' },
   { id: 'gmail', name: 'Gmail', icon: 'M', color: '#ffffff', mode: 'window', url: 'https://mail.google.com/mail/u/0/' },
   { id: 'amazon', name: 'Amazon', icon: 'a', color: '#232f3e', mode: 'window', url: 'https://www.amazon.ca' },
@@ -28,6 +30,10 @@ const ICONS = {
     + '<circle cx="4.8" cy="11.6" r="2" fill="#fff"/><circle cx="19.2" cy="11.6" r="2" fill="#fff"/><ellipse cx="12" cy="14.6" rx="8" ry="5.6" fill="#fff"/>'
     + '<circle cx="9" cy="13.8" r="1.3" fill="#ff4500"/><circle cx="15" cy="13.8" r="1.3" fill="#ff4500"/><path d="M9.2 17c1.7 1.1 3.9 1.1 5.6 0" fill="none" stroke="#ff4500" stroke-width="1.1" stroke-linecap="round"/>'),
   facebook: svg('<path d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.6-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.9 1.4-3.9 4v2.2H8v3h2.6V21z" fill="#fff"/>'),
+  // Événements Facebook : calendrier blanc avec le « f » bleu
+  fbevents: svg('<rect x="4" y="5.5" width="16" height="14.5" rx="2.4" fill="#fff"/><path d="M4 9.5h16" stroke="#1877f2" stroke-width="1.6"/>'
+    + '<path d="M8.2 3.6v3.6M15.8 3.6v3.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>'
+    + '<path d="M12.9 18.4v-3.9h1.4l.2-1.6h-1.6v-1c0-.5.2-.8.9-.8h.8V9.7c-.2 0-.7-.1-1.2-.1-1.2 0-2.1.7-2.1 2.1v1.2H9.9v1.6h1.4v3.9z" fill="#1877f2"/>'),
   messenger: svg('<path d="M12 3C7 3 3 6.7 3 11.3c0 2.6 1.3 4.9 3.3 6.4V21l3-1.7c.8.2 1.7.3 2.7.3 5 0 9-3.7 9-8.3S17 3 12 3z" fill="#fff"/><path d="M6.6 13.9l3.7-3.9 2 1.9 3.9-1.9-3.7 3.9-2-1.9z" fill="#7b5cff"/>'),
   gmail: svg('<path d="M3.5 8v10.4c0 .9.7 1.6 1.6 1.6H7.6V11z" fill="#4285f4"/><path d="M16.4 11v9h2.5c.9 0 1.6-.7 1.6-1.6V8z" fill="#34a853"/>'
     + '<path d="M20.5 8l-4.1 3V5.9l1.6-1.2c1-.7 2.5 0 2.5 1.3z" fill="#fbbc04"/><path d="M3.5 8l4.1 3V5.9L6 4.7c-1-.7-2.5 0-2.5 1.3z" fill="#c5221f"/>'
@@ -79,10 +85,12 @@ export async function list() {
   // Une seule fois par app : ajoute les nouvelles apps (Gmail, Amazon) à une liste déjà personnalisée, avant Spotify.
   // Si tu les retires ensuite, elles ne reviennent pas.
   for (const [id, flag, re] of [['gmail', 'launcherGmail', /mail\.google\.com/], ['amazon', 'launcherAmazon', /amazon\./],
-    ['stremio', 'launcherStremio', /stremio/], ['playbooks', 'launcherPlayBooks', /play\.google\.com\/(store\/)?books/]]) {
+    ['stremio', 'launcherStremio', /stremio/], ['playbooks', 'launcherPlayBooks', /play\.google\.com\/(store\/)?books/],
+    ['fbevents', 'launcherFbEvents', /facebook\.com\/events/]]) {
     if (await db.get('settings', flag)) continue;
     if (!saved.some((x) => x.id === id || re.test(x.url || ''))) {
-      const at = saved.findIndex((x) => x.id === 'spotify');
+      // Événements FB : juste après Facebook ; les autres : avant Spotify
+      const at = id === 'fbevents' ? saved.findIndex((x) => x.id === 'facebook') + 1 || saved.length : saved.findIndex((x) => x.id === 'spotify');
       saved.splice(at < 0 ? saved.length : at, 0, { ...DEFAULTS.find((x) => x.id === id) });
       await save(saved);
     }
