@@ -1962,3 +1962,21 @@ h2 { font-weight: 600; }
 .rail-fs svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 900px) { .rail-foot { flex-direction: column; } .rail-foot > a { width: 100%; } }
 @media (max-width: 600px) { .rail-foot { margin-top: 0; display: contents; } .rail-fs { display: none !important; } }
+/* Revue des retards (Missions du jour) */
+.late-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 10px; margin-bottom: 10px; border-radius: 10px; background: var(--warn-soft); border: 1px solid var(--gold-border); color: var(--warn); font-size: 14px; }
+.late-acts { display: flex; gap: 4px; flex-wrap: wrap; }
+.late-acts .btn { padding: 4px 10px; font-size: 13px; background: var(--surface); }
+
+/* Mode Focus (Aujourd'hui) : l'essentiel seulement */
+.today.focus-mode > .capture-card,
+.today.focus-mode .today-col > .card:not(.t-tasks):not(.t-habits) { display: none !important; }
+.today.focus-mode .t-tasks .tasks > li:nth-child(n+4), .today.focus-mode .t-tasks .hint { display: none; }
+.today.focus-mode .t-tasks .tasks:has(> li:nth-child(4))::after { content: 'Mode Focus : tes 3 premières missions. Les autres sont dans Missions.'; display: block; padding: 8px 2px 0; font-size: 12.5px; color: var(--muted); }
+.today.focus-mode .t-tasks, .today.focus-mode .t-habits { border-color: color-mix(in srgb, var(--gold) 45%, var(--border)); }
+/* Objectifs conclus depuis plus de 7 jours : repliés au bas de la colonne */
+.goal-old { margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 6px; }
+.goal-old > summary { cursor: pointer; padding: 6px 0; font-size: 13px; font-weight: 600; color: var(--muted); list-style: none; }
+.goal-old > summary::-webkit-details-marker { display: none; }
+.goal-old > summary::before { content: '› '; display: inline-block; transition: transform .15s; }
+.goal-old[open] > summary::before { transform: rotate(90deg); }
+.goal-old > summary:hover { color: var(--text); }

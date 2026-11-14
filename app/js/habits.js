@@ -256,6 +256,17 @@ async function ensurePreset() {
 export function start(onChange = () => {}) {
   onChanged = onChange;
   ensurePreset().then(() => onChange()).catch(console.error);
+  // Habitudes cochées depuis une notification pendant que l'app était fermée : on donne les points maintenant
+  (async () => {
+    const q = await db.get('cache', 'habitQueue');
+    if (!q?.length) return;
+    await db.put('cache', [], 'habitQueue');
+    for (const { id, day } of q) {
+      const h = await db.get('habits', id);
+      if (h) await setCount(id, day, countOn(h, day)); // même compte : enregistre (synchro) et donne l'XP
+    }
+    onChange();
+  })().catch(console.error);
   // On attend le premier échange avec les autres appareils (rappel déjà vu ou habitude déjà cochée ailleurs)
   sync.firstSync().then(() => {
     check();
