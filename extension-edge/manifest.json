@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Life Planner — Reddit et YouTube → Cerveau",
-  "version": "1.5.0",
-  "description": "Ajoute un bouton « Cerveau » aux posts Reddit et aux vidéos YouTube ouverts depuis le Lanceur de Life Planner (ou dans leur app installée), pour les enregistrer comme note.",
+  "name": "Life Planner — Reddit, YouTube et Amazon → Cerveau",
+  "version": "1.6.0",
+  "description": "Ajoute un bouton « Cerveau » aux posts Reddit, aux vidéos YouTube et aux produits Amazon ouverts depuis le Lanceur de Life Planner (ou dans leur app installée), pour les enregistrer comme note.",
   "permissions": ["storage"],
   "host_permissions": [
     "http://localhost:5173/*",
@@ -19,6 +19,11 @@
     {
       "matches": ["https://www.youtube.com/*"],
       "js": ["youtube.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.amazon.ca/*", "https://www.amazon.com/*", "https://www.amazon.fr/*", "https://amazon.ca/*", "https://amazon.com/*"],
+      "js": ["amazon.js"],
       "run_at": "document_idle"
     },
     {

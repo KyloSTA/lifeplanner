@@ -278,7 +278,13 @@ Quand YouTube est ouvert depuis le Lanceur (ou dans l'app YouTube installée), u
 **Ressource** : titre, lien, chaîne, le moment où tu étais rendu (lien qui reprend à cet endroit),
 description et étiquettes `#youtube #video #nomdelachaine`.
 
-Une page web ne peut pas modifier Reddit ni YouTube : le bouton vient d'une petite extension Edge, dans
+### Amazon → Cerveau (petit bouton « 🧠 » à côté du titre du produit)
+Quand Amazon est ouvert depuis le Lanceur (ou dans l'app Amazon installée), un petit bouton **🧠**
+apparaît à côté du titre de chaque produit. Un clic enregistre l'article comme note **Ressource** :
+titre, image (miniature de la carte), lien propre `amazon.ca/dp/…`, prix, marque, note des clients
+et étiquettes `#amazon #achat`.
+
+Une page web ne peut pas modifier Reddit, YouTube ni Amazon : le bouton vient d'une petite extension Edge, dans
 le dossier `extension-edge`. À installer une seule fois :
 1. Dans Edge, ouvre `edge://extensions`.
 2. Active **Mode développeur** (en bas à gauche).

@@ -12,6 +12,7 @@ export const DEFAULTS = [
   { id: 'facebook', name: 'Facebook', icon: 'f', color: '#1877f2', mode: 'window', url: 'https://www.facebook.com' },
   { id: 'messenger', name: 'Messenger', icon: '💬', color: '#7b5cff', mode: 'window', url: 'https://www.messenger.com' },
   { id: 'gmail', name: 'Gmail', icon: 'M', color: '#ffffff', mode: 'window', url: 'https://mail.google.com/mail/u/0/' },
+  { id: 'amazon', name: 'Amazon', icon: 'a', color: '#232f3e', mode: 'window', url: 'https://www.amazon.ca' },
   { id: 'spotify', name: 'Spotify', icon: '♫', color: '#1db954', mode: 'app', app: 'spotify:', url: 'https://open.spotify.com' },
 ];
 
@@ -28,6 +29,8 @@ const ICONS = {
     + '<path d="M20.5 8l-4.1 3V5.9l1.6-1.2c1-.7 2.5 0 2.5 1.3z" fill="#fbbc04"/><path d="M3.5 8l4.1 3V5.9L6 4.7c-1-.7-2.5 0-2.5 1.3z" fill="#c5221f"/>'
     + '<path d="M7.6 11V5.9L12 9.2l4.4-3.3V11L12 14.3z" fill="#ea4335"/>'),
   spotify: svg('<g fill="none" stroke="#191414" stroke-width="2" stroke-linecap="round"><path d="M5.8 9.4c4.1-1.3 8.8-1 12.4 1"/><path d="M6.8 12.8c3.4-1 7.2-.7 10 .9"/><path d="M7.8 16c2.6-.7 5.4-.5 7.6.8"/></g>'),
+  amazon: svg('<text x="12" y="13.2" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="12.5" fill="#fff">a</text>'
+    + '<path d="M4.8 15.6c4.3 2.7 10.1 2.7 14 .1" fill="none" stroke="#ff9900" stroke-width="1.9" stroke-linecap="round"/><path d="M16.6 14.6l2.4.9-.5 2.4" fill="none" stroke="#ff9900" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
   edge: svg('<path d="M20.4 15.6c-1.6 3-4.8 4.9-8.3 4.9-4.9 0-8.6-3.7-8.6-8.3 0-4.9 4-8.7 8.8-8.7 4.6 0 8.2 3.1 8.2 7 0 2.6-2 4.3-4.6 4.3-1.6 0-2.7-.6-2.7-1.4 0-.4.4-.8.4-1.6 0-1.8-1.6-3.2-3.8-3.2-2.6 0-4.3 2.2-4.3 4.7" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>'),
 };
 
@@ -43,14 +46,16 @@ export function iconHTML(it) {
 export async function list() {
   const saved = await db.get('settings', 'launcher');
   if (!saved) return DEFAULTS;
-  // Une seule fois : ajoute Gmail à une liste déjà personnalisée (avant Spotify)
-  if (!(await db.get('settings', 'launcherGmail'))) {
-    if (!saved.some((x) => x.id === 'gmail' || /mail\.google\.com/.test(x.url || ''))) {
+  // Une seule fois par app : ajoute les nouvelles apps (Gmail, Amazon) à une liste déjà personnalisée, avant Spotify.
+  // Si tu les retires ensuite, elles ne reviennent pas.
+  for (const [id, flag, re] of [['gmail', 'launcherGmail', /mail\.google\.com/], ['amazon', 'launcherAmazon', /amazon\./]]) {
+    if (await db.get('settings', flag)) continue;
+    if (!saved.some((x) => x.id === id || re.test(x.url || ''))) {
       const at = saved.findIndex((x) => x.id === 'spotify');
-      saved.splice(at < 0 ? saved.length : at, 0, { ...DEFAULTS.find((x) => x.id === 'gmail') });
+      saved.splice(at < 0 ? saved.length : at, 0, { ...DEFAULTS.find((x) => x.id === id) });
       await save(saved);
     }
-    await db.put('settings', true, 'launcherGmail');
+    await db.put('settings', true, flag);
   }
   return saved;
 }

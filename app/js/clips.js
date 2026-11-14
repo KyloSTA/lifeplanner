@@ -21,8 +21,18 @@ function youtubeNote(c) {
   return lines.join('\n');
 }
 
+// Article Amazon : lien, prix, marque, note des clients
+function amazonNote(c) {
+  const lines = [`🔗 ${c.url}`];
+  const meta = [c.price && '💲 ' + c.price, c.sub, c.rating && '⭐ ' + c.rating].filter(Boolean).join(' · ');
+  if (meta) lines.push(meta);
+  lines.push('', '#amazon #achat');
+  return lines.join('\n');
+}
+
 function noteFrom(c) {
   if (c.kind === 'youtube') return youtubeNote(c);
+  if (c.kind === 'amazon') return amazonNote(c);
   const sub = str(c.sub, 60);
   const author = str(c.author, 60);
   const date = c.created && !isNaN(new Date(c.created)) ? new Date(c.created).toLocaleDateString('fr-CA') : '';
@@ -38,10 +48,12 @@ function noteFrom(c) {
 
 /** Enregistre un post. Renvoie la note et si elle existait déjà. */
 export async function saveClip(raw) {
-  const kind = raw.kind === 'youtube' ? 'youtube' : 'reddit';
+  const kind = raw.kind === 'youtube' ? 'youtube' : raw.kind === 'amazon' ? 'amazon' : 'reddit';
   const c = {
     kind,
-    title: str(raw.title, 300) || (kind === 'youtube' ? 'Vidéo YouTube' : 'Post Reddit'),
+    title: str(raw.title, 300) || (kind === 'youtube' ? 'Vidéo YouTube' : kind === 'amazon' ? 'Article Amazon' : 'Post Reddit'),
+    price: str(raw.price, 40),
+    rating: str(raw.rating, 20),
     url: httpUrl(raw.url),
     link: httpUrl(raw.link),
     sub: str(raw.sub, kind === 'youtube' ? 80 : 60),
@@ -50,10 +62,11 @@ export async function saveClip(raw) {
     text: str(raw.text, 4000),
     at: Math.max(0, Math.min(86_400, Math.floor(Number(raw.at) || 0))),
     short: raw.short === true,
-    img: kind === 'reddit' ? httpUrl(raw.img) : '', // image du post (miniature de la carte)
+    img: kind !== 'youtube' ? httpUrl(raw.img) : '', // image du post ou du produit (miniature de la carte)
   };
   if (!c.url) throw new Error('Adresse invalide');
   if (kind === 'youtube' && !/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{6,20}$/.test(c.url)) throw new Error('Adresse YouTube invalide');
+  if (kind === 'amazon' && !/^https:\/\/(www\.)?amazon\.(ca|com|fr)\//.test(c.url)) throw new Error('Adresse Amazon invalide');
   const body = noteFrom(c);
   const title = c.title.length > 80 ? c.title.slice(0, 78).trim() + '…' : c.title;
   const existing = (await brain.allNotes()).find((n) => n.source?.url === c.url);
