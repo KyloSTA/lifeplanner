@@ -52,7 +52,6 @@ export async function renderPage(ctx) {
   view.innerHTML = `
     <header class="page-head">
       <div><p class="eyebrow">Gestion</p><h1>Missions</h1></div>
-      <div class="head-actions"><a class="btn" href="#/goals">🎯 Objectifs</a></div>
     </header>
     <div class="kpis">
       <button class="kpi ${state.f === 'todo' ? 'on' : ''}" data-f="todo"><b>${counts.todo}</b><span>à faire</span></button>
