@@ -2057,3 +2057,17 @@ h2 { font-weight: 600; }
 .pg-fold .exp { display: inline-block; transition: transform .15s; font-size: 15px; }
 .pg-fold[aria-expanded="true"] .exp { transform: rotate(90deg); }
 .pg-late { color: var(--warn); }
+/* Projet : options d'un objectif regroupées sous ⚙ */
+.pgoal .pg-head { position: relative; }
+.pg-gear { flex: none; width: 30px; height: 30px; min-height: 30px; font-size: 15px; color: var(--muted); }
+.pg-gear[aria-expanded="true"] { color: var(--gold-text, var(--accent)); border-color: var(--gold-border, var(--accent)); }
+.pg-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; display: grid; gap: 2px; min-width: 220px; padding: 6px;
+  border: 1px solid var(--gold-border, var(--border)); border-radius: 12px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.pg-menu[hidden] { display: none; }
+.pg-menu > button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer; min-height: 0; height: auto; opacity: 1; }
+.pg-menu > button:hover { background: var(--surface-2); }
+.pg-menu .g-done { color: var(--ok); }
+.pg-menu .pg-unlink { color: var(--danger, #e57373); }
+.pg-menu-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
+.pg-menu-row .pg-hz { color: var(--text); }

@@ -1648,10 +1648,14 @@ async function renderNote(id) {
         const ms = tasks.filter((t) => t.goalId === g.id).sort(sortM);
         return `<div class="pgoal ${goalClass(g)}" data-gid="${g.id}">
           <div class="pg-head"><a href="#/goals" data-opengoal="${g.id}" title="Ouvrir dans Objectifs">${goalMark(g)}${esc(g.title)}</a>
-            <select class="pg-hz" data-hz="${g.id}" aria-label="Échéance" title="Échéance">${hzOptions(g.horizon || '')}</select><span class="pct">${g.progress}%</span>
-            <button class="g-done ${g.done ? 'on' : ''}" type="button" data-gdone="${g.id}" title="${g.done ? 'Rouvrir l’objectif' : 'Conclure l’objectif (atteint ou abandonné)'}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Conclure l’objectif'}">${g.done ? '↺' : '✓'}</button>
-            <button class="btn icon sm pg-plus" type="button" aria-label="Ajouter une mission à cet objectif" title="Ajouter une mission">+</button>
-            <button class="x pg-unlink" data-unlink="${g.id}" title="Retirer du projet" aria-label="Retirer l’objectif du projet">×</button></div>
+            <span class="pct">${g.progress}%</span>
+            <button class="btn icon sm pg-gear" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Options de l’objectif" title="Options">⚙</button>
+            <div class="pg-menu" role="menu" hidden>
+              <label class="pg-menu-row">Échéance <select class="pg-hz" data-hz="${g.id}" aria-label="Échéance">${hzOptions(g.horizon || '')}</select></label>
+              <button class="pg-plus" type="button" role="menuitem">＋ Ajouter une mission</button>
+              <button class="g-done ${g.done ? 'on' : ''}" type="button" role="menuitem" data-gdone="${g.id}">${g.done ? '↺ Rouvrir l’objectif' : '✓ Conclure l’objectif'}</button>
+              <button class="pg-unlink" type="button" role="menuitem" data-unlink="${g.id}">× Retirer du projet</button>
+            </div></div>
           <div class="bar"><i style="width:${g.progress}%"></i></div>
           ${goalVerdict(g)}
           ${ms.length ? (() => {
@@ -1707,9 +1711,25 @@ async function renderNote(id) {
     $$('.pg-plus', el).forEach((b) => (b.onclick = () => {
       const f = b.closest('.pgoal').querySelector('.pg-add');
       f.hidden = !f.hidden;
-      b.textContent = f.hidden ? '+' : '−';
+      closePgMenus();
       if (!f.hidden) f.t.focus();
     }));
+    // ⚙ d'un objectif : petit menu (échéance, ajouter, conclure, retirer)
+    function closePgMenus(keep) {
+      $$('.pg-menu', el).forEach((m) => { if (m !== keep) { m.hidden = true; m.previousElementSibling.setAttribute('aria-expanded', 'false'); } });
+    }
+    $$('.pg-gear', el).forEach((b) => (b.onclick = (e) => {
+      e.stopPropagation();
+      const m = b.nextElementSibling;
+      closePgMenus(m);
+      m.hidden = !m.hidden;
+      b.setAttribute('aria-expanded', String(!m.hidden));
+    }));
+    if (!el.dataset.pgMenuBound) {
+      el.dataset.pgMenuBound = '1';
+      document.addEventListener('click', (e) => { if (!e.target.closest('.pg-menu, .pg-gear')) closePgMenus(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePgMenus(); });
+    }
     // Missions directes du projet
     $('.pd-toggle', el).onclick = () => { const f = $('.pd-add', el); f.hidden = !f.hidden; if (!f.hidden) f.t.focus(); };
     $('.pd-add', el).onsubmit = async (e) => {
