@@ -23,6 +23,7 @@ import * as assoc from './assoc.js';
 import * as news from './news.js';
 import * as finance from './finance.js';
 import * as usage from './usage.js';
+import * as activities from './activities.js';
 import * as reminders from './reminders.js';
 import * as rpg from './rpg.js';
 
@@ -114,11 +115,12 @@ const routes = {
   news: () => news.renderPage(pageCtx()),
   finance: (tab) => finance.renderPage(pageCtx(), tab),
   usage: renderUsage,
+  activities: () => activities.renderPage(pageCtx(), { tabs: plannerTabs('activities'), addEvent: (day, pre) => eventModal(day, null, pre) }),
   quest: () => rpg.renderPage(pageCtx()),
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
-const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', usage: 'settings', quest: 'hero', habits: 'hero', month: 'week', year: 'week', journal: 'week' };
+const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', usage: 'settings', activities: 'week', quest: 'hero', habits: 'hero', month: 'week', year: 'week', journal: 'week' };
 // Outils d'interface passés aux modules des onglets Habitudes, Cours RBQ et Workout
 const pageCtx = () => ({ view, modal, toast, confirmBox, setCleanup: (fn) => { cleanup = fn; } });
 
@@ -206,19 +208,19 @@ function eventDetails(ev, refresh) {
   });
 }
 
-function eventModal(dateStr, onDone) {
+function eventModal(dateStr, onDone, pre = {}) {
   modal(`<h2>Nouvel événement</h2>
     <form class="form" id="evf">
-      <label>Titre<input name="title" required autofocus autocomplete="off"></label>
+      <label>Titre<input name="title" required autofocus autocomplete="off" value="${esc(pre.title || '')}"></label>
       <div class="row">
         <label>Date<input type="date" name="date" value="${dateStr}" required></label>
-        <label class="check"><input type="checkbox" name="allDay"> Toute la journée</label>
+        <label class="check"><input type="checkbox" name="allDay" ${pre.allDay ? 'checked' : ''}> Toute la journée</label>
       </div>
-      <div class="row times">
-        <label>Début<input type="time" name="start" value="09:00"></label>
-        <label>Fin<input type="time" name="end" value="10:00"></label>
+      <div class="row times" ${pre.allDay ? 'hidden' : ''}>
+        <label>Début<input type="time" name="start" value="${pre.start || '09:00'}"></label>
+        <label>Fin<input type="time" name="end" value="${pre.end || '10:00'}"></label>
       </div>
-      <label>Notes<textarea name="description" rows="2"></textarea></label>
+      <label>Notes<textarea name="description" rows="2">${esc(pre.description || '')}</textarea></label>
       <div class="modal-actions">
         <button type="button" class="btn" data-close>Annuler</button>
         <button class="btn primary">Ajouter à Google Agenda</button>
@@ -1985,7 +1987,7 @@ async function renderLauncher() {
 /* ---------- Planificateur : onglets Semaine / Mois / Année / Journal ---------- */
 function plannerTabs(active, d = new Date()) {
   const day = iso(d);
-  const tabs = [['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${day}`]];
+  const tabs = [['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${day}`], ['activities', '🎟 Activités', '#/activities']];
   return `<nav class="seg planner-tabs" aria-label="Vues du planificateur">${tabs.map(([k, l, h]) => `<a href="${h}" class="${k === active ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
 }
 const moodOf = (j) => MOODS.find((m) => m.v === j?.mood);
