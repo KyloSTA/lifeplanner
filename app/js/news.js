@@ -243,9 +243,55 @@ const MEDIA = [
   ['docs', '🎞 Documentaires', 'https://itunes.apple.com/ca/rss/topmovies/limit=10/genre=4405/l=fr/json'],
 ];
 const MEDIA_TTL = 6 * 3600_000;
+
+/* ---------- Où regarder (Canada) : JustWatch ----------
+   Recherche publique de JustWatch (sans clé) : on ne lui envoie que le titre. Pour chaque titre :
+   les services où il est inclus (abonnement ou gratuit) et, sinon, où le louer ou l'acheter. */
+const JW = 'https://apis.justwatch.com/graphql';
+const JW_Q = `query S($q:String!){ popularTitles(country:CA, first:5, filter:{searchQuery:$q}){ edges{ node{ objectType
+  content(country:CA, language:"fr"){ title originalReleaseYear fullPath }
+  offers(country:CA, platform:WEB){ monetizationType package{ clearName } standardWebURL } } } } }`;
+const cleanTitle = (t) => t.replace(/,?\s*(Season|Saison)\s*\d+.*$/i, '').replace(/,?\s*The Complete (Collection|Series)$/i, '').replace(/\s*\(\d{4}\)\s*$/, '').trim();
+// Un seul nom par service : « Netflix Standard with Ads », « Paramount+ Amazon Channel »… -> Netflix, Paramount+
+function svcName(raw) {
+  let s = raw.replace(/\s+(Amazon|Apple TV|Roku Premium) Channel$/i, '')
+    .replace(/\s+(Standard|Basic)?\s*with Ads$/i, '').replace(/\s+(Premium|Standard|Basic|Essential)$/i, '').trim();
+  if (/^Paramount\s*(\+|Plus)/i.test(s)) s = 'Paramount+';
+  if (/^Amazon Prime Video/i.test(s)) s = 'Prime Video';
+  if (/^Disney\s*(\+|Plus)/i.test(s)) s = 'Disney+';
+  if (/^Apple TV\s*(\+|Plus)$/i.test(s)) s = 'Apple TV+';
+  if (/^JustWatch TV/i.test(s)) return ''; // la chaîne maison de JustWatch : pas un vrai service
+  return s;
+}
+
+async function whereToWatch(x, show) {
+  const res = await fetch(JW, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: JW_Q, variables: { q: cleanTitle(x.title) } }) });
+  const nodes = ((await res.json())?.data?.popularTitles?.edges || []).map((e) => e.node).filter((n) => n.objectType === (show ? 'SHOW' : 'MOVIE'));
+  const y = Number(x.year) || 0;
+  const n = (!show && y && nodes.find((m) => Math.abs((m.content?.originalReleaseYear || 0) - y) <= 1)) || nodes[0];
+  if (!n) return null;
+  const pick = (types) => {
+    const seen = new Map();
+    for (const o of n.offers || []) {
+      if (!types.includes(o.monetizationType)) continue;
+      const name = svcName(o.package?.clearName || '');
+      if (name && !seen.has(name)) seen.set(name, o.standardWebURL || '');
+    }
+    return [...seen].slice(0, 4).map(([name, url]) => ({ name, url }));
+  };
+  return { stream: pick(['FLATRATE', 'FREE', 'ADS']), rent: pick(['RENT', 'BUY']), jw: n.content?.fullPath ? 'https://www.justwatch.com' + n.content.fullPath : '' };
+}
+async function addWhere(lists) {
+  const jobs = [];
+  for (const [k, list] of Object.entries(lists)) for (const x of list) jobs.push([x, k === 'series']);
+  // 4 recherches à la fois
+  for (let i = 0; i < jobs.length; i += 4) {
+    await Promise.all(jobs.slice(i, i + 4).map(async ([x, show]) => { try { x.where = await whereToWatch(x, show); } catch { /* ignore */ } }));
+  }
+}
 async function loadMedia(force) {
   const cache = await db.get('cache', 'media');
-  if (!force && cache && Date.now() - cache.at < MEDIA_TTL) return cache;
+  if (!force && cache?.v === 2 && Date.now() - cache.at < MEDIA_TTL) return cache; // v2 : avec « où regarder »
   const lists = {};
   await Promise.all(MEDIA.map(async ([k, , url]) => {
     try {
@@ -261,10 +307,20 @@ async function loadMedia(force) {
       })).filter((x) => x.title);
     } catch { lists[k] = cache?.lists?.[k] || []; }
   }));
-  const out = { at: Date.now(), lists };
+  await addWhere(lists).catch(() => {});
+  const out = { v: 2, at: Date.now(), lists };
   if (Object.values(lists).some((l) => l.length)) await db.put('cache', out, 'media');
   return out;
 }
+// Pastilles « où regarder » : services inclus (abonnement / gratuit), sinon location ou achat
+function whereHTML(w) {
+  if (!w) return '';
+  const chip = (s, cls) => `<a class="md-svc ${cls}" href="${esc(s.url || w.jw || '#')}" target="_blank" rel="noopener">${esc(s.name)}</a>`;
+  if (w.stream.length) return `<span class="md-where" title="Inclus dans l’abonnement (ou gratuit)">📺 ${w.stream.map((s) => chip(s, 'inc')).join('')}</span>`;
+  if (w.rent.length) return `<span class="md-where" title="Pas inclus dans un abonnement : location ou achat">💳 ${w.rent.slice(0, 3).map((s) => chip(s, 'rent')).join('')}</span>`;
+  return w.jw ? `<a class="md-where md-none" href="${esc(w.jw)}" target="_blank" rel="noopener">Pas encore en streaming au Canada</a>` : '';
+}
+
 async function drawMedia(view, force) {
   const $ = (s) => view.querySelector(s);
   $('#nw-filters').innerHTML = '';
@@ -282,6 +338,7 @@ async function drawMedia(view, force) {
         ${x.img ? `<img class="md-poster" src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="md-poster"></span>'}
         <span class="md-info"><a class="md-title" href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a>
           <small class="muted">${esc([x.genre, x.year].filter(Boolean).join(' · '))}</small>
+          ${whereHTML(x.where)}
           <a class="md-trailer" href="${esc(trailer(x))}" target="_blank" rel="noopener">▶ Bande-annonce</a></span>
       </li>`).join('') || '<li class="empty-sm">Indisponible.</li>'}</ol></section>`).join('')}</div>
     <p class="hint muted">Palmarès des achats et locations sur iTunes Canada · mis à jour ${ago(data.at)}.</p>`;
