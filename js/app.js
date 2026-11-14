@@ -2001,6 +2001,11 @@ async function renderNote(id) {
    ========================================================= */
 let launcherEdit = false;
 
+/** « App Windows » qui ne s'est pas ouverte : le lien lpapp: n'est pas installé sur ce PC, ou le nom ne correspond à aucune app. */
+function pcMissing(it) {
+  toast(`${it.name} ne s’est pas ouvert : lance une fois « Installer apps Windows.bat » (dossier Life Planner), et vérifie que la tuile porte le même nom que l’app dans le menu Démarrer. 🌐 ouvre le site.`, 'err');
+}
+
 async function renderLauncher() {
   const items = await launcher.list();
   view.innerHTML = `
@@ -2008,13 +2013,13 @@ async function renderLauncher() {
       <div class="head-actions"><button class="btn ${launcherEdit ? 'primary' : ''}" id="ln-edit">${launcherEdit ? '✓ Terminé' : '✎ Modifier'}</button></div></header>
     <div class="launch-grid ${launcherEdit ? 'editing' : ''}">${items.map((it, i) => `
       <div class="lt-wrap" data-i="${i}">
-        <button class="lt" data-open="${i}" title="${esc(it.mode === 'app' ? `Ouvrir l’application ${it.name}` : it.mode === 'installed' ? `Ouvrir ${it.name} dans son application installée` : `Ouvrir ${it.name} dans une nouvelle fenêtre`)}">
-          <span class="lt-ico" style="--c:${esc(it.color || '#4f46e5')}">${launcher.iconHTML(it)}</span>
+        <button class="lt" data-open="${i}" title="${esc(it.mode === 'app' || it.mode === 'pc' ? `Ouvrir l’application ${it.name}` : it.mode === 'installed' ? `Ouvrir ${it.name} dans son application installée` : `Ouvrir ${it.name} dans une nouvelle fenêtre`)}">
+          <span class="lt-ico" style="--c:${esc(launcher.colorOf(it))}">${launcher.iconHTML(it)}</span>
           <span class="lt-name">${esc(it.name)}</span>
           <small class="muted">${it.mode === 'app' ? 'Application' : launcher.MODES[it.mode] || 'Fenêtre'}</small>
         </button>
         ${launcherEdit && it.mode !== 'app' ? `<select class="lt-mode" data-mode="${i}" aria-label="Ouverture de ${esc(it.name)}">${Object.entries(launcher.MODES).map(([k, l]) => `<option value="${k}" ${k === (it.mode || 'window') ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
-        ${it.mode === 'app' && it.url && !launcherEdit ? `<button class="lt-web" data-web="${i}" title="Ouvrir la version web" aria-label="Version web de ${esc(it.name)}">🌐</button>` : ''}
+        ${(it.mode === 'app' || it.mode === 'pc') && it.url && !launcherEdit ? `<button class="lt-web" data-web="${i}" title="Ouvrir la version web" aria-label="Version web de ${esc(it.name)}">🌐</button>` : ''}
         ${launcherEdit ? `<div class="lt-tools">
           <button data-mv="-1" ${i === 0 ? 'disabled' : ''} aria-label="Déplacer vers la gauche">‹</button>
           <button data-mv="1" ${i === items.length - 1 ? 'disabled' : ''} aria-label="Déplacer vers la droite">›</button>
@@ -2027,9 +2032,10 @@ async function renderLauncher() {
         <input name="name" placeholder="Nom (ex. Gmail)" required autocomplete="off">
         <input name="url" placeholder="Adresse (ex. mail.google.com)" required autocomplete="off" spellcheck="false">
         <input name="icon" placeholder="Icône (emoji, facultatif)" maxlength="2" autocomplete="off" style="max-width:150px">
-        <select name="mode" aria-label="Ouverture"><option value="window">Nouvelle fenêtre</option><option value="installed">App installée dans Edge</option><option value="tab">Onglet du navigateur</option></select>
+        <select name="mode" aria-label="Ouverture"><option value="window">Nouvelle fenêtre</option><option value="pc">App Windows (sans page web)</option><option value="installed">App installée dans Edge</option><option value="tab">Onglet du navigateur</option></select>
         <button class="btn primary">Ajouter</button>
       </form>
+      <p class="hint muted"><b>App Windows</b> : ouvre directement l’app du menu Démarrer qui porte le même nom que la tuile (ex. NHL installée depuis Edge, ou une app du Microsoft Store), sans passer par une page web. À faire une seule fois sur ce PC : double-clique <code>Installer apps Windows.bat</code> dans le dossier Life Planner. Sur cellulaire, la tuile ouvre le site.</p>
       <p class="hint muted"><b>App installée</b> : ouvre le site sans barre d’adresse. Installe-le d’abord dans Edge (sur le site : ⋯ → Applications → Installer ce site en tant qu’application), puis dans <code>edge://apps</code>, ouvre les détails de l’app et autorise-la à ouvrir les liens pris en charge.</p>
       <button class="btn" id="ln-reset" type="button">Rétablir les raccourcis par défaut</button>
     </section>` : `<p class="hint muted">Les sites s’ouvrent chacun dans leur propre fenêtre (un 2e clic ramène la même). Edge et Spotify s’ouvrent comme applications Windows ; 🌐 ouvre la version web. Si rien ne s’ouvre, autorise les fenêtres pop-up pour Life Planner dans Edge.</p>
@@ -2039,7 +2045,7 @@ async function renderLauncher() {
   $$('[data-open]').forEach((b) => (b.onclick = () => {
     if (launcherEdit) return;
     const it = items[Number(b.dataset.open)];
-    if (!launcher.open(it)) toast('La fenêtre a été bloquée : autorise les pop-ups pour Life Planner dans Edge', 'err');
+    if (!launcher.open(it, pcMissing)) toast('La fenêtre a été bloquée : autorise les pop-ups pour Life Planner dans Edge', 'err');
   }));
   $$('[data-web]').forEach((b) => (b.onclick = () => launcher.openWindow(items[Number(b.dataset.web)])));
   $$('.lt-tools [data-mv]').forEach((b) => (b.onclick = async () => {
@@ -3638,7 +3644,7 @@ $('#brand-launch').onclick = async (e) => {
   pop.className = 'launch-pop';
   pop.setAttribute('role', 'menu');
   pop.innerHTML = `<div class="lp-grid">${items.map((it, i) => `<button class="lp-item" role="menuitem" data-i="${i}" title="${esc(it.name)}">
-      <span class="lp-ico" style="--c:${esc(it.color)}">${launcher.iconHTML(it)}</span><span class="lp-name">${esc(it.name)}</span></button>`).join('')}</div>
+      <span class="lp-ico" style="--c:${esc(launcher.colorOf(it))}">${launcher.iconHTML(it)}</span><span class="lp-name">${esc(it.name)}</span></button>`).join('')}</div>
     <a class="lp-manage" href="#/launcher">✎ Gérer le Lanceur</a>`;
   document.body.appendChild(pop);
   const r = btn.getBoundingClientRect();
@@ -3654,7 +3660,7 @@ $('#brand-launch').onclick = async (e) => {
   $$('.lp-item', pop).forEach((b) => (b.onclick = () => {
     const it = items[Number(b.dataset.i)];
     close();
-    if (!launcher.open(it)) toast('La fenêtre a été bloquée : autorise les pop-ups pour Life Planner dans Edge', 'err');
+    if (!launcher.open(it, pcMissing)) toast('La fenêtre a été bloquée : autorise les pop-ups pour Life Planner dans Edge', 'err');
   }));
   pop.querySelector('.lp-item')?.focus();
 };
