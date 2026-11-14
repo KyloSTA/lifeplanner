@@ -108,8 +108,8 @@ const routes = {
   today: renderToday, week: renderWeek, journal: renderJournal, notebook: renderNotebook,
   page: renderPage, goals: renderGoals, settings: renderSettings, hero: renderHero,
   brain: renderBrain, note: renderNote, launcher: renderLauncher, setup: renderSetup,
-  // Les habitudes sont dans la page du héros : #/habits y mène directement
-  habits: async () => { await renderHero(); $('#hero-habits')?.scrollIntoView({ block: 'start' }); },
+  // Habitudes : onglet de la section Corps (elles restent aussi dans la page du héros)
+  habits: () => habits.renderPage(pageCtx()),
   missions: () => missions.renderPage(pageCtx()),
   month: renderMonth, year: renderYear,
   news: () => news.renderPage(pageCtx()),
@@ -120,7 +120,30 @@ const routes = {
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
-const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', usage: 'settings', activities: 'week', quest: 'hero', habits: 'hero', month: 'week', year: 'week', journal: 'week' };
+const NAV_PARENT = {
+  page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', habits: 'workout',
+  setup: 'settings', usage: 'settings', activities: 'week', quest: 'hero', month: 'week', year: 'week', journal: 'week',
+};
+// Onglets en haut des sections qui regroupent plusieurs pages (le menu n'a qu'une entrée par section)
+const SECTION_TABS = {
+  missions: [['missions', '✅ Missions'], ['goals', '🎯 Objectifs']],
+  brain: [['brain', '🧠 Notes'], ['news', '📰 Actualités'], ['notebook', '✏️ Carnet']],
+  workout: [['workout', '🏃 Workout'], ['habits', '🔁 Habitudes']],
+};
+let tabsWatch = null;
+function sectionTabs(name) {
+  const tabs = SECTION_TABS[NAV_PARENT[name] || name];
+  if (!tabs || !tabs.some(([k]) => k === name)) return;
+  // Une page qui se redessine (cocher une habitude, filtrer) efface les onglets : on les remet
+  tabsWatch ||= new MutationObserver(() => {
+    const cur = (location.hash.replace(/^#\/?/, '') || 'today').split('/')[0];
+    if (!view.querySelector(':scope > .section-tabs')) sectionTabs(cur);
+  });
+  tabsWatch.observe(view, { childList: true });
+  view.querySelector(':scope > .section-tabs')?.remove();
+  view.insertAdjacentHTML('afterbegin', `<nav class="seg section-tabs" aria-label="Pages de la section">${tabs.map(([k, l]) =>
+    `<a href="#/${k}" class="${k === name ? 'on' : ''}" ${k === name ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`);
+}
 // Outils d'interface passés aux modules des onglets Habitudes, Cours RBQ et Workout
 const pageCtx = () => ({ view, modal, toast, confirmBox, setCleanup: (fn) => { cleanup = fn; } });
 
@@ -139,6 +162,7 @@ async function router() {
   view.scrollTop = 0;
   try {
     await fn(arg ? decodeURIComponent(arg) : undefined);
+    sectionTabs(name);
   } catch (err) {
     console.error(err);
     view.innerHTML = `<div class="empty">Oups : ${esc(err.message)}</div>`;
@@ -3266,7 +3290,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'finance', 'workout', 'rbq']; // Aventure : dans la page du héros (Progression) // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'week', 'missions', 'brain', 'finance', 'workout', 'rbq']; // Objectifs : onglet de Missions · Actualités et Carnet : onglets du Cerveau · Habitudes : onglet de Corps // Aventure : dans la page du héros (Progression) // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
