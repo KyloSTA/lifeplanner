@@ -149,8 +149,9 @@ export function taskHTML(t, ref, opts = {}) {
   const chips = [
     focusChip,
     alarmChip,
-    goal && !opts.hideGoal ? `<span class="chip goal-chip" title="Objectif : ${esc(goal.title)}">🎯 ${esc(goal.title)}</span>` : '',
-    (() => { const p = t.projectId && !opts.hideProject && projectsCache.find((x) => x.id === t.projectId); return p ? `<span class="chip goal-chip" title="Projet : ${esc(p.title)}">🚀 ${esc(p.title || 'Projet')}</span>` : ''; })(),
+    // Pastilles cliquables : le projet ouvre sa page ; l'objectif ouvre son projet (sinon la page Objectifs)
+    goal && !opts.hideGoal ? `<a class="chip goal-chip chip-link" href="${goal.projectId ? `#/note/${goal.projectId}` : '#/goals'}" title="Objectif : ${esc(goal.title)}${goal.projectId ? ' (ouvrir son projet)' : ''}">🎯 ${esc(goal.title)}</a>` : '',
+    (() => { const p = t.projectId && !opts.hideProject && projectsCache.find((x) => x.id === t.projectId); return p ? `<a class="chip goal-chip chip-link" href="#/note/${p.id}" title="Ouvrir le projet ${esc(p.title)}">🚀 ${esc(p.title || 'Projet')}</a>` : ''; })(),
     dateChip,
     subs.length ? `<span class="chip ${sd === subs.length ? 'ok' : ''}" title="Étapes faites">✓ ${sd}/${subs.length}</span>` : '',
     t.notes ? '<span class="chip" title="Contient des notes">✎</span>' : '',
