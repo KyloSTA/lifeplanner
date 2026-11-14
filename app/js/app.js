@@ -118,7 +118,7 @@ const routes = {
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
 };
-const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', usage: 'settings', habits: 'hero', month: 'week', year: 'week', journal: 'week' };
+const NAV_PARENT = { page: 'notebook', note: 'brain', setup: 'settings', usage: 'settings', quest: 'hero', habits: 'hero', month: 'week', year: 'week', journal: 'week' };
 // Outils d'interface passés aux modules des onglets Habitudes, Cours RBQ et Workout
 const pageCtx = () => ({ view, modal, toast, confirmBox, setCleanup: (fn) => { cleanup = fn; } });
 
@@ -813,7 +813,8 @@ async function renderHero() {
   const owned = new Set((await db.get('settings', 'badges')) || []);
   const next = AV.nextUnlock(s.level);
   view.innerHTML = `
-    <header class="page-head"><div><p class="eyebrow">Progression</p><h1>Ton héros</h1></div></header>
+    <header class="page-head"><div><p class="eyebrow">Progression</p><h1>Ton héros</h1></div>
+      <div class="head-actions"><a class="btn primary" href="#/quest">⚔️ Aventure</a></div></header>
     <div class="hero-layout">
       <section class="card hero-id">
         <div id="hero-big">${AV.avatarSVG(av, 168)}</div>
@@ -2983,7 +2984,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'finance', 'quest', 'workout', 'rbq']; // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'missions', 'brain', 'goals', 'finance', 'workout', 'rbq']; // Aventure : dans la page du héros (Progression) // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];
