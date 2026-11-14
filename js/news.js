@@ -111,6 +111,40 @@ async function fetchFeed(feed) {
   }));
 }
 
+/* ---------- Google Actualités : son fil n'a pas d'images ----------
+   Le titre finit par « - Nom du journal ». On sépare le journal, on reprend la photo du même article
+   s'il est dans une autre source (La Presse, TVA…), sinon on affiche le logo du journal. */
+const PUBS = {
+  'tva nouvelles': 'tvanouvelles.ca', 'la presse': 'lapresse.ca', 'le devoir': 'ledevoir.com', 'radio-canada': 'ici.radio-canada.ca',
+  'radio-canada.ca': 'ici.radio-canada.ca', 'ici radio-canada': 'ici.radio-canada.ca', 'le journal de montréal': 'journaldemontreal.com',
+  'journal de montréal': 'journaldemontreal.com', 'le journal de québec': 'journaldequebec.com', 'journal de québec': 'journaldequebec.com',
+  'le soleil': 'lesoleil.com', 'le droit': 'ledroit.com', 'la tribune': 'latribune.ca', 'le nouvelliste': 'lenouvelliste.ca',
+  'le quotidien': 'lequotidien.com', 'la voix de l\'est': 'lavoixdelest.ca', 'noovo info': 'noovo.info', 'noovo': 'noovo.info',
+  '98.5 montréal': 'qub.ca', 'qub': 'qub.ca', 'métro': 'journalmetro.com', 'l\'actualité': 'lactualite.com', 'les affaires': 'lesaffaires.com',
+  'rds': 'rds.ca', 'rds.ca': 'rds.ca', 'tva sports': 'tvasports.ca', 'narcity québec': 'narcity.com', 'narcity': 'narcity.com',
+  'cbc': 'cbc.ca', 'cbc news': 'cbc.ca', 'ctv news': 'ctvnews.ca', 'global news': 'globalnews.ca', 'montreal gazette': 'montrealgazette.com',
+  'the globe and mail': 'theglobeandmail.com', 'cnn': 'cnn.com', 'bbc': 'bbc.com', 'reuters': 'reuters.com', 'le monde': 'lemonde.fr',
+  'le figaro': 'lefigaro.fr', 'france 24': 'france24.com', 'tvanouvelles.ca': 'tvanouvelles.ca', 'lapresse.ca': 'lapresse.ca',
+};
+const normTitle = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+async function enrichGoogle(items) {
+  const g = items.filter((x) => /^gnews/.test(x.src) && !x.img);
+  if (!g.length) return;
+  // Photos connues : titres de cette section et des autres sections déjà chargées
+  const pool = [...items];
+  for (const k of ['news', ...SECTIONS.map(([s]) => 'news-' + s)]) pool.push(...((await db.get('cache', k))?.items || []));
+  const byTitle = pool.filter((x) => x.img && !/^gnews/.test(x.src)).map((x) => [normTitle(x.title), x.img]);
+  for (const x of g) {
+    const m = x.title.match(/^(.*\S)\s+[-–—|]\s+([^-–—|]{2,60})$/);
+    if (m) { x.title = m[1]; x.pub = m[2].trim(); }
+    const t = normTitle(x.title);
+    const hit = t.length > 20 && byTitle.find(([o]) => o === t || (o.length > 20 && (o.startsWith(t.slice(0, 45)) || t.startsWith(o.slice(0, 45)))));
+    if (hit) { x.img = hit[1]; continue; }
+    const dom = PUBS[(x.pub || '').toLowerCase()];
+    if (dom) x.logo = `https://www.google.com/s2/favicons?domain=${dom}&sz=128`;
+  }
+}
+
 /** Tous les titres des sources activées (cache 20 min, ou force = true). */
 export async function load(force = false, cat = 'general') {
   const list = (await feeds()).filter((f) => f.on && f.cat === cat);
@@ -119,11 +153,15 @@ export async function load(force = false, cat = 'general') {
   const key = list.map((f) => f.id + f.url).join('|');
   // Une source a échoué (souvent : trop de fils convertis d'un coup) : on réessaie après 2 min au lieu de 20
   const ttl = cache.errors?.length ? 2 * 60_000 : TTL;
-  if (!force && cache.key === key && Date.now() - cache.at < ttl && cache.items.length) return cache;
+  if (!force && cache.key === key && Date.now() - cache.at < ttl && cache.items.length) {
+    if (cache.items.some((x) => /^gnews/.test(x.src) && !x.img && !x.logo && !x.pub)) await enrichGoogle(cache.items).catch(() => {}); // titres gardés avant cette version
+    return cache;
+  }
   const errors = [];
   const results = await Promise.all(list.map((f) => fetchFeed(f).catch((e) => { errors.push(`${f.name} : ${e.message}`); return []; })));
   const seen = new Set();
   const items = results.flat().filter((x) => x.title && x.link && !seen.has(x.title) && seen.add(x.title)).sort((a, b) => b.date - a.date).slice(0, 120);
+  await enrichGoogle(items).catch(() => {});
   const out = { at: Date.now(), items, errors, key };
   if (items.length) await db.put('cache', out, ckey);
   else if (cache.items.length) return { ...cache, errors }; // hors ligne : on garde les derniers titres
@@ -301,9 +339,10 @@ export async function renderPage(ctx, force = false) {
     const saved = await savedLinks();
     const [top, ...rest] = items;
     const card = (x, big = false) => `<article class="card nw-item ${big ? 'nw-top' : ''}">
-        ${x.img ? `<a class="nw-img" href="${esc(x.link)}" target="_blank" rel="noopener"><img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>` : ''}
+        ${x.img ? `<a class="nw-img" href="${esc(x.link)}" target="_blank" rel="noopener"><img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`
+          : x.logo || x.pub ? `<a class="nw-img nw-logo" href="${esc(x.link)}" target="_blank" rel="noopener" aria-label="${esc(x.pub || '')}">${x.logo ? `<img src="${esc(x.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" onload="if(this.naturalWidth<48)this.classList.add('sm')">` : ''}<span>${esc(x.pub || '')}</span></a>` : ''}
         <div class="nw-body">
-          <p class="nw-meta"><i class="nw-dot" style="--c:${esc(byId[x.src]?.color || '#888')}"></i>${esc(byId[x.src]?.name || '')} · ${ago(x.date)}</p>
+          <p class="nw-meta"><i class="nw-dot" style="--c:${esc(byId[x.src]?.color || '#888')}"></i>${esc(byId[x.src]?.name || '')}${x.pub ? ` · <b>${esc(x.pub)}</b>` : ''} · ${ago(x.date)}</p>
           <a class="nw-title" href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a>
           ${x.text && big ? `<p class="nw-text">${esc(x.text)}</p>` : ''}
           ${saveBtn(x, saved)}
