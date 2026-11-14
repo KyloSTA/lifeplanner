@@ -1432,7 +1432,7 @@ async function renderNote(id) {
   // Bandeau « à classer »
   const drawInbox = () => {
     $('#n-inbox').innerHTML = n.inbox ? `<div class="inbox-banner">📥 <span>Cette idée attend d’être classée : choisis son type, ajoute des <b>#étiquettes</b> ou des <b>[[liens]]</b>, puis</span>
-      <button class="btn primary" id="n-triage">Classer (+${game.XP.triage} XP)</button></div>` : '';
+      <button class="btn primary" id="n-triage" title="Range la note : elle quitte « À classer » (et te donne quelques points d’XP)">Classer</button></div>` : '';
     $('#n-triage')?.addEventListener('click', async () => {
       n.inbox = false;
       await flush();
