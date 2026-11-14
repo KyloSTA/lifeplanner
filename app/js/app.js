@@ -3385,6 +3385,9 @@ game.init().catch(console.error).finally(async () => {
   }
   router();
   usage.start().catch(console.error);
+  // Finances : rappel hebdomadaire (après la synchro, pour ne le créer qu'une fois) et import auto du dossier surveillé
+  sync.firstSync().then(() => finance.checkReminder()).catch(console.error);
+  finance.autoImport().then((r) => { if (r?.added) toast(`📁 ${r.files} relevé${r.files > 1 ? 's' : ''} importé${r.files > 1 ? 's' : ''} · ${r.added} nouvelle${r.added > 1 ? 's' : ''} transaction${r.added > 1 ? 's' : ''}`); }).catch(() => {});
   timer.mount();
   // Synchro : des changements arrivent d'un autre appareil -> on rafraîchit la vue (sauf pendant une saisie)
   sync.start((stores, n) => {

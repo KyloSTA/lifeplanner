@@ -349,9 +349,11 @@ export async function renderPage(ctx, arg) {
     <header class="page-head">
       <div><p class="eyebrow">Argent</p><h1>Finances</h1></div>
       <div class="head-actions">
+        <button class="btn" id="fi-auto" title="Import automatique depuis ton dossier Téléchargements et rappel hebdomadaire">⚙ Import auto</button>
         <label class="btn primary" id="fi-import" title="Relevés .csv de ta banque (compte chèques, carte de crédit)"><input type="file" accept=".csv,text/csv" multiple hidden>⬆ Importer un relevé .csv</label>
       </div>
     </header>
+    <div id="fi-autobar"></div>
     ${hasData ? `<div class="fi-bar">
       <div class="seg" role="tablist">${[['apercu', '📊 Aperçu'], ['budget', '🎯 Budget'], ['transactions', '🧾 Transactions']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>
       <div class="fi-month">
@@ -373,6 +375,21 @@ export async function renderPage(ctx, arg) {
     renderPage(ctx);
   };
   $('#fi-import input').onchange = (e) => doImport(e.target.files);
+  $('#fi-auto').onclick = () => autoSettings(ctx, () => renderPage(ctx));
+  // Dossier surveillé : nouveaux relevés importés à l'ouverture de la page
+  (async () => {
+    const st = await dirStatus();
+    const bar = $('#fi-autobar');
+    if (!bar || !st.on) return;
+    if (st.perm !== 'granted') {
+      bar.innerHTML = `<div class="fi-autobar warn">📁 Import auto : Edge demande de confirmer l’accès au dossier « ${esc(st.name)} ». <button class="btn sm-text" id="fi-perm">Autoriser et vérifier</button></div>`;
+      bar.querySelector('#fi-perm').onclick = async () => { const r = await autoImport({ ask: true }); afterAuto(ctx, r, () => renderPage(ctx)); };
+      return;
+    }
+    const r = await autoImport();
+    if (r?.added) afterAuto(ctx, r, () => renderPage(ctx));
+    else if (bar.isConnected) bar.innerHTML = `<div class="fi-autobar">📁 Import auto actif : « ${esc(st.name)} » · aucun nouveau relevé</div>`;
+  })().catch(console.error);
   // Glisser-déposer des fichiers sur la page
   const drop = $('#fi-drop');
   view.ondragover = (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); drop.hidden = false; } };
@@ -400,6 +417,128 @@ function emptyState() {
     </ol>
     <p class="muted">Réimporter un relevé plus récent ajoute seulement les nouvelles transactions (pas de doublons). Tout reste sur tes appareils et dans ta synchronisation Google Drive privée ; les courriels des destinataires et les numéros de compte ne sont pas enregistrés.</p>
   </section>`;
+}
+
+/* =========================================================
+   Import automatique (dossier Téléchargements) et rappel hebdomadaire
+   ========================================================= */
+// Le dossier choisi est gardé sur cet appareil (store « cache », jamais synchronisé).
+// On ne lit que les relevés Wealthsimple : chequing-activities-….csv et credit-card-activities-….csv.
+const DIR_KEY = 'financeDir', SEEN_KEY = 'financeDirSeen';
+const STATEMENT_RE = /^(chequing|credit-card)-activities.*\.csv$/i;
+export const canWatch = () => typeof window.showDirectoryPicker === 'function';
+export async function dirStatus() {
+  const h = await db.get('cache', DIR_KEY).catch(() => null);
+  if (!h) return { on: false };
+  let perm = 'prompt';
+  try { perm = await h.queryPermission({ mode: 'read' }); } catch { /* ignore */ }
+  return { on: true, name: h.name, perm, last: (await db.get('cache', 'financeDirLast')) || 0 };
+}
+async function chooseDir() {
+  const h = await window.showDirectoryPicker({ id: 'lp-finance', mode: 'read', startIn: 'downloads' });
+  await db.put('cache', h, DIR_KEY);
+  // Les relevés déjà importés à la main ne seront pas relus : on mémorise ceux qui sont là
+  return h;
+}
+/** Importe les nouveaux relevés du dossier surveillé. ask : peut demander la permission (après un clic). */
+export async function autoImport({ ask = false } = {}) {
+  const h = await db.get('cache', DIR_KEY).catch(() => null);
+  if (!h) return null;
+  let perm = await h.queryPermission({ mode: 'read' }).catch(() => 'denied');
+  if (perm !== 'granted' && ask) perm = await h.requestPermission({ mode: 'read' }).catch(() => 'denied');
+  if (perm !== 'granted') return { needPermission: true };
+  const seen = (await db.get('cache', SEEN_KEY)) || {};
+  const files = [];
+  for await (const entry of h.values()) {
+    if (entry.kind !== 'file' || !STATEMENT_RE.test(entry.name)) continue;
+    const f = await entry.getFile();
+    const sig = `${f.size}|${f.lastModified}`;
+    if (seen[entry.name] === sig) continue;
+    files.push(f);
+    seen[entry.name] = sig;
+  }
+  await db.put('cache', Date.now(), 'financeDirLast');
+  if (!files.length) return { files: 0, added: 0 };
+  const rep = await importFiles(files);
+  await db.put('cache', seen, SEEN_KEY);
+  await completeReminder(); // le relevé de la semaine est rentré : la mission de rappel se coche toute seule
+  return { files: files.length, added: rep.reduce((a, r) => a + (r.added || 0), 0), rep };
+}
+function afterAuto(ctx, r, redraw) {
+  if (!r) return;
+  if (r.needPermission) { ctx.toast('Accès au dossier refusé : l’import auto attendra ton autorisation', 'err'); return; }
+  ctx.toast(r.files ? `📁 ${r.files} relevé${r.files > 1 ? 's' : ''} importé${r.files > 1 ? 's' : ''} automatiquement · ${r.added} nouvelle${r.added > 1 ? 's' : ''} transaction${r.added > 1 ? 's' : ''}` : '📁 Aucun nouveau relevé dans le dossier');
+  redraw();
+}
+
+// Rappel : une mission « Exporter tes relevés Wealthsimple » chaque semaine (réglage synchronisé, une seule fois par semaine)
+const REM_KEY = 'financeReminder', REM_LAST = 'financeReminderLast';
+const WS_URL = 'https://my.wealthsimple.com/app/activity';
+export async function reminderCfg() { return { on: true, day: 0, time: '10:00', ...((await db.get('settings', REM_KEY)) || {}) }; }
+/** Crée la mission de rappel de la semaine si son jour est arrivé (appelé au démarrage de l'app). */
+export async function checkReminder() {
+  const cfg = await reminderCfg();
+  if (!cfg.on) return;
+  const today = new Date();
+  const back = (today.getDay() - cfg.day + 7) % 7;
+  const due = U.addDays(U.startOfDay(today), -back); // dernier jour de rappel (aujourd'hui compris)
+  const week = U.iso(due);
+  const last = await db.get('settings', REM_LAST);
+  if (!last) { // premier démarrage : le premier rappel sera au prochain jour choisi (sauf si c'est aujourd'hui)
+    if (back !== 0) { await db.put('settings', week, REM_LAST); return; }
+  } else if (last >= week) return;
+  await db.put('settings', week, REM_LAST);
+  const { addTask } = await import('./tasks.js');
+  const t = await addTask('📥 Exporter tes relevés Wealthsimple', U.iso(today));
+  const cur = await db.get('tasks', t.id);
+  cur.kind = 'finance-export';
+  cur.notes = `Dans Wealthsimple : Activité → choisis le compte chèques (et la carte de crédit) → Exporter en .csv.\n${WS_URL}\nSi l’import auto est actif, la mission se coche toute seule quand le fichier arrive dans ton dossier Téléchargements.`;
+  const [h, m] = cfg.time.split(':').map(Number);
+  const at = new Date(today); at.setHours(h, m, 0, 0);
+  if (at > today) cur.alarmAt = at.getTime(); // alarme à l'heure choisie (si elle n'est pas passée)
+  await db.put('tasks', cur);
+}
+async function completeReminder() {
+  const open = (await db.all('tasks')).filter((t) => t.kind === 'finance-export' && !t.done);
+  if (!open.length) return;
+  const { setTaskDone } = await import('./tasks.js');
+  for (const t of open) await setTaskDone(t.id, true);
+}
+
+async function autoSettings(ctx, onDone) {
+  const st = await dirStatus();
+  const rem = await reminderCfg();
+  const DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  ctx.modal(`<h2>Import automatique</h2>
+    <section class="fi-auto-sec">
+      <h3>📁 Dossier surveillé</h3>
+      ${!canWatch() ? '<p class="muted">Disponible sur ordinateur, dans Edge ou Chrome. Sur cellulaire, continue avec « Importer un relevé » : la synchro apporte les imports faits sur ton ordi.</p>'
+        : st.on ? `<p>Actif : <b>${esc(st.name)}</b>${st.last ? ` · vérifié ${esc(U.fmtShort(new Date(st.last)))} ${esc(U.fmtTime(new Date(st.last)))}` : ''}.</p>
+          <p class="muted">À chaque ouverture de Finances, les nouveaux fichiers <code>chequing-activities-….csv</code> et <code>credit-card-activities-….csv</code> sont importés tout seuls (sans doublons).</p>
+          <div class="modal-actions" style="justify-content:flex-start"><button class="btn" id="fa-check">Vérifier maintenant</button><button class="btn" id="fa-change">Changer de dossier</button><button class="btn danger" id="fa-stop">Arrêter</button></div>`
+        : `<p class="muted">Choisis ton dossier <b>Téléchargements</b> : les relevés que tu exportes de Wealthsimple y arrivent, et l’app les importera toute seule à l’ouverture de Finances. Elle ne lit que ces relevés.</p>
+          <div class="modal-actions" style="justify-content:flex-start"><button class="btn primary" id="fa-choose">Choisir le dossier Téléchargements</button></div>`}
+    </section>
+    <section class="fi-auto-sec">
+      <h3>⏰ Rappel hebdomadaire</h3>
+      <label class="check"><input type="checkbox" id="fa-rem" ${rem.on ? 'checked' : ''}> Me rappeler d’exporter mes relevés</label>
+      <div class="row"><label>Jour<select id="fa-day">${DAYS.map((d, i) => `<option value="${i}" ${rem.day === i ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
+        <label>Heure<input type="time" id="fa-time" value="${esc(rem.time)}"></label></div>
+      <p class="muted">Ce jour-là, la mission « 📥 Exporter tes relevés Wealthsimple » apparaît dans Aujourd’hui avec une alarme et le lien vers Wealthsimple. Elle se coche toute seule quand le relevé est importé.</p>
+    </section>
+    <div class="modal-actions"><button class="btn" data-close>Fermer</button><button class="btn primary" id="fa-save">Enregistrer</button></div>`, (m, close) => {
+    const run = async (fn) => { try { await fn(); } catch (err) { if (err?.name !== 'AbortError') ctx.toast(err.message || 'Impossible', 'err'); } };
+    m.querySelector('#fa-choose')?.addEventListener('click', () => run(async () => { await chooseDir(); close(); afterAuto(ctx, await autoImport({ ask: true }), onDone); }));
+    m.querySelector('#fa-change')?.addEventListener('click', () => run(async () => { await chooseDir(); close(); afterAuto(ctx, await autoImport({ ask: true }), onDone); }));
+    m.querySelector('#fa-check')?.addEventListener('click', () => run(async () => { close(); afterAuto(ctx, await autoImport({ ask: true }), onDone); }));
+    m.querySelector('#fa-stop')?.addEventListener('click', () => run(async () => { await db.del('cache', DIR_KEY); close(); ctx.toast('Import auto arrêté'); onDone(); }));
+    m.querySelector('#fa-save').onclick = async () => {
+      await db.put('settings', { on: m.querySelector('#fa-rem').checked, day: Number(m.querySelector('#fa-day').value), time: m.querySelector('#fa-time').value || '10:00' }, REM_KEY);
+      close();
+      ctx.toast('⏰ Rappel enregistré');
+      checkReminder().catch(console.error);
+    };
+  });
 }
 
 function importReport(ctx, rep) {

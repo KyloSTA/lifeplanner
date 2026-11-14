@@ -2043,3 +2043,11 @@ h2 { font-weight: 600; }
 .page-head:has(.planner-tabs) #sync + .btn { margin-left: auto; }
 @media (max-width: 700px) { .page-head:has(.planner-tabs) #sync { flex: 1 1 100%; margin-left: 0; } .page-head:has(.planner-tabs) #sync + .btn { margin-left: 0; } }
 @media (max-width: 700px) { .page-head .planner-tabs a { flex: none; padding: 0 12px; } }
+/* Finances : import automatique */
+.fi-autobar { margin: -4px 0 12px; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fi-autobar.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--gold-border); }
+.fi-auto-sec { padding: 10px 0; border-top: 1px solid var(--border); }
+.fi-auto-sec h3 { margin: 0 0 6px; font-size: 15px; }
+.fi-auto-sec p { margin: 4px 0 8px; }
+.fi-auto-sec .row { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
+.fi-auto-sec .row label { display: grid; gap: 4px; font-size: 13px; }
