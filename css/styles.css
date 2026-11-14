@@ -1938,6 +1938,12 @@ h2 { font-weight: 600; }
 .view-grid .note-card:not(:has(> .nc-img)) p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; }
 .view-grid .nc-foot { font-size: 12px; }
 @media (max-width: 600px) { .note-grid.view-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .view-list .note-card { grid-template-columns: 64px minmax(0, 1fr) auto; } .view-list .note-card .nc-img img { height: 48px; } }
-/* Dates préprogrammées sous « + Mission » */
-.quick-dates { flex: 1 1 100%; display: flex; gap: 6px; flex-wrap: wrap; }
-.quick-dates .chip-btn { padding: 4px 10px; font-size: 13px; }
+/* Dates rapides sous « + Mission » : bouton 📅 et son menu */
+.add-mission > .btn.icon:not(.qd-btn) { order: 2; }
+.qd-wrap { position: relative; order: 1; flex: none; }
+.qd-btn { width: 40px; font-size: 16px; }
+.qd-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 160px; display: grid; padding: 6px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.qd-menu button { text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.qd-menu button:hover, .qd-menu button:focus-visible { background: var(--surface-2); outline: none; }
+.qd-menu button.on { color: var(--accent); font-weight: 600; }
+.qd-menu button.on::after { content: ' ✓'; }

@@ -557,11 +557,20 @@ async function quoteCard() {
 }
 
 /* ---------- Dates préprogrammées sous les boîtes « + Mission » (objectifs, projets) ---------- */
-const QUICK_DATES = `<div class="quick-dates" role="group" aria-label="Date rapide">
-  <button type="button" class="chip-btn" data-qd="today">Aujourd’hui</button>
-  <button type="button" class="chip-btn" data-qd="tomorrow">Demain</button>
-  <button type="button" class="chip-btn" data-qd="weekend" title="Samedi qui vient (aujourd’hui si on est déjà la fin de semaine)">Week-end</button>
-  <button type="button" class="chip-btn" data-qd="none">Sans date</button></div>`;
+// Petit bouton 📅 à côté de la date : ouvre un menu de dates rapides
+const QUICK_DATES = `<span class="qd-wrap">
+  <button type="button" class="btn icon qd-btn" aria-haspopup="menu" aria-expanded="false" title="Dates rapides" aria-label="Dates rapides">📅</button>
+  <div class="qd-menu" role="menu" hidden>
+    <button type="button" role="menuitem" data-qd="today">Aujourd’hui</button>
+    <button type="button" role="menuitem" data-qd="tomorrow">Demain</button>
+    <button type="button" role="menuitem" data-qd="weekend" title="Samedi qui vient (aujourd’hui si on est déjà la fin de semaine)">Week-end</button>
+    <button type="button" role="menuitem" data-qd="none">Sans date</button>
+  </div></span>`;
+const closeQuickMenus = (except) => document.querySelectorAll('.qd-menu:not([hidden])').forEach((m) => {
+  if (m === except) return;
+  m.hidden = true;
+  m.previousElementSibling?.setAttribute('aria-expanded', 'false');
+});
 function quickDate(kind) {
   const d = new Date();
   if (kind === 'tomorrow') return iso(U.addDays(d, 1));
@@ -574,14 +583,26 @@ const syncQuickDates = (form) => {
   form.querySelectorAll('[data-qd]').forEach((b) => b.classList.toggle('on', quickDate(b.dataset.qd) === v));
 };
 document.addEventListener('click', (e) => {
+  // 📅 : ouvre ou ferme le menu
+  const btn = e.target.closest('.qd-btn');
+  if (btn) {
+    const menu = btn.nextElementSibling;
+    closeQuickMenus(menu);
+    menu.hidden = !menu.hidden;
+    btn.setAttribute('aria-expanded', String(!menu.hidden));
+    if (!menu.hidden) { syncQuickDates(btn.closest('form')); (menu.querySelector('.on') || menu.querySelector('button')).focus(); }
+    return;
+  }
   const b = e.target.closest('[data-qd]');
   const form = b?.closest('form');
   const input = form?.querySelector('input[type="date"]');
-  if (!input) return;
+  if (!input) { if (!e.target.closest('.qd-menu')) closeQuickMenus(); return; }
   input.value = quickDate(b.dataset.qd);
   syncQuickDates(form);
+  closeQuickMenus();
   form.querySelector('input[name="t"]')?.focus();
 });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.qd-menu:not([hidden])')) { e.stopPropagation(); closeQuickMenus(); } }, true);
 document.addEventListener('input', (e) => { if (e.target.matches?.('.add-mission input[type="date"]')) syncQuickDates(e.target.closest('form')); });
 // Le bouton qui correspond à la date déjà inscrite s'allume quand la boîte apparaît
 new MutationObserver(() => document.querySelectorAll('form.add-mission:not([hidden]):not([data-qd-sync])').forEach((f) => { f.dataset.qdSync = '1'; syncQuickDates(f); }))
