@@ -1560,7 +1560,7 @@ async function renderNote(id) {
       <div class="head-actions">
         <select id="n-type" style="width:auto" aria-label="Type">${brain.TYPES.map((t) => `<option value="${t.id}" ${t.id === n.type ? 'selected' : ''}>${t.icon} ${t.name}</option>`).join('')}</select>
         <button class="btn" id="n-pin">${n.pinned ? '📌 Épinglée' : '📌 Épingler'}</button>
-        <button class="btn" id="n-task" title="Crée une mission pour aujourd’hui et range cette note dans les Archives">✅ En faire une mission</button>
+        <button class="btn" id="n-task" title="Crée une mission pour aujourd’hui et range cette note dans les Archives">✅ Créer une mission</button>
         <button class="btn" id="n-arch" title="${n.archived ? 'Remettre la note avec les autres' : 'Ranger la note dans les archives (elle garde son type)'}">${n.archived ? '↩ Désarchiver' : '🗄 Archiver'}</button>
         <button class="btn danger" id="n-del">Supprimer</button>
       </div>

@@ -3,7 +3,7 @@
 
 import { db } from './db.js';
 import * as U from './util.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, deleteTask } from './tasks.js';
+import { taskHTML, bindTaskList, addTask, loadGoals, deleteTask, trashList, restoreTask, purgeTasks } from './tasks.js';
 
 const { esc, iso } = U;
 const FILTERS = [
@@ -14,6 +14,7 @@ const FILTERS = [
   ['nodate', 'Sans date'],
   ['done', 'Terminées'],
   ['all', 'Toutes'],
+  ['trash', '🗑 Supprimées'],
 ];
 const state = { f: 'todo', q: '', by: 'date' }; // gardé pendant la session
 
@@ -44,6 +45,7 @@ export async function renderPage(ctx) {
     nodate: open.filter((t) => !t.date).length,
     done: all.filter((t) => t.done).length,
     all: all.length,
+    trash: (await trashList()).length,
   };
   const doneWeek = all.filter((t) => t.done && (t.doneAt || t.updatedAt || t.createdAt || 0) >= weekAgo).length;
 
@@ -74,7 +76,44 @@ export async function renderPage(ctx) {
     </div>
     <div id="ms-list"></div>`;
 
+  // Onglet « Supprimées » : restaurer une mission, ou la supprimer définitivement
+  const drawTrash = async () => {
+    const el = view.querySelector('#ms-list');
+    const nq = state.q.trim().toLowerCase();
+    const list = (await trashList()).filter((t) => !nq || `${t.title} ${t.notes || ''}`.toLowerCase().includes(nq));
+    const gTitle = (id) => goals.find((g) => g.id === id)?.title;
+    el.innerHTML = list.length ? `<section class="card ms-group ms-trash">
+        <div class="card-head"><h2>🗑 Supprimées</h2><button class="btn danger sm-text" id="tr-empty" type="button">Vider (${list.length})</button></div>
+        <p class="muted tr-hint">Une mission supprimée reste ici jusqu’à ce que tu la supprimes définitivement.</p>
+        <ul class="tr-list">${list.map((t) => `<li class="tr-item" data-id="${t.id}">
+          <div class="tr-main"><span class="tr-title">${esc(t.title)}</span>
+            <small class="muted">Supprimée ${esc(U.fmtShort(new Date(t.deletedAt || Date.now())))}${t.date ? ` · prévue ${esc(U.fmtShort(U.parseISO(t.date)))}` : ''}${t.done ? ' · terminée' : ''}${gTitle(t.goalId) ? ` · 🎯 ${esc(gTitle(t.goalId))}` : ''}</small></div>
+          <button class="btn sm-text tr-restore" type="button">↺ Restaurer</button>
+          <button class="btn danger sm-text tr-purge" type="button" title="Supprimer définitivement">Supprimer définitivement</button>
+        </li>`).join('')}</ul></section>`
+      : `<div class="card empty-card"><p>${nq ? 'Aucune mission supprimée ne correspond à ta recherche.' : 'Aucune mission supprimée.'}</p></div>`;
+    el.querySelectorAll('.tr-restore').forEach((b) => (b.onclick = async () => {
+      const t = await restoreTask(b.closest('.tr-item').dataset.id);
+      toast(`↺ « ${t?.title || 'Mission'} » restaurée`);
+      redraw();
+    }));
+    el.querySelectorAll('.tr-purge').forEach((b) => (b.onclick = async () => {
+      const li = b.closest('.tr-item');
+      if (!(await confirmBox(`Supprimer définitivement « ${li.querySelector('.tr-title').textContent} » ? Cette action ne peut pas être annulée.`))) return;
+      await purgeTasks([li.dataset.id]);
+      toast('Mission supprimée définitivement');
+      redraw();
+    }));
+    el.querySelector('#tr-empty')?.addEventListener('click', async () => {
+      if (!(await confirmBox(`Supprimer définitivement les ${list.length} mission(s) de Supprimées ? Cette action ne peut pas être annulée.`))) return;
+      await purgeTasks(list.map((t) => t.id));
+      toast('🗑 Supprimées vidé');
+      redraw();
+    });
+  };
+
   const drawList = () => {
+    if (state.f === 'trash') return drawTrash();
     const nq = state.q.trim().toLowerCase();
     let list = all.filter((t) => {
       switch (state.f) {
@@ -119,9 +158,9 @@ export async function renderPage(ctx) {
       : `<div class="card empty-card"><p>${nq ? 'Aucune mission ne correspond à ta recherche.' : state.f === 'late' ? '🎉 Aucune mission en retard.' : state.f === 'done' ? 'Aucune mission terminée pour l’instant.' : 'Rien ici. Ajoute une mission ci-dessus.'}</p></div>`;
     bindTaskList(el, redraw);
     el.querySelector('#ms-clean')?.addEventListener('click', async () => {
-      if (!(await confirmBox(`Supprimer définitivement ${cleanable.length} mission(s) terminée(s) sans objectif ? Les XP déjà gagnés restent. Les missions liées à un objectif sont gardées pour sa progression.`))) return;
+      if (!(await confirmBox(`Déplacer ${cleanable.length} mission(s) terminée(s) sans objectif dans Supprimées ? Les XP déjà gagnés restent. Les missions liées à un objectif sont gardées pour sa progression.`))) return;
       for (const t of cleanable) await deleteTask(t.id);
-      toast('🧹 Missions terminées supprimées');
+      toast('🧹 Missions terminées déplacées dans Supprimées');
       redraw();
     });
   };
