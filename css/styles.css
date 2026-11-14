@@ -1906,3 +1906,35 @@ h2 { font-weight: 600; }
 .note-article { padding: 10px; }
 .na-img img { display: block; width: 100%; max-height: 360px; object-fit: cover; border-radius: 12px; background: var(--surface-2); }
 .na-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+/* Cerveau : affichages Liste / Grille / Cartes */
+.brain-search-row { display: flex; gap: 8px; align-items: center; }
+.brain-search-row .brain-search { flex: 1 1 auto; min-width: 0; }
+.brain-views { flex: none; }
+.brain-views button { padding: 8px 10px; }
+.brain-views svg { width: 18px; height: 18px; }
+
+/* Liste : une ligne par élément (miniature, titre, début du texte, date) */
+.note-grid.view-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.view-list .note-card { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; column-gap: 14px; row-gap: 3px; align-items: center; min-height: 0; padding: 10px 14px; }
+.view-list .note-card > * { grid-column: 2; }
+.view-list .note-card > .nc-img { grid-column: 1; grid-row: 1 / span 4; margin: 0; align-self: center; }
+.view-list .note-card .nc-img img { height: 56px; border-radius: 8px; }
+.view-list .nc-img > span { display: none; }
+.view-list .nc-yt .nc-play { width: 26px; height: 20px; font-size: 10px; border-radius: 6px; }
+.view-list .note-card > .nc-foot { grid-column: 3; grid-row: 1 / span 4; align-self: center; }
+.view-list .nc-foot .tag, .view-list .nc-foot .grow, .view-list .nc-proj { display: none; }
+.view-list .note-card p { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; }
+.view-list .note-card.has-media .nc-head b { -webkit-line-clamp: 1; }
+.view-list .note-card:not(:has(> .nc-img)) { grid-template-columns: minmax(0, 1fr) auto; }
+.view-list .note-card:not(:has(> .nc-img)) > * { grid-column: 1; }
+.view-list .note-card:not(:has(> .nc-img)) > .nc-foot { grid-column: 2; }
+
+/* Grille : petites tuiles (image et titre) */
+.note-grid.view-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.view-grid .note-card { min-height: 0; padding: 10px; gap: 6px; }
+.view-grid .note-card .nc-img img { height: 104px; }
+.view-grid .nc-head b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 13.5px; line-height: 1.3; }
+.view-grid .note-card p, .view-grid .nc-proj, .view-grid .note-card > .chip, .view-grid .nc-foot .tag { display: none; }
+.view-grid .note-card:not(:has(> .nc-img)) p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; }
+.view-grid .nc-foot { font-size: 12px; }
+@media (max-width: 600px) { .note-grid.view-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .view-list .note-card { grid-template-columns: 64px minmax(0, 1fr) auto; } .view-list .note-card .nc-img img { height: 48px; } }
