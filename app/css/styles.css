@@ -2107,3 +2107,4 @@ h2 { font-weight: 600; }
 .lt-ico svg, .lp-ico svg { width: 66%; height: 66%; display: block; }
 .ico-fav { position: absolute; inset: 20%; width: 60%; height: 60%; object-fit: contain; }
 .lt-ico:has(.ico-fav), .lp-ico:has(.ico-fav) { background: #fff; color: transparent; } /* icône du site sur fond blanc (lisible) */
+.ev-desc a { color: var(--gold-text, var(--accent)); overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; }
