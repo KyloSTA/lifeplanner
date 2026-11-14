@@ -382,3 +382,19 @@ app/js/gcal.js            synchronisation Google Agenda
 app/js/db.js              stockage local (IndexedDB)
 app/sw.js                 mode hors ligne
 ```
+
+## Couple Life Organiser (app partagée à deux)
+Une 2e app, **même code que Life Planner**, pour toi et ta blonde : https://kylosta.github.io/lifeplanner/couple/
+- Ses données sont **séparées** de Life Planner (base « couplelife », fichiers Drive `cp-…`, réglages locaux à part).
+- Chaque amélioration de Life Planner s'applique aussi à l'app couple. La page `app/couple/index.html`
+  est générée à partir de `app/index.html` par `tools/make-couple.ps1` (fait automatiquement par `Publier.bat`).
+- **Qui fait quoi** : chaque mission peut être pour l'un, pour l'autre ou pour les deux (choix « 👤 Pour »),
+  avec le filtre « 🙋 Mes missions » dans Missions. Les prénoms se règlent dans Réglages → 👫 Vous deux.
+
+### Mise en route (une fois)
+1. Crée un compte Google commun pour vous deux (ex. un Gmail du couple).
+2. Dans la console Google Cloud de Life Planner → Écran de consentement → **Audience** : ajoute ce compte comme utilisateur test.
+3. Sur chaque appareil, ouvre l'app couple, installe-la (⋯ → Applications → Installer), puis dans Réglages :
+   colle le même identifiant client Google que Life Planner et connecte-toi **avec le compte commun**
+   (synchronisation et Google Agenda).
+4. Au premier lancement, entre vos deux prénoms et choisis qui utilise l'appareil.
