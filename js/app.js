@@ -1096,14 +1096,17 @@ function cardText(body = '') {
 
 function noteCard(n, proj) {
   const t = brain.typeOf(n.type);
-  return `<a class="note-card ${n.pinned ? 'pinned' : ''}" href="#/note/${n.id}">
-    <div class="nc-head"><span class="nc-type" title="${t.name}">${t.icon}</span><b>${esc(n.title || 'Sans titre')}</b>${n.pinned ? '<span title="Épinglée">📌</span>' : ''}</div>
+  const media = n.source?.kind === 'news' || youtubeVideos(n.body).length > 0; // titre complet sur 2 lignes
+  return `<a class="note-card ${n.pinned ? 'pinned' : ''} ${media ? 'has-media' : ''}" href="#/note/${n.id}">
+    <div class="nc-head"><span class="nc-type" title="${t.name}">${t.icon}</span><b>${esc((n.source?.kind === 'news' && n.source.title) || n.title || 'Sans titre')}</b>${n.pinned ? '<span title="Épinglée">📌</span>' : ''}</div>
     ${n.inbox ? '<span class="chip warn">📥 À classer</span>' : ''}
     ${proj?.goals.length ? `<div class="nc-proj"><span class="muted">🎯 ${proj.goals.length} objectif${proj.goals.length > 1 ? 's' : ''}${proj.missions ? ` · ${proj.done}/${proj.missions} missions` : ''}</span><b>${proj.pct} %</b>
       <div class="bar"><i style="width:${proj.pct}%"></i></div></div>` : ''}
     ${(() => {
       const im = images.refsIn(n.body);
       if (im.length) return `<div class="nc-img"><img data-img="${im[0]}" alt="" loading="lazy">${im.length > 1 ? `<span>+${im.length - 1}</span>` : ''}</div>`;
+      // Article d'actualité : son image
+      if (n.source?.kind === 'news' && n.source.img) return `<div class="nc-img nc-news"><img src="${esc(n.source.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>`;
       // Vidéo YouTube : sa miniature plutôt que le lien
       const v = youtubeVideos(n.body);
       if (!v.length) return '';
@@ -1118,7 +1121,8 @@ function noteCard(n, proj) {
 }
 
 async function renderBrain() {
-  const everything = await brain.allNotes();
+  let everything = await brain.allNotes();
+  if (await news.recoverImages(everything).catch(() => 0)) everything = await brain.allNotes(); // images des articles déjà gardés
   const archivedCount = everything.filter((n) => n.archived).length;
   if (!archivedCount) brainState.arch = false;
   // Mode normal : notes actives seulement. Mode Archives : notes archivées seulement (filtres identiques).
