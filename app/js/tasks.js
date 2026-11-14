@@ -201,7 +201,6 @@ export function taskHTML(t, ref, opts = {}) {
         <label><input type="checkbox" class="t-cb" ${t.done ? 'checked' : ''}><span class="t-title">${esc(t.title)}</span></label>
         ${chips ? `<div class="t-chips">${chips}</div>` : ''}
       </div>
-      <button class="exp" aria-label="Modifier la mission" title="Modifier : étapes, notes, date, objectif">›</button>
       <button class="x t-del" aria-label="Supprimer">×</button>
       <button type="button" class="t-drag" aria-label="Déplacer « ${esc(t.title)} » (glisser, ou flèches ↑ ↓)" title="Glisser pour déplacer"><svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></button>
     </div>
@@ -289,12 +288,14 @@ export function bindTaskList(root, redraw) {
       redraw();
       showUndo(`🗑 « ${title} » déplacée dans Supprimées`, async () => { await restoreTask(id); redraw(); }, 5000);
     };
-    li.querySelector('.exp').onclick = () => openTaskEditor(id, redraw);
+    li.querySelector('.exp')?.addEventListener('click', () => openTaskEditor(id, redraw));
     // Toucher le titre ouvre la mission ; seule la case la marque accomplie
     const title = li.querySelector('.t-title');
     if (title) {
       title.setAttribute('role', 'button');
-      title.title = 'Ouvrir la mission';
+      title.tabIndex = 0; // au clavier : Tab puis Entrée ouvre la mission (remplace l'ancienne flèche ›)
+      title.title = 'Ouvrir la mission : étapes, notes, date, objectif';
+      title.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTaskEditor(id, redraw); } };
       title.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openTaskEditor(id, redraw); };
     }
     // L'espace vide de la ligne (après le titre, autour des pastilles) ouvre aussi la mission, sans la cocher
