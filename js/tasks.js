@@ -198,13 +198,16 @@ function startDrag(e, li, redraw) {
   if (e.button > 0) return;
   e.preventDefault();
   const ul = li.parentElement;
-  const handle = e.currentTarget;
-  handle.setPointerCapture?.(e.pointerId);
+  const pid = e.pointerId;
+  // On écoute toute la fenêtre : déplacer la ligne dans la liste fait perdre la « capture » du pointeur
+  // à la poignée, ce qui arrêtait le glisser après une seule place.
   const startY = e.clientY;
   let moved = false;
   li.classList.add('dragging');
   ul.classList.add('drag-on');
   const onMove = (ev) => {
+    if (ev.pointerId !== pid) return;
+    ev.preventDefault();
     if (!moved && Math.abs(ev.clientY - startY) < 4) return;
     moved = true;
     // On place la mission avant la première voisine dont le milieu est sous le doigt
@@ -214,19 +217,20 @@ function startDrag(e, li, redraw) {
     // Défilement automatique près des bords de l'écran
     if (ev.clientY < 60) scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) scrollBy(0, 12);
   };
-  const onUp = async () => {
-    handle.removeEventListener('pointermove', onMove);
-    handle.removeEventListener('pointerup', onUp);
-    handle.removeEventListener('pointercancel', onUp);
+  const onUp = async (ev) => {
+    if (ev && ev.pointerId !== pid) return;
+    removeEventListener('pointermove', onMove);
+    removeEventListener('pointerup', onUp);
+    removeEventListener('pointercancel', onUp);
     li.classList.remove('dragging');
     ul.classList.remove('drag-on');
     if (!moved) return;
     await saveOrder(ul);
     redraw();
   };
-  handle.addEventListener('pointermove', onMove);
-  handle.addEventListener('pointerup', onUp);
-  handle.addEventListener('pointercancel', onUp);
+  addEventListener('pointermove', onMove, { passive: false });
+  addEventListener('pointerup', onUp);
+  addEventListener('pointercancel', onUp);
 }
 
 export function bindTaskList(root, redraw) {
