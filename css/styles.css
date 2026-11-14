@@ -1953,3 +1953,12 @@ h2 { font-weight: 600; }
 .goal-col .goal > .g-tools { grid-column: 2; grid-row: 2; display: flex; align-items: center; gap: 2px; }
 .goal-col .goal > .g-tools .pct { margin-right: 4px; min-width: 38px; text-align: right; }
 .goal-col .goal > .bar, .goal-col .goal > input[type="range"] { grid-column: 1; grid-row: 2; align-self: center; }
+/* Bas du menu : Réglages et le bouton plein écran côte à côte */
+.rail-foot { margin-top: auto; display: flex; align-items: center; gap: 4px; }
+.rail-foot > a { flex: 1 1 auto; min-width: 0; }
+.rail-fs { flex: none; width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 1px solid var(--rail-line); border-radius: 10px; background: rgba(255, 255, 255, .04); color: var(--rail-text); cursor: pointer; }
+.rail-fs:hover { color: #fff; border-color: var(--gold); background: rgba(255, 255, 255, .1); }
+.rail-fs.active { color: var(--gold); border-color: var(--gold); }
+.rail-fs svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 900px) { .rail-foot { flex-direction: column; } .rail-foot > a { width: 100%; } }
+@media (max-width: 600px) { .rail-foot { margin-top: 0; display: contents; } .rail-fs { display: none !important; } }
