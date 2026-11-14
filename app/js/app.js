@@ -856,7 +856,19 @@ async function heroCard() {
       ${tile('#/habits', 'Habitudes', `${hDone}/${hs.length}`, hs.length ? (hDone === hs.length ? 'toutes faites ✓' : `${hs.length - hDone} restante${hs.length - hDone > 1 ? 's' : ''}`) : 'aucune aujourd’hui', hs.length ? pct(hDone, hs.length) : null, hs.length && hDone === hs.length ? 'ok' : '')}
       ${tile('#/workout', 'Workout', wk.icon, esc(wk.label), null, wk.done ? 'ok' : '')}
       ${tile('#/hero', 'Série', s.streak ? `🔥 ${s.streak}` : '–', `+${s.todayXp} XP aujourd’hui`, null)}
-    </div>`;
+    </div>
+    ${await focusLine()}`;
+}
+
+/** Rappel de l'objectif en focus (page Aujourd'hui) : titre, progression et prochaine mission. */
+async function focusLine() {
+  const fg = (await db.all('goals')).find((g) => g.focus && !isGoalDone(g));
+  if (!fg) return '';
+  const next = (await db.all('tasks')).filter((t) => t.goalId === fg.id && !t.done)
+    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.createdAt - b.createdAt)[0];
+  return `<a class="sum-focus" href="#/goals" title="Objectif en focus">
+    <span class="gc-ring sm" style="--p:${fg.progress || 0}%"><span>${fg.progress || 0}</span></span>
+    <span class="sum-focus-txt"><small>⭐ Focus</small><b>${esc(fg.title)}</b>${next ? `<small class="muted">Prochaine : ${esc(next.title)}</small>` : ''}</span></a>`;
 }
 
 /* ---------- Logo personnel (menu + onglet du navigateur) ---------- */
@@ -2838,21 +2850,40 @@ async function renderGoals() {
     const md = ms.filter((t) => t.done).length;
     const open = openGoals.has(g.id);
     const proj = g.projectId && allProjects.find((p) => p.id === g.projectId);
-    const done = isGoalDone(g);
-    return `<div class="goal ${open ? 'open' : ''} ${goalClass(g)}" data-id="${g.id}">
-      <span class="title" title="Clique pour renommer">${goalMark(g)}<span class="g-name" tabindex="0" role="button" aria-label="Renommer « ${esc(g.title)} »">${esc(g.title)}</span></span>
-      <span class="g-tools"><span class="pct">${g.progress}%</span>
-        <button class="g-done ${g.done ? 'on' : ''}" aria-label="${g.done ? 'Rouvrir l’objectif' : 'Conclure l’objectif'}" title="${g.done ? 'Rouvrir l’objectif' : 'Conclure l’objectif (atteint ou abandonné)'}">${g.done ? '↺' : '✓'}</button>
-        <button class="g-mv" data-swap="${prev || ''}" ${prev ? '' : 'disabled'} aria-label="Monter l’objectif" title="Monter">↑</button><button class="g-mv" data-swap="${next || ''}" ${next ? '' : 'disabled'} aria-label="Descendre l’objectif" title="Descendre">↓</button>
-        <button class="x g-del" aria-label="Supprimer l’objectif">×</button></span>
-      ${goalVerdict(g)}
-      ${proj && !inProjectGroup ? `<a class="chip proj-chip" href="#/note/${proj.id}" title="Projet du Cerveau${proj.archived ? ' (archivé)' : ''}">${proj.archived ? '🗄' : '🚀'} ${esc(proj.title || 'Projet')}</a>` : ''}
-      ${ms.length
-        ? `<div class="bar"><i style="width:${g.progress}%"></i></div>`
-        : `<input type="range" min="0" max="100" step="5" value="${g.progress}" style="--v:${g.progress}%" aria-label="Progression">`}
-      <button class="goal-toggle" aria-expanded="${open}">🎯 ${ms.length ? `${md}/${ms.length} mission${ms.length > 1 ? 's accomplies' : ' accomplie'}` : 'Ajouter des missions'}<span class="exp">›</span></button>
-      ${g.projectId && g.horizon ? `<span class="chip hz-chip">📅 ${esc(HZ_LABEL[g.horizon])}</span>` : ''}
+    const done = isGoalDone(g), dropped = isGoalDropped(g);
+    const late = ms.filter((t) => !t.done && t.date && t.date < today).length;
+    const p = done && !dropped ? 100 : g.progress || 0;
+    const focus = g.focus && !done;
+    const sub = ms.length ? `${md}/${ms.length} mission${ms.length > 1 ? 's' : ''}${late ? ` · <span class="gc-late">⚠ ${late} en retard</span>` : ''}`
+      : done ? 'Détails' : 'Aucune mission — en ajouter';
+    const chips = [
+      proj && !inProjectGroup ? `<a class="chip proj-chip" href="#/note/${proj.id}" title="Projet du Cerveau${proj.archived ? ' (archivé)' : ''}">${proj.archived ? '🗄' : '🚀'} ${esc(proj.title || 'Projet')}</a>` : '',
+      g.projectId && g.horizon && inProjectGroup ? `<span class="chip hz-chip">📅 ${esc(HZ_LABEL[g.horizon])}</span>` : '',
+    ].join('');
+    // Carte d'objectif : anneau de progression (déplie), titre, une ligne de résumé ; les actions sont dans le menu ⋯
+    return `<article class="gcard ${open ? 'open' : ''} ${goalClass(g)} ${focus ? 'is-focus' : ''}" data-id="${g.id}">
+      <div class="gc-row">
+        <button type="button" class="gc-ring goal-toggle" style="--p:${p}%" aria-expanded="${open}" aria-label="${open ? 'Replier' : 'Déplier'} « ${esc(g.title)} » (${p} %)"><span>${dropped ? '⛔' : done ? '✓' : p + '%'}</span></button>
+        <div class="gc-body">
+          <div class="gc-title"><span class="g-name" tabindex="0" role="button" title="Clique pour renommer" aria-label="Renommer « ${esc(g.title)} »">${esc(g.title)}</span>${focus ? '<span class="gc-badge">⭐ Focus</span>' : ''}</div>
+          <button type="button" class="gc-sub goal-toggle" aria-expanded="${open}">${sub}<span class="exp" aria-hidden="true">›</span></button>
+          ${chips ? `<div class="gc-chips">${chips}</div>` : ''}
+          ${goalVerdict(g)}
+        </div>
+        <div class="gc-more">
+          <button type="button" class="gc-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Options de « ${esc(g.title)} »" title="Options">⋯</button>
+          <div class="gc-menu" role="menu" hidden>
+            ${done ? '' : `<button type="button" role="menuitem" data-act="focus">${g.focus ? '☆ Retirer le focus' : '⭐ Mettre en focus'}</button>`}
+            <button type="button" role="menuitem" class="g-done">${g.done ? '↺ Rouvrir l’objectif' : '✓ Conclure l’objectif'}</button>
+            <button type="button" role="menuitem" data-act="rename">✎ Renommer</button>
+            <button type="button" role="menuitem" class="g-mv" data-swap="${prev || ''}" ${prev ? '' : 'disabled'}>↑ Monter</button>
+            <button type="button" role="menuitem" class="g-mv" data-swap="${next || ''}" data-dir="down" ${next ? '' : 'disabled'}>↓ Descendre</button>
+            <button type="button" role="menuitem" class="g-del gc-danger">🗑 Supprimer</button>
+          </div>
+        </div>
+      </div>
       ${open ? `<div class="goal-missions">
+        ${!ms.length && !done ? `<label class="gc-manual"><span>Progression manuelle</span><input type="range" min="0" max="100" step="5" value="${g.progress}" style="--v:${g.progress}%" aria-label="Progression de l’objectif"></label>` : ''}
         <div class="goal-settings">
           <label class="goal-proj" title="Échéance">📅 <select class="g-hz" aria-label="Échéance">${hzOptions(g.horizon || '')}</select></label>
           <label class="goal-proj" title="Projet">🚀 <select class="g-proj" aria-label="Projet du Cerveau">${projOptions(g.projectId)}</select></label>
@@ -2870,8 +2901,28 @@ async function renderGoals() {
         ${free.length ? `<select class="link-mission" aria-label="Lier une mission existante"><option value="">🔗 Lier une mission existante…</option>
           ${free.map((t) => `<option value="${t.id}">${esc(t.title)}${t.date ? ' · ' + U.fmtShort(U.parseISO(t.date)) : ''}</option>`).join('')}</select>` : ''}
       </div>` : ''}
-    </div>`;
+    </article>`;
   };
+
+  // Objectif en focus : grande carte en haut de la page avec ses prochaines missions
+  const fg = goals.find((g) => g.focus && !isGoalDone(g));
+  const focusHTML = (() => {
+    if (!fg) return '';
+    const ms = tasks.filter((t) => t.goalId === fg.id);
+    const nextMs = ms.filter((t) => !t.done).sort(sortM).slice(0, 4);
+    const proj = fg.projectId && allProjects.find((p) => p.id === fg.projectId);
+    const meta = [ms.length ? `${ms.filter((t) => t.done).length}/${ms.length} missions` : 'aucune mission', fg.horizon ? HZ_LABEL[fg.horizon] : '', proj ? '🚀 ' + (proj.title || 'Projet') : ''].filter(Boolean);
+    return `<section class="card gfocus" data-id="${fg.id}">
+      <div class="gf-head">
+        <div class="gc-ring big" style="--p:${fg.progress || 0}%"><span>${fg.progress || 0}%</span></div>
+        <div class="gf-txt"><p class="eyebrow">⭐ Objectif en focus</p><h2>${esc(fg.title)}</h2><p class="muted">${esc(meta.join(' · '))}</p></div>
+        <button type="button" class="btn gf-off" title="Retirer le focus">☆ Retirer</button>
+      </div>
+      ${nextMs.length ? `<p class="gf-label">Prochaines missions</p><ul class="tasks" id="gf-tasks">${nextMs.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>`
+        : `<p class="empty-sm">${ms.length ? 'Toutes les missions sont faites : conclus l’objectif ou ajoute la suite.' : 'Découpe cet objectif en missions : la première étape commence ici.'}</p>`}
+      <form class="add-mission gf-add"><input name="t" placeholder="Prochaine mission pour cet objectif…" autocomplete="off"><input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
+    </section>`;
+  })();
 
   // Chiffres clés
   const active = goals.filter((g) => !isGoalDone(g));
@@ -2921,9 +2972,14 @@ async function renderGoals() {
       ${projects.length ? `<select name="project" aria-label="Projet">${projOptions('')}</select>` : ''}
       <button class="btn primary">Ajouter</button>
     </form>
+    ${focusHTML}
     ${goalsView === 'hz'
-      ? `<div class="goal-groups">${[...HORIZONS, ...(dated.some((g) => !g.horizon) ? [['', 'Sans échéance']] : [])]
-        .map(([v, l]) => column(l, dated.filter((g) => (g.horizon || '') === v))).join('')}</div>`
+      ? (() => {
+        // Seulement les échéances qui ont des objectifs (les colonnes vides encombraient la page)
+        const cols = [...HORIZONS, ['', 'Sans échéance']].map(([v, l]) => [l, dated.filter((g) => (g.horizon || '') === v)]).filter(([, list]) => list.length);
+        return cols.length ? `<div class="goal-groups">${cols.map(([l, list]) => column(l, list)).join('')}</div>`
+          : '<div class="card empty-card"><p>Aucun objectif pour l’instant : écris le premier ci-dessus.</p></div>';
+      })()
       : projGroups.length
         ? `<div class="goal-groups">${projGroups.map(({ p, list }) => {
           const st = brain.projectStats(p.id, goals, tasks);
@@ -2931,7 +2987,7 @@ async function renderGoals() {
             `<p class="muted goal-proj-meta">${st.pct} % · ${st.missions ? `${st.done}/${st.missions} missions` : 'aucune mission'}</p>`);
         }).join('')}</div>`
         : '<div class="card empty-card"><p>Aucun objectif rattaché à un projet. Crée une note 🚀 Projet dans le Cerveau, puis choisis-la quand tu déplies un objectif.</p></div>'}
-    <p class="hint muted">Ajoute des missions à un objectif : sa progression se calcule toute seule. Sans mission, règle-la avec le curseur. Déplie un objectif pour changer son échéance ou son projet.</p>`;
+    <p class="hint muted">Touche l’anneau ou la ligne des missions pour déplier un objectif (missions, échéance, projet). Le menu ⋯ permet de le mettre en focus, le conclure, le renommer ou le déplacer.</p>`;
   $$('[data-gv]').forEach((b) => (b.onclick = () => { goalsView = b.dataset.gv; renderGoals(); }));
 
   $('#add-goal').onsubmit = async (e) => {
@@ -2943,21 +2999,68 @@ async function renderGoals() {
     await db.put('goals', { id, title, horizon: f.horizon.value, projectId: f.project?.value || null, progress: 0, createdAt: Date.now() });
     openGoals.add(id);
     await renderGoals();
-    $(`.goal[data-id="${id}"] .g-addm`)?.click(); // nouvel objectif : la boîte « mission » s'ouvre tout de suite
+    $(`.gcard[data-id="${id}"] .g-addm`)?.click(); // nouvel objectif : la boîte « mission » s'ouvre tout de suite
   };
-  $$('.goal').forEach((el) => {
+
+  // Objectif en focus : missions, ajout rapide, retirer le focus
+  const gf = $('.gfocus');
+  if (gf) {
+    const gid = gf.dataset.id;
+    if ($('#gf-tasks')) bindTaskList($('#gf-tasks'), renderGoals);
+    $('.gf-off', gf).onclick = () => setGoalFocus(gid, false);
+    $('.gf-add', gf).onsubmit = async (e) => {
+      e.preventDefault();
+      const v = e.target.t.value.trim();
+      if (!v) return;
+      await addTask(v, e.target.d.value || null, gid);
+      await renderGoals();
+      $('.gf-add input')?.focus();
+    };
+  }
+  async function setGoalFocus(id, on) {
+    // Un seul objectif en focus à la fois
+    for (const g of await db.all('goals')) {
+      const want = on && g.id === id;
+      if (!!g.focus !== want) { g.focus = want; await db.put('goals', g); }
+    }
+    const g = goals.find((x) => x.id === id);
+    toast(on ? `⭐ Focus : « ${g?.title || 'objectif'} »` : 'Focus retiré');
+    renderGoals();
+    if (on) view.scrollTo?.({ top: 0, behavior: 'smooth' });
+  }
+
+  // Menu ⋯ : un seul ouvert à la fois ; clic ailleurs ou Échap pour fermer
+  const closeGcMenus = (keep) => $$('.gc-menu').forEach((m) => { if (m !== keep) { m.hidden = true; m.previousElementSibling.setAttribute('aria-expanded', 'false'); m.closest('.gcard')?.classList.remove('menu-open'); } });
+  if (!view.dataset.gcMenuBound) {
+    view.dataset.gcMenuBound = '1';
+    document.addEventListener('click', (e) => { if (!e.target.closest('.gc-more')) closeGcMenus(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeGcMenus(); });
+  }
+
+  $$('.gcard').forEach((el) => {
     const id = el.dataset.id;
     const range = el.querySelector('input[type=range]');
     if (range) {
-      range.oninput = () => { el.querySelector('.pct').textContent = range.value + '%'; range.style.setProperty('--v', range.value + '%'); };
+      const ring = el.querySelector('.gc-ring');
+      range.oninput = () => { ring.style.setProperty('--p', range.value + '%'); ring.querySelector('span').textContent = range.value + '%'; range.style.setProperty('--v', range.value + '%'); };
       range.onchange = async () => {
         const g = await db.get('goals', id);
         g.progress = Number(range.value);
         await db.put('goals', g);
         await game.syncGoal(g);
+        if (g.progress >= 100) renderGoals();
       };
     }
-    el.querySelector('.goal-toggle').onclick = () => { openGoals.has(id) ? openGoals.delete(id) : openGoals.add(id); renderGoals(); };
+    el.querySelectorAll('.goal-toggle').forEach((b) => (b.onclick = () => { openGoals.has(id) ? openGoals.delete(id) : openGoals.add(id); renderGoals(); }));
+    const menuBtn = el.querySelector('.gc-menu-btn'), menu = el.querySelector('.gc-menu');
+    menuBtn.onclick = () => {
+      closeGcMenus(menu);
+      menu.hidden = !menu.hidden;
+      menuBtn.setAttribute('aria-expanded', String(!menu.hidden));
+      el.classList.toggle('menu-open', !menu.hidden);
+    };
+    menu.querySelector('[data-act="focus"]')?.addEventListener('click', () => setGoalFocus(id, !goals.find((x) => x.id === id)?.focus));
+    menu.querySelector('[data-act="rename"]').onclick = () => { closeGcMenus(); startRename(); };
     // Renommer : clic sur le nom -> champ de texte (Entrée ou clic ailleurs = enregistrer, Échap = annuler)
     const nameEl = el.querySelector('.g-name');
     const startRename = () => {
@@ -2995,7 +3098,7 @@ async function renderGoals() {
       if (!other) return;
       const [a, c] = await Promise.all([db.get('goals', id), db.get('goals', other)]);
       let oa = a.order ?? a.createdAt ?? 0, oc = c.order ?? c.createdAt ?? 0;
-      if (oa === oc) oc += b.textContent === '↑' ? -1 : 1;
+      if (oa === oc) oc += b.dataset.dir === 'down' ? 1 : -1;
       a.order = oc; c.order = oa;
       await db.put('goals', a);
       await db.put('goals', c);
@@ -3033,7 +3136,7 @@ async function renderGoals() {
       await addTask(v, e.target.d.value || null, id);
       await renderGoals();
       // On garde la boîte ouverte pour enchaîner plusieurs missions
-      const box2 = $(`.goal[data-id="${id}"] .goal-missions`);
+      const box2 = $(`.gcard[data-id="${id}"] .goal-missions`);
       if (box2) { box2.querySelector('.add-mission').hidden = false; box2.querySelector('.g-addm').textContent = '− Fermer'; box2.querySelector('.add-mission input').focus(); }
     };
     const link = box.querySelector('.link-mission');
