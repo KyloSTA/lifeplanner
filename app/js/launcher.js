@@ -4,6 +4,9 @@
 import { db } from './db.js';
 import { uid } from './util.js';
 
+// Page d'accueil des événements Facebook (onglet « Découvrir » inclus). L'ancienne adresse /events/discover est brisée.
+const FB_EVENTS = 'https://www.facebook.com/events/';
+
 // mode : 'window' = fenêtre séparée, 'tab' = onglet du navigateur, 'app' = application Windows (avec site de secours)
 export const DEFAULTS = [
   { id: 'edge', name: 'Edge', icon: 'e', color: '#0c8484', mode: 'app', app: 'microsoft-edge:https://www.bing.com', url: 'https://www.bing.com' },
@@ -11,7 +14,7 @@ export const DEFAULTS = [
   { id: 'reddit', name: 'Reddit', icon: 'r', color: '#ff4500', mode: 'window', url: 'https://www.reddit.com' },
   { id: 'facebook', name: 'Facebook', icon: 'f', color: '#1877f2', mode: 'window', url: 'https://www.facebook.com' },
   // Événements Facebook autour de toi ; le bouton « 🎟 Activités » de l'extension les envoie dans Activités
-  { id: 'fbevents', name: 'Événements FB', icon: '🎟', color: '#1877f2', mode: 'window', url: 'https://www.facebook.com/events/discover' },
+  { id: 'fbevents', name: 'Événements FB', icon: '🎟', color: '#1877f2', mode: 'window', url: FB_EVENTS },
   { id: 'messenger', name: 'Messenger', icon: '💬', color: '#7b5cff', mode: 'window', url: 'https://www.messenger.com' },
   { id: 'gmail', name: 'Gmail', icon: 'M', color: '#ffffff', mode: 'window', url: 'https://mail.google.com/mail/u/0/' },
   { id: 'amazon', name: 'Amazon', icon: 'a', color: '#232f3e', mode: 'window', url: 'https://www.amazon.ca' },
@@ -82,6 +85,9 @@ export function iconHTML(it) {
 export async function list() {
   const saved = await db.get('settings', 'launcher');
   if (!saved) return DEFAULTS;
+  // Tuile « Événements FB » enregistrée avec l'ancienne adresse brisée : on la corrige
+  const brokenFb = saved.filter((x) => /facebook\.com\/events\/discover/.test(x.url || ''));
+  if (brokenFb.length) { brokenFb.forEach((x) => { x.url = FB_EVENTS; }); await save(saved); }
   // Une seule fois par app : ajoute les nouvelles apps (Gmail, Amazon) à une liste déjà personnalisée, avant Spotify.
   // Si tu les retires ensuite, elles ne reviennent pas.
   for (const [id, flag, re] of [['gmail', 'launcherGmail', /mail\.google\.com/], ['amazon', 'launcherAmazon', /amazon\./],
