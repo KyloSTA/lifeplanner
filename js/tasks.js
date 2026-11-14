@@ -165,6 +165,7 @@ export function taskHTML(t, ref, opts = {}) {
       </div>
       <button class="exp" aria-label="Modifier la mission" title="Modifier : étapes, notes, date, objectif">›</button>
       <button class="x t-del" aria-label="Supprimer">×</button>
+      <button type="button" class="t-drag" aria-label="Déplacer « ${esc(t.title)} » (glisser, ou flèches ↑ ↓)" title="Glisser pour déplacer"><svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></button>
     </div>
   </li>`;
 }
@@ -181,6 +182,51 @@ export function showUndo(text, onUndo, ms = 3000) {
   const hide = () => { bar.className = ''; };
   bar.querySelector('button').onclick = async () => { clearTimeout(undoTimer); hide(); await onUndo(); dispatchEvent(new Event('lp-undo')); };
   undoTimer = setTimeout(hide, ms);
+}
+
+/** Enregistre l'ordre affiché d'une liste de missions (champ « order », synchronisé). */
+async function saveOrder(ul) {
+  const ids = [...ul.children].filter((x) => x.classList.contains('task')).map((x) => x.dataset.id);
+  for (let i = 0; i < ids.length; i++) {
+    const t = await db.get('tasks', ids[i]);
+    if (t && t.order !== i * 10) { t.order = i * 10; t.updatedAt = Date.now(); await db.put('tasks', t); }
+  }
+}
+
+// Glisser-déposer d'une mission dans sa liste (pointer events : souris, doigt et stylet)
+function startDrag(e, li, redraw) {
+  if (e.button > 0) return;
+  e.preventDefault();
+  const ul = li.parentElement;
+  const handle = e.currentTarget;
+  handle.setPointerCapture?.(e.pointerId);
+  const startY = e.clientY;
+  let moved = false;
+  li.classList.add('dragging');
+  ul.classList.add('drag-on');
+  const onMove = (ev) => {
+    if (!moved && Math.abs(ev.clientY - startY) < 4) return;
+    moved = true;
+    // On place la mission avant la première voisine dont le milieu est sous le doigt
+    const others = [...ul.children].filter((x) => x !== li && x.classList.contains('task'));
+    const before = others.find((x) => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+    if (before) { if (li.nextElementSibling !== before) ul.insertBefore(li, before); } else if (ul.lastElementChild !== li) ul.appendChild(li);
+    // Défilement automatique près des bords de l'écran
+    if (ev.clientY < 60) scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) scrollBy(0, 12);
+  };
+  const onUp = async () => {
+    handle.removeEventListener('pointermove', onMove);
+    handle.removeEventListener('pointerup', onUp);
+    handle.removeEventListener('pointercancel', onUp);
+    li.classList.remove('dragging');
+    ul.classList.remove('drag-on');
+    if (!moved) return;
+    await saveOrder(ul);
+    redraw();
+  };
+  handle.addEventListener('pointermove', onMove);
+  handle.addEventListener('pointerup', onUp);
+  handle.addEventListener('pointercancel', onUp);
 }
 
 export function bindTaskList(root, redraw) {
@@ -203,6 +249,21 @@ export function bindTaskList(root, redraw) {
       title.setAttribute('role', 'button');
       title.title = 'Ouvrir la mission';
       title.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openTaskEditor(id, redraw); };
+    }
+    // ⋮⋮ : glisser pour changer la place de la mission dans sa liste (souris ou doigt), ou flèches ↑ ↓ au clavier
+    const handle = li.querySelector('.t-drag');
+    if (handle) {
+      handle.onpointerdown = (e) => startDrag(e, li, redraw);
+      handle.onkeydown = async (e) => {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        const sib = e.key === 'ArrowUp' ? li.previousElementSibling : li.nextElementSibling;
+        if (!sib?.classList.contains('task')) return;
+        e.key === 'ArrowUp' ? sib.before(li) : sib.after(li);
+        await saveOrder(li.parentElement);
+        await redraw();
+        document.querySelector(`.task[data-id="${id}"] .t-drag`)?.focus();
+      };
     }
     // 📷 : ouvre les photos de la mission en plein écran
     const ph = li.querySelector('.t-photos');

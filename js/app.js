@@ -290,7 +290,7 @@ async function taskCard(el, date) {
     const all = await db.all('tasks');
     const items = all
       .filter((t) => t.date === date || (!t.done && t.date && t.date < date))
-      .sort((a, b) => a.done - b.done || a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+      .sort((a, b) => a.done - b.done || a.date.localeCompare(b.date) || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     const done = items.filter((t) => t.done).length;
     const late = items.filter((t) => !t.done && t.date < date).sort((a, b) => a.date.localeCompare(b.date));
     el.innerHTML = `<div class="card-head"><h2>📋 Missions du jour</h2><span class="muted">${done}/${items.length} · <a href="#/missions">Gérer →</a></span></div>
@@ -865,7 +865,7 @@ async function focusLine() {
   const fg = (await db.all('goals')).find((g) => g.focus && !isGoalDone(g));
   if (!fg) return '';
   const next = (await db.all('tasks')).filter((t) => t.goalId === fg.id && !t.done)
-    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.createdAt - b.createdAt)[0];
+    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt)[0];
   return `<a class="sum-focus" href="#/goals" title="Objectif en focus">
     <span class="gc-ring sm" style="--p:${fg.progress || 0}%"><span>${fg.progress || 0}</span></span>
     <span class="sum-focus-txt"><small>⭐ Focus</small><b>${esc(fg.title)}</b>${next ? `<small class="muted">Prochaine : ${esc(next.title)}</small>` : ''}</span></a>`;
@@ -1677,7 +1677,7 @@ async function renderNote(id) {
     const [goals, tasks] = await Promise.all([loadGoals(), db.all('tasks')]);
     const st = brain.projectStats(n.id, goals, tasks);
     const others = goals.filter((g) => g.projectId !== n.id);
-    const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || a.createdAt - b.createdAt;
+    const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
     el.innerHTML = `<div class="card-head"><h2>🎯 Objectifs et missions du projet</h2>
         <span class="muted">${st.goals.length || st.direct.length ? `${st.pct} %${st.missions ? ` · ${st.done}/${st.missions} missions` : ''}` : ''}</span></div>
       ${st.goals.length || st.direct.length ? `<div class="xp-bar proj-bar"><i style="width:${st.pct}%"></i></div>` : '<p class="empty-sm">Ajoute des objectifs ou des missions à ce projet : son avancement les suivra.</p>'}
@@ -2245,7 +2245,7 @@ async function renderWeek(arg) {
   await loadGoals();
   const drawTasks = async (dayEl) => {
     const k = dayEl.dataset.day;
-    const items = (await db.all('tasks')).filter((t) => t.date === k).sort((a, b) => a.done - b.done || a.createdAt - b.createdAt);
+    const items = (await db.all('tasks')).filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     const ul = dayEl.querySelector('.tasks');
     ul.innerHTML = items.map((t) => taskHTML(t)).join('');
     bindTaskList(ul, () => drawTasks(dayEl));
@@ -2325,7 +2325,7 @@ async function renderDay(arg) {
   let alarmTasks = [];
   const drawTasks = async () => {
     const all = await db.all('tasks');
-    const items = all.filter((t) => t.date === k).sort((a, b) => a.done - b.done || a.createdAt - b.createdAt);
+    const items = all.filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     alarmTasks = all.filter((t) => !t.done && t.alarmAt && iso(new Date(t.alarmAt)) === k);
     const ul = $('#dv-tasks');
     if (!ul) return;
@@ -2831,7 +2831,7 @@ async function renderGoals() {
   const goals = await loadGoals();
   const tasks = await db.all('tasks');
   const today = iso(new Date());
-  const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || a.createdAt - b.createdAt;
+  const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
   const free = tasks.filter((t) => !t.goalId && !t.done).sort(sortM);
   const everyNote = await brain.allNotes();
   const relNotes = everyNote.filter((x) => !x.archived && (x.rel?.goals || []).length); // notes associées à des objectifs
