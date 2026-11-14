@@ -2063,7 +2063,7 @@ function plannerTabs(active, d = new Date()) {
     : active === 'year' ? now.getFullYear() === d.getFullYear()
     : active === 'activities';
   const dayLink = hasToday ? t : day;
-  const tabs = [['day', 'Jour', `#/day/${dayLink}`], ['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${day}`], ['activities', '🎟 Activités', '#/activities']];
+  const tabs = [['day', 'Jour', `#/day/${dayLink}`], ['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', '#/journal'], ['activities', '🎟 Activités', '#/activities']];
   return `<nav class="seg planner-tabs" aria-label="Vues du planificateur">${tabs.map(([k, l, h]) => `<a href="${h}" class="${k === active ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
 }
 const moodOf = (j) => MOODS.find((m) => m.v === j?.mood);
@@ -2383,7 +2383,10 @@ async function renderDay(arg) {
    Vue : Journal de bord
    ========================================================= */
 async function renderJournal(date) {
-  date = date || iso(new Date());
+  // Sans date (onglet Journal) : on reprend la dernière date ouverte dans le journal, sinon aujourd'hui
+  try { date = date || localStorage.getItem('lp.journalDate'); } catch { /* ignore */ }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) date = iso(new Date());
+  try { localStorage.setItem('lp.journalDate', date); } catch { /* ignore */ }
   const d = U.parseISO(date);
   const entries = (await db.all('journal'))
     .filter((j) => j.mood || j.text || j.grat || j.lesson || j.intention)
