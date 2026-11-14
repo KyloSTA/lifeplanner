@@ -4,7 +4,7 @@ import * as gcal from './gcal.js';
 import { InkEditor, INK_COLORS, HL_COLORS } from './ink.js';
 import * as game from './game.js';
 import * as AV from './avatar.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor } from './tasks.js';
+import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo } from './tasks.js';
 import * as brain from './brain.js';
 import * as quotes from './quotes.js';
 import * as assistant from './assistant.js';
@@ -258,7 +258,15 @@ async function taskCard(el, date) {
       .filter((t) => t.date === date || (!t.done && t.date && t.date < date))
       .sort((a, b) => a.done - b.done || a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
     const done = items.filter((t) => t.done).length;
+    const late = items.filter((t) => !t.done && t.date < date).sort((a, b) => a.date.localeCompare(b.date));
     el.innerHTML = `<div class="card-head"><h2>📋 Missions du jour</h2><span class="muted">${done}/${items.length} · <a href="#/missions">Gérer →</a></span></div>
+      ${late.length ? `<div class="late-bar" role="group" aria-label="Missions en retard">
+        <span>⚠ <b>${late.length}</b> mission${late.length > 1 ? 's' : ''} en retard</span>
+        <div class="late-acts">
+          <button type="button" class="btn sm-text" data-late="today" title="Les mettre toutes à aujourd’hui">Tout à aujourd’hui</button>
+          <button type="button" class="btn sm-text" data-late="spread" title="Une par jour à partir d’aujourd’hui, les plus vieilles d’abord">Répartir sur la semaine</button>
+          <button type="button" class="btn sm-text" data-late="none" title="Retirer la date (elles restent dans Missions)">Sans date</button>
+        </div></div>` : ''}
       <form class="add-row"><input name="t" placeholder="Ajouter une mission…" autocomplete="off"><button class="btn icon" aria-label="Ajouter">+</button></form>
       <ul class="tasks">${items.map((t) => taskHTML(t, date)).join('') || '<li class="empty-sm">Rien de prévu pour l’instant.</li>'}</ul>
       <p class="hint muted">Astuce : touche › sur une mission pour l’ouvrir : étapes, notes, date et objectif.</p>`;
@@ -271,6 +279,28 @@ async function taskCard(el, date) {
       el.querySelector('input[name=t]').focus();
     };
     bindTaskList(el, draw);
+    // Revue des retards : on redonne une date aux missions en retard d'un seul coup (annulable 5 s)
+    el.querySelectorAll('[data-late]').forEach((b) => (b.onclick = async () => {
+      const before = late.map((t) => ({ id: t.id, date: t.date }));
+      const kind = b.dataset.late;
+      const days = Math.min(7, late.length);
+      const moved = [];
+      for (const [i, t] of late.entries()) {
+        const cur = await db.get('tasks', t.id);
+        if (!cur) continue;
+        cur.date = kind === 'none' ? null : kind === 'spread' ? iso(U.addDays(U.parseISO(date), i % days)) : date;
+        moved.push(cur);
+      }
+      for (const t of moved) await db.put('tasks', t);
+      await draw();
+      refreshToday();
+      const label = kind === 'none' ? 'sans date' : kind === 'spread' ? `réparties sur ${days} jour${days > 1 ? 's' : ''}` : 'mises à aujourd’hui';
+      showUndo(`${moved.length} mission${moved.length > 1 ? 's' : ''} ${label}`, async () => {
+        for (const p of before) { const cur = await db.get('tasks', p.id); if (cur) { cur.date = p.date; await db.put('tasks', cur); } }
+        await draw();
+        refreshToday();
+      }, 5000);
+    }));
   };
   await draw();
 }
@@ -332,6 +362,7 @@ async function renderToday() {
     <header class="page-head">
       <div><p class="eyebrow">${greeting()}</p><h1>${cap(U.fmtLong(now))}</h1></div>
       <div class="head-actions">
+        <button class="btn" id="focus-toggle" aria-pressed="false" title="Mode Focus : seulement l’essentiel (3 missions, agenda, habitudes)">🎯 Focus</button>
         <button class="btn" id="as-open" title="Demander à l’assistant (ajouter, déplacer, cocher…)">✨ Assistant</button>
         <button class="btn" id="add-ev">+ Événement</button>
         <a class="btn primary" href="#/page/day-${today}">✎ Écrire à la main</a>
@@ -362,6 +393,18 @@ async function renderToday() {
     </div>`;
   $('#add-ev').onclick = () => eventModal(today, renderToday);
   $('#as-open').onclick = openAssistant;
+  // Mode Focus (gardé sur cet appareil) : la page ne montre que l'essentiel
+  const focusOn = () => { try { return localStorage.getItem('lp.focus') === '1'; } catch { return false; } };
+  const applyFocus = () => {
+    const on = focusOn();
+    $('.today', view)?.classList.toggle('focus-mode', on);
+    const b = $('#focus-toggle');
+    b.classList.toggle('primary', on);
+    b.setAttribute('aria-pressed', String(on));
+    b.textContent = on ? '🎯 Focus activé' : '🎯 Focus';
+  };
+  $('#focus-toggle').onclick = () => { try { localStorage.setItem('lp.focus', focusOn() ? '0' : '1'); } catch { /* ignore */ } applyFocus(); };
+  applyFocus();
   // Le résumé du haut suit les cases cochées (missions, habitudes…)
   const refreshSummary = U.debounce(() => heroCard(), 800);
   // clic (cocher), Entrée (ajouter une mission) ou changement : le résumé suit
@@ -1188,6 +1231,102 @@ function noteCard(n, proj) {
   </a>`;
 }
 
+/* ---------- Tri rapide : les éléments « À classer », un à la fois ---------- */
+async function quickTriage(onDone = () => {}) {
+  const all = await brain.allNotes();
+  const queue = all.filter((n) => n.inbox && !n.archived).sort((a, b) => a.createdAt - b.createdAt).map((n) => n.id);
+  const projects = brain.projectsOf(all).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  let i = 0, sorted = 0;
+  modal('<div class="qt" id="qt"></div>', (m, close) => {
+    const root = m.querySelector('#qt');
+    const finish = () => { close(); onDone(); };
+    const show = async () => {
+      while (i < queue.length && !(await db.get('notes', queue[i]))?.inbox) i++; // déjà classé ou supprimé entre-temps
+      if (i >= queue.length) {
+        root.innerHTML = `<div class="qt-done"><div class="qt-big">🎉</div><h2>${sorted ? 'Tout est classé !' : 'Rien à classer'}</h2>
+          <p class="muted">${sorted ? `${sorted} élément${sorted > 1 ? 's' : ''} rangé${sorted > 1 ? 's' : ''}.` : 'Ta boîte « À classer » est vide.'}</p>
+          <div class="modal-actions"><button class="btn primary" id="qt-close">Fermer</button></div></div>`;
+        root.querySelector('#qt-close').onclick = finish;
+        return;
+      }
+      const n = await db.get('notes', queue[i]);
+      let type = n.type || 'idee';
+      const tags = new Set(n.tags || []);
+      const yt = youtubeVideos(n.body)[0];
+      const img = images.refsIn(n.body)[0];
+      const media = n.source?.kind === 'news' && n.source.img ? `<img src="${esc(n.source.img)}" alt="" referrerpolicy="no-referrer">`
+        : yt ? `<img src="https://i.ytimg.com/vi/${yt.id}/mqdefault.jpg" alt="" referrerpolicy="no-referrer">`
+        : img ? `<img data-img="${img}" alt="">` : '';
+      root.innerHTML = `
+        <div class="card-head"><h2>⚡ Tri rapide</h2><span class="muted">${i + 1} / ${queue.length}</span>
+          <button class="tm-close" data-x aria-label="Fermer" title="Fermer (Échap)">×</button></div>
+        <div class="qt-bar"><i style="width:${(i / queue.length) * 100}%"></i></div>
+        ${media ? `<div class="qt-media">${media}</div>` : ''}
+        <input class="qt-title" value="${esc((n.source?.kind === 'news' && n.source.title) || n.title || '')}" placeholder="Titre" aria-label="Titre" maxlength="80">
+        <p class="qt-text muted">${esc(brain.excerpt(cardText(n.body), 220)) || 'Note vide'}</p>
+        <div class="qt-row"><span class="qt-lbl">Type</span><div class="qt-types">${brain.TYPES.map((t) => `<button type="button" class="chip-btn ${t.id === type ? 'on' : ''}" data-type="${t.id}">${t.icon} ${t.name}</button>`).join('')}</div></div>
+        <div class="qt-row"><span class="qt-lbl">Étiquettes</span><div class="qt-tags" id="qt-tags"></div></div>
+        ${projects.length ? `<div class="qt-row"><span class="qt-lbl">Projet</span><select class="qt-proj" aria-label="Projet"><option value="">Aucun</option>${projects.map((p) => `<option value="${p.id}" ${(n.rel?.projects || []).includes(p.id) ? 'selected' : ''}>🚀 ${esc(p.title || 'Projet')}</option>`).join('')}</select></div>` : ''}
+        <div class="qt-actions">
+          <button class="btn danger" data-act="del">🗑 Supprimer</button>
+          <button class="btn" data-act="arch" title="Ranger dans les Archives">🗄 Archiver</button>
+          <span class="grow"></span>
+          <button class="btn" data-act="skip" title="Passer (→)">Passer →</button>
+          <button class="btn primary" data-act="ok" title="Classer (Ctrl + Entrée)">✓ Classer</button>
+        </div>`;
+      images.hydrate(root);
+      const drawTags = () => {
+        root.querySelector('#qt-tags').innerHTML = [...tags].map((t) => `<button type="button" class="chip-btn on" data-rmtag="${esc(t)}" title="Retirer">#${esc(t)} ×</button>`).join('')
+          + '<input class="qt-tag-in" placeholder="+ étiquette" aria-label="Ajouter une étiquette" autocomplete="off">';
+        root.querySelectorAll('[data-rmtag]').forEach((b) => (b.onclick = () => { tags.delete(b.dataset.rmtag); drawTags(); }));
+        const inp = root.querySelector('.qt-tag-in');
+        inp.onkeydown = (e) => {
+          if (e.key !== 'Enter' && e.key !== ',' && e.key !== ' ') return;
+          e.preventDefault();
+          const v = inp.value.replace(/^#/, '').trim().toLowerCase().replace(/\s+/g, '-');
+          if (v) { tags.add(v); drawTags(); root.querySelector('.qt-tag-in').focus(); }
+        };
+      };
+      drawTags();
+      root.querySelectorAll('[data-type]').forEach((b) => (b.onclick = () => { type = b.dataset.type; root.querySelectorAll('[data-type]').forEach((x) => x.classList.toggle('on', x === b)); }));
+      root.querySelector('[data-x]').onclick = finish;
+      const next = () => { i++; show(); };
+      const act = async (a) => {
+        const cur = await db.get('notes', n.id);
+        if (!cur) return next();
+        if (a === 'skip') return next();
+        if (a === 'del') {
+          const b = root.querySelector('[data-act="del"]');
+          if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Confirmer la suppression'; return; }
+          await brain.deleteNote(cur.id);
+          sorted++;
+          return next();
+        }
+        // Classer ou archiver : on garde le titre, le type, les étiquettes et le projet choisis
+        const title = root.querySelector('.qt-title').value.trim();
+        if (title) cur.title = title.slice(0, 80);
+        cur.type = type;
+        const missing = [...tags].filter((t) => !(cur.tags || []).includes(t));
+        if (missing.length) cur.body = (cur.body || '').trimEnd() + '\n\n' + missing.map((t) => '#' + t).join(' ');
+        for (const t of (cur.tags || []).filter((t) => !tags.has(t))) cur.body = cur.body.replace(new RegExp(`(^|\\s)#${t.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?=\\s|$)`, 'g'), '$1');
+        const proj = root.querySelector('.qt-proj')?.value;
+        if (proj !== undefined) { cur.rel ||= {}; cur.rel.projects = proj ? [proj] : (cur.rel.projects || []).filter((x) => projects.some((p) => p.id === x) ? false : true); }
+        cur.inbox = false;
+        await brain.saveNote(cur); // donne aussi les points « Idée classée »
+        if (a === 'arch') await brain.setArchived(cur.id, true);
+        sorted++;
+        next();
+      };
+      root.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => act(b.dataset.act)));
+      root.onkeydown = (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); act('ok'); }
+        else if (e.key === 'ArrowRight' && !e.target.closest('input, select, textarea')) { e.preventDefault(); act('skip'); }
+      };
+    };
+    show();
+  });
+}
+
 // Affichage du Cerveau (gardé sur cet appareil) : 'list', 'grid' ou 'cards'
 const brainView = () => { try { return ['list', 'grid', 'cards'].includes(localStorage.getItem('lp.brainView')) ? localStorage.getItem('lp.brainView') : 'cards'; } catch { return 'cards'; } };
 
@@ -1213,7 +1352,7 @@ async function renderBrain() {
 
   view.innerHTML = `
     <header class="page-head"><div><p class="eyebrow">Second cerveau</p><h1>Cerveau</h1></div>
-      <div class="head-actions"><button class="btn primary" id="new-note">+ Nouvelle note</button></div></header>
+      <div class="head-actions">${inbox && !brainState.arch ? `<button class="btn" id="qt-open" title="Classer les éléments « À classer » un par un">⚡ Tri rapide <small>${inbox}</small></button>` : ''}<button class="btn primary" id="new-note">+ Nouvelle note</button></div></header>
     <div class="brain-top">
       <section class="card capture-card brain-cap"><div class="card-head"><h2>💡 Capture rapide</h2><span class="muted cap-stats">${inbox ? `📥 ${inbox} à classer` : ''}</span></div>${captureForm('cap')}</section>
       <div class="brain-aside">
@@ -1291,6 +1430,7 @@ async function renderBrain() {
     $$('[data-tag]').forEach((x) => x.classList.toggle('on', x.dataset.tag === brainState.tag));
     drawList();
   }));
+  $('#qt-open')?.addEventListener('click', () => quickTriage(() => renderBrain()));
   $('#new-note').onclick = async () => {
     const n = await brain.createNote({ type: 'note' });
     location.hash = '#/note/' + n.id;
@@ -2553,7 +2693,16 @@ async function renderGoals() {
     return `<section class="card goal-col">
       <div class="card-head"><h2>${title}</h2><span class="muted">${counted ? `${ok}/${counted} atteint${ok > 1 ? 's' : ''}` : ''}</span></div>
       ${extra}${list.length ? `<div class="bar goal-col-bar" title="Progression moyenne"><i style="width:${cAvg}%"></i></div>` : ''}
-      ${(() => { const s = [...list].sort(byOrder); return s.map((g, i) => goalHTML(g, !!extra, s[i - 1]?.id, s[i + 1]?.id)).join(''); })() || '<p class="empty-sm">Aucun objectif.</p>'}</section>`;
+      ${(() => {
+        // Les objectifs conclus depuis plus de 7 jours se rangent dans une section repliée au bas de la colonne
+        const old = (g) => isGoalDone(g) && Date.now() - (g.doneAt || g.updatedAt || g.createdAt || 0) > 7 * 864e5;
+        const s = [...list].sort(byOrder);
+        const cur = s.filter((g) => !old(g)), past = s.filter(old);
+        const html = cur.map((g, i) => goalHTML(g, !!extra, cur[i - 1]?.id, cur[i + 1]?.id)).join('');
+        const pastHtml = past.length ? `<details class="goal-old" ${past.some((g) => openGoals.has(g.id)) ? 'open' : ''}><summary>🏁 Atteints et conclus <small class="muted">${past.length}</small></summary>
+          ${past.map((g, i) => goalHTML(g, !!extra, past[i - 1]?.id, past[i + 1]?.id)).join('')}</details>` : '';
+        return html + pastHtml;
+      })() || '<p class="empty-sm">Aucun objectif.</p>'}</section>`;
   };
 
   view.innerHTML = `
@@ -3224,6 +3373,13 @@ game.init().catch(console.error).finally(async () => {
   if (!location.hash || location.hash === '#' || location.hash === '#/') {
     const sp = await db.get('settings', 'startPage').catch(() => null);
     if (sp && sp !== 'today' && routes[sp]) history.replaceState(null, '', '#/' + sp);
+  }
+  // Une seule fois : cartes Page manuscrite et Examen RBQ cachées d'Aujourd'hui (réaffichables dans Ton utilisation)
+  if (!(await db.get('settings', 'todayDefaultsV1').catch(() => true))) {
+    const cur = new Set((await db.get('settings', 'todayHidden')) || []);
+    ['t-ink', 't-rbq'].forEach((k) => cur.add(k));
+    await db.put('settings', [...cur], 'todayHidden');
+    await db.put('settings', true, 'todayDefaultsV1');
   }
   router();
   usage.start().catch(console.error);
