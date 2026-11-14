@@ -3762,6 +3762,12 @@ game.init().catch(console.error).finally(async () => {
   // Posts Reddit et vidéos YouTube sauvegardés avec le bouton « 🧠 Cerveau » (extension extension-edge).
   // L'app couple ne les reçoit pas : ils vont dans le Cerveau de Life Planner (ou attendent son ouverture).
   if (!APP.couple) clips.start((note, updated, kind) => {
+    if (kind === 'fbevent') {
+      const r = location.hash.replace(/^#\/?/, '').split('/')[0];
+      if (r === 'activities' && !$('#modal-root').children.length) router();
+      toast(`🎟 Événement Facebook ${updated ? 'mis à jour' : 'ajouté à Activités'} : « ${note.title} »${note.start ? '' : ' (date à vérifier)'}`);
+      return;
+    }
     refreshRail();
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
     if (route === 'brain' && !$('#modal-root').children.length) router();

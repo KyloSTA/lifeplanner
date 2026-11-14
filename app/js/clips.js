@@ -48,6 +48,12 @@ function noteFrom(c) {
 
 /** Enregistre un post. Renvoie la note et si elle existait déjà. */
 export async function saveClip(raw) {
+  // Événement Facebook (bouton « 🎟 Activités ») : va dans Activités autour de toi, pas dans le Cerveau
+  if (raw.kind === 'fbevent') {
+    const { addFacebookEvent } = await import('./activities.js');
+    const { ev, updated } = await addFacebookEvent(raw);
+    return { note: { title: ev.title, start: ev.start }, updated, kind: 'fbevent' };
+  }
   const kind = raw.kind === 'youtube' ? 'youtube' : raw.kind === 'amazon' ? 'amazon' : 'reddit';
   const c = {
     kind,

@@ -278,6 +278,12 @@ Quand YouTube est ouvert depuis le Lanceur (ou dans l'app YouTube installée), u
 **Ressource** : titre, lien, chaîne, le moment où tu étais rendu (lien qui reprend à cet endroit),
 description et étiquettes `#youtube #video #nomdelachaine`.
 
+### Facebook → Activités (bouton « 🎟 Activités » sur un événement)
+Quand Facebook est ouvert depuis le Lanceur (ou dans l'app Facebook installée), un bouton **🎟 Activités**
+apparaît en bas à droite des pages d'événements (`facebook.com/events/…`). Un clic ajoute l'événement à
+**Activités autour de toi** (titre, date et heure lues sur la page, lieu, lien). Facebook ne permet plus de
+chercher des événements automatiquement : c'est la façon d'y ajouter ceux qui t'intéressent.
+
 ### Amazon → Cerveau (petit bouton « 🧠 » à côté du titre du produit)
 Quand Amazon est ouvert depuis le Lanceur (ou dans l'app Amazon installée), un petit bouton **🧠**
 apparaît à côté du titre de chaque produit. Un clic enregistre l'article comme note **Ressource** :
