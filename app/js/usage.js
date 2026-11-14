@@ -22,7 +22,7 @@ export const PAGES = {
   settings: 'Réglages', launcher: 'Lanceur', usage: 'Utilisation', setup: 'Configuration',
 };
 const NAV = ['today', 'missions', 'brain', 'goals', 'finance', 'workout', 'rbq']; // onglets du menu (voir app.js)
-export const TODAY_CARDS = { 't-tasks': 'Missions du jour', 't-agenda': 'Agenda', 't-goals': 'Objectifs en cours', 't-habits': 'Habitudes du jour', 't-money': 'Budget du mois', 't-workout': 'Workout du jour', 't-rbq': 'Examen RBQ', 't-news': 'À la une', 't-ink': 'Page manuscrite', 't-quote': 'Citation' };
+export const TODAY_CARDS = { 't-tasks': 'Missions du jour', 't-goals': 'Objectifs en cours', 't-habits': 'Habitudes du jour', 't-money': 'Budget du mois', 't-workout': 'Workout du jour', 't-rbq': 'Examen RBQ', 't-news': 'À la une', 't-ink': 'Page manuscrite', 't-quote': 'Citation' };
 
 /* =========================================================
    Collecte
