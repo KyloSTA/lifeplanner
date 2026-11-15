@@ -8,7 +8,7 @@ import * as gcal from './gcal.js';
 import { APP } from './config.js';
 
 const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'notes', 'xp', 'settings', 'habits', 'study', 'workouts', 'files', 'money'];
-const LOCAL_ONLY = new Set(['anthropicKey', 'clientId', 'xpInit', 'ticketmasterKey']); // réglages propres à cet appareil
+const LOCAL_ONLY = new Set(['anthropicKey', 'clientId', 'clientSecret', 'xpInit', 'ticketmasterKey']); // réglages propres à cet appareil
 const MERGED = { lastLevel: 'max', lastEvo: 'max', badges: 'union', taskTrash: 'byId' }; // réglages fusionnés plutôt que remplacés
 const P = APP.filePrefix; // « lp- » (Life Planner) ou « cp- » (app couple) : chaque édition a ses fichiers
 const FILE = (s) => `${P}${s}.json`;
@@ -35,7 +35,7 @@ export function disable() { st = { on: false }; saveSt(); }
 /* ---------- Drive ---------- */
 class AuthError extends Error {}
 async function drive(url, opts = {}) {
-  const t = gcal.token();
+  const t = await gcal.freshToken();
   if (!t) throw new AuthError('login');
   const r = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + t, ...(opts.headers || {}) } });
   if (r.status === 401) { gcal.forget(); throw new AuthError('login'); }
@@ -164,7 +164,7 @@ async function syncDocs() {
 
 /** Télécharge un document depuis Drive (pour docs.js). */
 export async function fetchDoc(driveId) {
-  if (!gcal.token()) return null;
+  if (!(await gcal.freshToken())) return null;
   return (await drive(`${DRIVE}/files/${driveId}?alt=media`)).blob();
 }
 
@@ -185,7 +185,7 @@ export function syncNow() {
   if (!st.on) return Promise.resolve(0);
   if (running) return running;
   const go = async () => {
-    if (!gcal.token()) { st.status = 'login'; saveSt(); armRelogin(); return 0; }
+    if (!(await gcal.freshToken())) { st.status = 'login'; saveSt(); armRelogin(); return 0; }
     if (!gcal.hasScope(gcal.DRIVE_SCOPE)) { st.status = 'permission'; saveSt(); return 0; }
     if (!navigator.onLine) { st.status = 'offline'; saveSt(); return 0; }
     st.status = 'syncing'; emit();

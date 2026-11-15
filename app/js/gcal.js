@@ -12,11 +12,65 @@ const SCOPES = [
   DRIVE_SCOPE,
 ].join(' ');
 const TOKEN_KEY = 'lp.gtoken';
+// Jeton de renouvellement (avec le code secret du client) : garde la connexion d'une ouverture à l'autre,
+// sans fenêtre Google. Il reste sur cet appareil (jamais synchronisé ni exporté).
+const REFRESH_KEY = 'lp.grefresh';
+const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
 let tok = null;
 try { tok = JSON.parse(localStorage.getItem(TOKEN_KEY)); } catch { tok = null; }
+let refresh = null;
+try { refresh = localStorage.getItem(REFRESH_KEY); } catch { refresh = null; }
 
-export const isConnected = () => !!(tok && tok.exp > Date.now() + 30_000);
+const valid = () => !!(tok && tok.exp > Date.now() + 30_000);
+/** Connecté : jeton encore valide, ou renouvelable sans fenêtre. */
+export const isConnected = () => valid() || !!refresh;
+export const staysConnected = () => !!refresh;
+
+function keep(r) {
+  tok = { t: r.access_token, exp: Date.now() + (Number(r.expires_in) - 60) * 1000, scope: r.scope || tok?.scope || SCOPES };
+  try { localStorage.setItem(TOKEN_KEY, JSON.stringify(tok)); } catch { /* stockage indisponible */ }
+  if (r.refresh_token) {
+    refresh = r.refresh_token;
+    try { localStorage.setItem(REFRESH_KEY, refresh); } catch { /* ignore */ }
+  }
+}
+
+function dropRefresh() {
+  refresh = null;
+  try { localStorage.removeItem(REFRESH_KEY); } catch { /* ignore */ }
+}
+
+async function tokenCall(params) {
+  const r = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) { const e = new Error(j.error_description || j.error || 'Google a refusé la connexion'); e.code = j.error; throw e; }
+  return j;
+}
+
+let renewing = null;
+/** Renouvelle le jeton en silence s'il a expiré (une seule demande à la fois). */
+export async function ensure() {
+  if (valid() || !refresh) return valid();
+  if (!renewing) {
+    renewing = (async () => {
+      const [cid, secret] = await Promise.all([db.get('settings', 'clientId'), db.get('settings', 'clientSecret')]);
+      if (!cid || !secret) return false;
+      try {
+        keep(await tokenCall({ client_id: cid, client_secret: secret, refresh_token: refresh, grant_type: 'refresh_token' }));
+        window.dispatchEvent(new Event('lp-google'));
+        return true;
+      } catch (err) {
+        if (err.code === 'invalid_grant' || err.code === 'invalid_client' || err.code === 'unauthorized_client') dropRefresh(); // révoqué ou expiré : il faudra se reconnecter
+        return false;
+      }
+    })().finally(() => { renewing = null; });
+  }
+  return renewing;
+}
+
+/** Jeton prêt à l'emploi (renouvelé au besoin), ou null. */
+export async function freshToken() { await ensure(); return valid() ? tok.t : null; }
 
 let gisPromise = null;
 function loadGis() {
@@ -39,7 +93,7 @@ export async function preload() {
 }
 
 export const hasScope = (s) => !!(tok?.scope || '').split(' ').includes(s);
-export const token = () => (isConnected() ? tok.t : null);
+export const token = () => (valid() ? tok.t : null);
 
 /**
  * Ouvre la fenêtre de connexion Google (à appeler depuis un clic).
@@ -48,15 +102,37 @@ export const token = () => (isConnected() ? tok.t : null);
 export async function connect({ silent = false } = {}) {
   const clientId = await db.get('settings', 'clientId');
   if (!clientId) throw new Error('NO_CLIENT_ID');
+  if (silent && (await ensure())) return; // renouvelé sans fenêtre
+  const secret = await db.get('settings', 'clientSecret');
   await loadGis();
+  // Avec le code secret : connexion « code » qui donne un jeton de renouvellement (on reste connecté)
+  if (secret) {
+    return new Promise((resolve, reject) => {
+      const client = google.accounts.oauth2.initCodeClient({
+        client_id: clientId,
+        scope: SCOPES,
+        ux_mode: 'popup',
+        callback: async (r) => {
+          if (r.error) return reject(new Error(r.error_description || r.error));
+          try {
+            keep(await tokenCall({ code: r.code, client_id: clientId, client_secret: secret, redirect_uri: 'postmessage', grant_type: 'authorization_code' }));
+            window.dispatchEvent(new Event('lp-google'));
+            resolve();
+          } catch (err) { reject(err.code === 'invalid_client' ? new Error('Code secret du client invalide : vérifie-le dans Réglages › Google Agenda') : err); }
+        },
+        error_callback: (e) => reject(new Error(e.type === 'popup_closed' ? 'Connexion annulée' : e.message || e.type)),
+      });
+      // Pas encore de jeton de renouvellement : Google ne le donne qu'avec l'écran d'autorisation
+      client.requestCode(refresh ? {} : { prompt: 'consent' });
+    });
+  }
   return new Promise((resolve, reject) => {
     const client = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: SCOPES,
       callback: (r) => {
         if (r.error) return reject(new Error(r.error_description || r.error));
-        tok = { t: r.access_token, exp: Date.now() + (Number(r.expires_in) - 60) * 1000, scope: r.scope || SCOPES };
-        try { localStorage.setItem(TOKEN_KEY, JSON.stringify(tok)); } catch { /* stockage indisponible */ }
+        keep(r);
         window.dispatchEvent(new Event('lp-google'));
         resolve();
       },
@@ -66,29 +142,29 @@ export async function connect({ silent = false } = {}) {
   });
 }
 
-/** Oublie un jeton refusé par Google (expiré ou révoqué). */
+/** Oublie un jeton refusé par Google (expiré ou révoqué) ; le jeton de renouvellement en redonnera un. */
 export function forget() {
   tok = null;
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
 }
 
 export async function disconnect() {
-  if (tok && window.google?.accounts?.oauth2) {
-    try { google.accounts.oauth2.revoke(tok.t, () => {}); } catch { /* ignore */ }
-  }
+  const t = refresh || tok?.t;
+  if (t) fetch('https://oauth2.googleapis.com/revoke', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: t }) }).catch(() => {});
   tok = null;
+  dropRefresh();
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
 }
 
-async function api(path, opts = {}) {
-  if (!isConnected()) throw new Error('NOT_CONNECTED');
+async function api(path, opts = {}, retry = true) {
+  if (!(await ensure())) throw new Error('NOT_CONNECTED');
   const r = await fetch(API + path, {
     ...opts,
     headers: { Authorization: 'Bearer ' + tok.t, 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
   if (r.status === 401) {
-    tok = null;
-    try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+    forget();
+    if (retry && refresh) return api(path, opts, false); // jeton refusé : on en redemande un en silence
     throw new Error('NOT_CONNECTED');
   }
   if (!r.ok) {
