@@ -26,8 +26,8 @@ export async function linksOf(note) {
   return out;
 }
 
-/** Ajoute ou retire une association. note : l'objet note en mémoire (il est enregistré). */
-export async function toggle(note, kind, targetId, on) {
+/** Ajoute ou retire une association. note : l'objet note (ou page manuscrite) en mémoire ; save l'enregistre. */
+export async function toggle(note, kind, targetId, on, save = (n) => brain.saveNote(n, { touch: false })) {
   if (kind === 'rbq') {
     const m = await db.get('study', targetId);
     if (!m) return;
@@ -41,7 +41,21 @@ export async function toggle(note, kind, targetId, on) {
   const ids = new Set(note.rel[kind] || []);
   on ? ids.add(targetId) : ids.delete(targetId);
   note.rel[kind] = [...ids];
-  await brain.saveNote(note, { touch: false });
+  await save(note);
+}
+
+/* ---------- Pages manuscrites (Carnet) : page.rel = { projects, goals, tasks } ---------- */
+export const PAGE_KINDS = KINDS.filter(([k]) => k !== 'rbq');
+export const savePage = (p) => db.put('pages', p);
+
+/** Pages manuscrites associées à un projet, un objectif ou une mission. */
+export async function pagesFor(kind, targetId) {
+  return (await db.all('pages')).filter((p) => (p.rel?.[kind] || []).includes(targetId));
+}
+
+/** Pastilles de pages manuscrites. */
+export function pageChips(list) {
+  return list.map((p) => `<a class="assoc-chip" href="#/page/${encodeURIComponent(p.id)}" data-page="${esc(p.id)}">✍️ ${esc(p.title || 'Sans titre')}</a>`).join('');
 }
 
 /** Notes associées à un projet, un objectif ou une mission. */
@@ -55,10 +69,10 @@ export function noteChips(list) {
 }
 
 /** Fenêtre « Associer à… » (onglets Projet / Cours RBQ / Objectif / Mission). */
-export async function picker(modal, note, onChange) {
+export async function picker(modal, note, onChange, { kinds = KINDS, save } = {}) {
   let tab = 'projects', q = '';
   modal(`<h2>Associer « ${esc(note.title || 'Sans titre')} » à…</h2>
-    <div class="seg assoc-tabs" role="tablist">${KINDS.map(([k, l]) => `<button role="tab" data-k="${k}">${l}</button>`).join('')}</div>
+    <div class="seg assoc-tabs" role="tablist">${kinds.map(([k, l]) => `<button role="tab" data-k="${k}">${l}</button>`).join('')}</div>
     <input class="pick-search" placeholder="🔍 Chercher…" autocomplete="off">
     <div class="pick-list" id="as-list"></div>
     <div class="modal-actions"><button class="btn primary" data-close>Terminé</button></div>`, (m) => {
@@ -79,7 +93,7 @@ export async function picker(modal, note, onChange) {
           <span class="pick-txt"><b>${esc(r.label)}</b>${r.sub ? `<small class="muted">${esc(r.sub)}</small>` : ''}</span></label>`).join('')
         || `<p class="empty-sm">${tab === 'projects' ? 'Aucun projet : crée une note de type 🚀 Projet dans le Cerveau.' : 'Rien à afficher.'}</p>`;
       list.querySelectorAll('input').forEach((cb) => (cb.onchange = async () => {
-        await toggle(note, tab, cb.value, cb.checked);
+        await toggle(note, tab, cb.value, cb.checked, save);
         cb.closest('.pick-row').classList.toggle('on', cb.checked);
         onChange();
       }));
