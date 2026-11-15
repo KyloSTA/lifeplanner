@@ -20,6 +20,8 @@ import * as workout from './workout.js';
 import * as images from './images.js';
 import * as missions from './missions.js';
 import * as docs from './docs.js';
+import * as linkmeta from './linkmeta.js';
+import { withTeamLogos } from './teams.js';
 import * as assoc from './assoc.js';
 import * as news from './news.js';
 import * as finance from './finance.js';
@@ -201,7 +203,7 @@ function evItem(ev, compact = false) {
   const past = !ev.allDay && ev.end < Date.now();
   return `<li class="ev ${past ? 'past' : ''}" data-ev="${esc(ev.id)}" style="--c:${esc(ev.color)}">
     <span class="ev-time">${time}${!compact && !ev.allDay ? ' – ' + U.fmtTime(new Date(ev.end)) : ''}</span>
-    <span class="ev-title">${esc(ev.title)}</span></li>`;
+    <span class="ev-title">${withTeamLogos(esc(ev.title))}</span></li>`;
 }
 
 function bindEvents(root, events, refresh) {
@@ -1167,9 +1169,22 @@ function bindCapture(form, after) {
         : ids.length ? `📷 Image du ${U.fmtShort(new Date())} à ${U.fmtTime(new Date())}` : `📎 ${dms[0].name.replace(/\.[^.]+$/, '')}`;
       let body = lines.join('\n').trim();
       if (title.length > 80) { body = (title + '\n' + body).trim(); title = title.slice(0, 60).trim() + '…'; }
+      // Lien Facebook : son titre et sa vignette (titre tiré de l'adresse si la page n'est pas publique)
+      const fb = linkmeta.facebookUrl(v);
+      let fbSource = null;
+      if (fb) {
+        const meta = await linkmeta.facebookMeta(fb);
+        if (title.replace(fb, '').trim() === '') { // la 1re ligne n'était que le lien : il passe dans le contenu
+          title = meta.title || linkmeta.facebookLabel(fb);
+          if (title.length > 80) title = title.slice(0, 78).trim() + '…';
+          body = [fb, body].filter(Boolean).join('\n');
+        }
+        fbSource = { kind: 'facebook', url: fb, label: linkmeta.facebookLabel(fb), ...(meta.img ? { img: meta.img } : {}) };
+      }
       body = [body, ...ids.map(images.refLine), ...dms.map(docs.refLine)].filter(Boolean).join('\n');
       const n = await brain.createNote({ title, body, type: 'idee', inbox: true });
       n.captured = true;
+      if (fbSource) n.source = fbSource;
       await brain.saveNote(n, { touch: false });
       files.forEach((f) => URL.revokeObjectURL(f.url));
       files = [];
@@ -1278,7 +1293,7 @@ function amazonPrice(n) {
 
 function noteCard(n, proj) {
   const t = brain.typeOf(n.type);
-  const media = n.source?.kind === 'news' || !!n.source?.img || youtubeVideos(n.body).length > 0; // titre complet sur 2 lignes
+  const media = n.source?.kind === 'news' || n.source?.kind === 'facebook' || !!n.source?.img || youtubeVideos(n.body).length > 0; // titre complet sur 2 lignes
   return `<a class="note-card ${n.pinned ? 'pinned' : ''} ${media ? 'has-media' : ''}" href="#/note/${n.id}">
     <div class="nc-head"><span class="nc-type" title="${t.name}">${t.icon}</span><b>${esc((n.source?.kind === 'news' && n.source.title) || n.title || 'Sans titre')}</b>${n.pinned ? '<span title="Épinglée">📌</span>' : ''}</div>
     ${n.inbox ? '<span class="chip warn">📥 À classer</span>' : ''}
@@ -1287,6 +1302,8 @@ function noteCard(n, proj) {
     ${(() => {
       const im = images.refsIn(n.body);
       if (im.length) return `<div class="nc-img"><img data-img="${im[0]}" alt="" loading="lazy">${im.length > 1 ? `<span>+${im.length - 1}</span>` : ''}</div>`;
+      // Lien Facebook : son image sur une vignette Facebook (qui reste si l'image manque ou expire)
+      if (n.source?.kind === 'facebook') return `<div class="nc-img nc-fb"><span class="nc-fb-logo">f</span><small>${esc(n.source.label || 'Facebook')}</small>${n.source.img ? `<img src="${esc(n.source.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>`;
       // Article d'actualité : son image
       if (n.source?.img) return `<div class="nc-img nc-news"><img src="${esc(n.source.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>`
         + (amazonPrice(n) ? `<div class="nc-price">${esc(amazonPrice(n))}</div>` : ''); // article Amazon : son prix sous l'image
@@ -1604,7 +1621,7 @@ async function renderNote(id) {
       <div class="note-left">
       <section class="card project-panel" id="n-proj" hidden></section>
       <section class="card note-video" id="n-video" hidden></section>
-      ${['news', 'reddit', 'amazon'].includes(n.source?.kind) && n.source.img ? (() => {
+      ${['news', 'reddit', 'amazon', 'facebook'].includes(n.source?.kind) && n.source.img ? (() => {
         let host = ''; try { host = new URL(n.source.url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
         const reddit = n.source.kind === 'reddit', amz = n.source.kind === 'amazon';
         return `<section class="card note-article"><a href="${esc(n.source.url)}" target="_blank" rel="noopener" class="na-img"><img src="${esc(n.source.img)}" alt="" referrerpolicy="no-referrer" onerror="this.closest('.note-article').remove()"></a>
@@ -2195,7 +2212,7 @@ async function renderMonth(arg) {
   $$('.mc-day').forEach((cell) => {
     const ds = +U.parseISO(cell.dataset.day), de = +U.addDays(ds, 1);
     const list = events.filter((e) => e.start < de && e.end > ds);
-    cell.querySelector('.mc-evs').innerHTML = list.slice(0, 3).map((e) => `<li title="${esc(e.title)}">${e.allDay ? '' : `<small>${U.fmtTime(new Date(e.start))}</small> `}${esc(e.title)}</li>`).join('')
+    cell.querySelector('.mc-evs').innerHTML = list.slice(0, 3).map((e) => `<li title="${esc(e.title)}">${e.allDay ? '' : `<small>${U.fmtTime(new Date(e.start))}</small> `}${withTeamLogos(esc(e.title))}</li>`).join('')
       + (list.length > 3 ? `<li class="more">+ ${list.length - 3}</li>` : '');
   });
 }
@@ -2411,7 +2428,7 @@ async function renderDay(arg) {
       + timed.map((e) => {
         const h = Math.max(top(e.e2) - top(e.s), 22);
         return `<div class="ev dayv-ev ${e.end < now ? 'past' : ''} ${h < 40 ? 'short' : ''}" data-ev="${esc(e.id)}" style="--c:${esc(e.color)};top:${top(e.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${e.col} / ${e.cols});width:calc((100% - 60px) / ${e.cols} - 4px)">
-          <span class="ev-title">${esc(e.title)}</span><span class="ev-time">${U.fmtTime(new Date(e.start))} – ${U.fmtTime(new Date(e.end))}</span></div>`;
+          <span class="ev-title">${withTeamLogos(esc(e.title))}</span><span class="ev-time">${U.fmtTime(new Date(e.start))} – ${U.fmtTime(new Date(e.end))}</span></div>`;
       }).join('')
       + marks.map(({ t, s }) => `<a class="dayv-alarm" href="#/missions" style="top:${top(s) - 11}px" title="Alarme de mission">⏰ ${U.fmtTime(new Date(s))} · ${esc(t.title)}</a>`).join('')
       + (isToday && hr(now) >= from && hr(now) <= to ? `<div class="dayv-now" style="top:${top(now)}px"></div>` : '');
