@@ -1,0 +1,15 @@
+/* Pages publiques : règles de confidentialité et conditions d'utilisation */
+:root { --bg: #f7f4ee; --card: #fff; --text: #1d1a17; --muted: #6b645c; --line: #e6dfd3; --accent: #7a1f2b; --gold: #b8892f; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0d0c0b; --card: #171513; --text: #f1ece4; --muted: #a59d92; --line: #2c2823; --accent: #e3a3ad; --gold: #d8b25e; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.legal { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+.eyebrow { font-size: 14px; margin: 0 0 8px; }
+h1 { font-size: 30px; line-height: 1.2; margin: 8px 0 4px; border-bottom: 3px solid var(--gold); padding-bottom: 8px; }
+h2 { font-size: 19px; margin: 28px 0 6px; }
+a { color: var(--accent); }
+.muted { color: var(--muted); margin-top: 0; }
+code { font-size: 13px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; overflow-wrap: anywhere; }
+ul { padding-left: 22px; }
+li { margin: 4px 0; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 48px 0 24px; }
