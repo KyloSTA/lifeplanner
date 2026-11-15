@@ -3323,6 +3323,7 @@ async function renderSettings() {
           <option value="">Selon Windows</option><option value="light">Clair</option><option value="dark">Sombre</option>
         </select>
       </section>
+      <p class="muted legal-links"><a href="${APP.couple ? '../' : ''}privacy.html" target="_blank" rel="noopener">Règles de confidentialité</a> · <a href="${APP.couple ? '../' : ''}terms.html" target="_blank" rel="noopener">Conditions d’utilisation</a></p>
     </div>`;
 
   $('#cid-form').onsubmit = async (e) => {
