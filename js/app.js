@@ -3240,6 +3240,7 @@ async function renderGoals() {
 async function renderSettings() {
   const clientId = (await db.get('settings', 'clientId')) || '';
   const connected = gcal.isConnected();
+  const cSecret = await db.get('settings', 'clientSecret');
   const aKey = await db.get('settings', 'anthropicKey');
   const aModel = (await db.get('settings', 'assistantModel')) || assistant.DEFAULT_MODEL;
   if (couple.ON) await couple.people();
@@ -3249,7 +3250,8 @@ async function renderSettings() {
       ${couple.ON ? `<section class="card" id="cp-card"><div class="card-head"><h2>👫 Vous deux</h2><button class="btn" id="cp-edit" type="button">Modifier</button></div>
         <p class="muted" style="margin:0">${esc(couple.nameOf('a'))} et ${esc(couple.nameOf('b'))} · sur cet appareil : <b>${couple.me() ? esc(couple.nameOf(couple.me())) : 'à choisir'}</b>. Les deux utilisez le même compte Google : connectez-vous avec lui dans Synchronisation et Google Agenda.</p></section>` : ''}
       <section class="card">
-        <div class="card-head"><h2>Google Agenda</h2>${connected ? '<span class="sync live">Connecté</span>' : ''}</div>
+        <div class="card-head"><h2>Google Agenda</h2>${connected ? `<span class="sync live">${gcal.staysConnected() ? 'Connecté · reste connecté' : 'Connecté'}</span>` : ''}</div>
+        ${connected && cSecret && !gcal.staysConnected() ? '<p class="warn-text" style="margin-top:0">Pour ne plus avoir à te reconnecter : clique « Déconnecter », puis reconnecte-toi une fois.</p>' : ''}
         <p class="muted" style="margin-top:0">Une seule fois : crée ton propre identifiant Google (gratuit, ~5 minutes).</p>
         <ol class="steps">
           <li>Va sur <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">console.cloud.google.com</a> et crée un projet (ex. « Life Planner »).</li>
@@ -3257,10 +3259,13 @@ async function renderSettings() {
           <li><a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noopener">Écran de consentement OAuth</a> : type <em>Externe</em>, puis dans <em>Audience</em> ajoute ton adresse Gmail comme <em>utilisateur test</em>.</li>
           <li><a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener">Clients</a> → <em>Créer un client</em> → type <em>Application Web</em>. Dans <em>Origines JavaScript autorisées</em>, ajoute <code>${esc(location.origin)}</code>.</li>
           <li>Copie l’<em>ID client</em> (se termine par <code>.apps.googleusercontent.com</code>) et colle-le ci-dessous.</li>
+          <li><b>Pour rester connecté</b> (plus de fenêtre Google à chaque ouverture) : sur la page du même client, copie aussi le <em>Code secret du client</em> (commence par <code>GOCSPX-</code>) et colle-le ci-dessous. Puis dans <a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noopener">Audience</a>, clique <em>Publier l’application</em> : en mode « Test », Google redemande la connexion tous les 7 jours.</li>
         </ol>
         <form class="form" id="cid-form">
           <label>ID client OAuth<input name="cid" value="${esc(clientId)}" placeholder="123456789-abc….apps.googleusercontent.com" autocomplete="off" spellcheck="false"></label>
-          <div><button class="btn">Enregistrer l’ID</button></div>
+          <label>Code secret du client <small class="muted">(facultatif : pour rester connecté)</small><input name="secret" type="password" value="" placeholder="${cSecret ? '•••••••• (code enregistré)' : 'GOCSPX-…'}" autocomplete="off" spellcheck="false"></label>
+          <div class="head-actions"><button class="btn">Enregistrer</button>${cSecret ? '<button class="btn danger" type="button" id="cs-del">Retirer le code secret</button>' : ''}</div>
+          <p class="muted hint" style="margin:0">Le code secret reste sur cet appareil : il n’est envoyé qu’à Google et n’est jamais synchronisé ni inclus dans les sauvegardes exportées.</p>
         </form>
         <div class="status-line">
           ${connected
@@ -3324,9 +3329,12 @@ async function renderSettings() {
     e.preventDefault();
     const v = e.target.cid.value.trim();
     if (v && !v.endsWith('.apps.googleusercontent.com')) { toast('Cet ID ne ressemble pas à un ID client Google', 'err'); return; }
+    const sec = e.target.secret.value.trim();
+    if (sec && !/^GOCSPX-[\w-]{10,}$/.test(sec)) { toast('Ce code ne ressemble pas à un code secret de client Google (GOCSPX-…)', 'err'); return; }
     await db.put('settings', v, 'clientId');
-    if (v !== clientId) await gcal.disconnect();
-    toast('ID enregistré');
+    if (sec) await db.put('settings', sec, 'clientSecret');
+    if (v !== clientId || sec) await gcal.disconnect(); // nouvelle connexion avec le jeton de renouvellement
+    toast(sec ? 'Enregistré — reconnecte-toi une fois et tu resteras connecté' : 'ID enregistré');
     gcal.preload();
     renderSettings();
   };
@@ -3445,6 +3453,7 @@ async function renderSettings() {
   drawLogo();
 
   $('#ak-del')?.addEventListener('click', async () => { await db.del('settings', 'anthropicKey'); toast('Clé retirée'); renderSettings(); });
+  $('#cs-del')?.addEventListener('click', async () => { await db.del('settings', 'clientSecret'); await gcal.disconnect(); toast('Code secret retiré'); renderSettings(); });
   $('#g-off')?.addEventListener('click', async () => { await gcal.disconnect(); toast('Déconnecté'); renderSettings(); });
 
   // Choix des agendas
@@ -3473,7 +3482,7 @@ async function renderSettings() {
   $('#exp').onclick = async () => {
     const data = { app: APP.id, version: 1, exportedAt: new Date().toISOString(), stores: {} };
     for (const s of STORES) if (s !== 'cache') data.stores[s] = await db.entries(s);
-    data.stores.settings = data.stores.settings.filter(([k]) => k !== 'anthropicKey'); // la clé API ne sort jamais de l'appareil
+    data.stores.settings = data.stores.settings.filter(([k]) => k !== 'anthropicKey' && k !== 'clientSecret'); // la clé API et le code secret Google ne sortent jamais de l'appareil
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -3489,10 +3498,12 @@ async function renderSettings() {
       if (![APP.id, 'lifeplanner'].includes(data.app)) throw new Error('Fichier non reconnu');
       if (!(await confirmBox('Remplacer toutes les données actuelles par cette sauvegarde ?', 'Restaurer'))) return;
       const keepKey = await db.get('settings', 'anthropicKey');
+      const keepSecret = await db.get('settings', 'clientSecret');
       for (const [s, rows] of Object.entries(data.stores)) {
         if (!STORES.includes(s)) continue;
         await db.clear(s);
         if (s === 'settings' && keepKey) await db.put('settings', keepKey, 'anthropicKey');
+        if (s === 'settings' && keepSecret) await db.put('settings', keepSecret, 'clientSecret');
         const inline = s !== 'settings';
         for (const [k, v] of rows) await (inline ? db.put(s, v) : db.put(s, v, k));
       }
