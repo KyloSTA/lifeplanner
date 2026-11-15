@@ -1694,12 +1694,13 @@ async function renderNote(id) {
       ? all.filter((x) => x.id !== me.id && !x.archived && !linked.has(x.id) && x.title && (x.tags || []).some((t) => me.tags.includes(t))).slice(0, 5) : [];
     const links = await assoc.linksOf(n);
     const relNotes = me.type === 'projet' ? await assoc.notesFor('projects', me.id) : [];
+    const relPages = me.type === 'projet' ? await assoc.pagesFor('projects', me.id) : [];
     el.innerHTML = `
       <section class="card assoc-card"><div class="card-head"><h3>🧷 Associé à</h3><button class="btn sm-text" id="n-assoc">+ Associer</button></div>
         ${links.length ? `<div class="assoc-list">${links.map((l) => `<span class="assoc-chip"><a href="${l.href}" ${l.task ? `data-open-task="${l.task}"` : ''}>${esc(l.label)}</a><button data-unassoc="${l.kind}|${l.id}" aria-label="Retirer l’association">×</button></span>`).join('')}</div>`
           : '<p class="empty-sm">Relie cette note à un projet, un module du cours RBQ, un objectif ou une mission.</p>'}</section>
-      ${me.type === 'projet' ? `<section class="card"><h3>🧠 Éléments associés (${relNotes.length})</h3>
-        ${relNotes.length ? `<div class="assoc-list">${assoc.noteChips(relNotes)}</div>` : '<p class="empty-sm">Depuis n’importe quelle note : « 🧷 Associé à » → 🚀 Projet.</p>'}</section>` : ''}
+      ${me.type === 'projet' ? `<section class="card"><h3>🧠 Éléments associés (${relNotes.length + relPages.length})</h3>
+        ${relNotes.length + relPages.length ? `<div class="assoc-list">${assoc.noteChips(relNotes)}${assoc.pageChips(relPages)}</div>` : '<p class="empty-sm">Depuis n’importe quelle note ou page manuscrite : « 🧷 Associer » → 🚀 Projet.</p>'}</section>` : ''}
       <section class="card"><h3>🔗 Liens (${out.length})</h3>
         ${out.map(({ l, t }) => t
           ? `<a class="side-link" href="#/note/${t.id}">${brain.typeOf(t.type).icon} ${esc(t.title)}</a>`
@@ -2621,6 +2622,7 @@ async function renderPage(id) {
         </div>
         <label class="btn" id="ink-img" title="Ajouter une image (tu peux aussi la coller avec Ctrl + V ou la glisser sur la page)"><input type="file" accept="image/*" multiple hidden>🖼 Image</label>
         <label class="btn ink-extra" id="ink-doc" title="Joindre un document à cette page (PDF, Word, EPUB…)"><input type="file" accept="${docs.ACCEPT}" multiple hidden>📎</label>
+        <button class="btn ink-extra" id="ink-assoc" type="button" title="Associer cette page à une mission, un objectif ou un projet">🧷 Associer</button>
         <div class="seg" id="colors"></div>
         <div class="seg ink-extra" id="sizes">${[6, 9, 13].map((s, i) => `<button data-size="${i}" class="${i === 1 ? 'on' : ''}" title="Épaisseur"><span class="dot" style="width:${s}px;height:${s}px"></span></button>`).join('')}</div>
         <div class="seg">
@@ -2636,6 +2638,7 @@ async function renderPage(id) {
         <button class="btn danger ink-extra" id="clear">Effacer</button>
         <span class="saved muted" id="saved"></span>
       </div>
+      <div class="ink-docs" id="ink-rel" hidden></div>
       <div class="ink-docs" id="ink-docs" hidden></div>
       <div class="ink-scroll" id="ink-scroll"></div>
     </div>`;
@@ -2691,6 +2694,27 @@ async function renderPage(id) {
   const pickDoc = $('#ink-doc input');
   pickDoc.onchange = () => { addDocsToPage([...pickDoc.files]); pickDoc.value = ''; };
   drawDocs();
+
+  // Associations de la page : missions, objectifs, projets (bandeau au-dessus de la feuille)
+  const drawRel = async () => {
+    const el = $('#ink-rel');
+    if (!el) return;
+    const links = (await assoc.linksOf(meta)).filter((l) => l.kind !== 'rbq');
+    el.hidden = !links.length;
+    el.innerHTML = `<span class="muted">🧷 Associée à :</span>${links.map((l) => `<span class="assoc-chip"><a href="${l.href}" ${l.task ? `data-open-task="${l.task}"` : ''} ${l.kind === 'goals' ? `data-goal="${esc(l.id)}"` : ''}>${esc(l.label)}</a><button data-unassoc="${l.kind}|${l.id}" aria-label="Retirer l’association">×</button></span>`).join('')}`;
+    $$('[data-unassoc]', el).forEach((b) => (b.onclick = async () => {
+      const [k, tid] = b.dataset.unassoc.split('|');
+      await assoc.toggle(meta, k, tid, false, assoc.savePage);
+      drawRel();
+    }));
+    $$('[data-open-task]', el).forEach((a) => (a.onclick = (e) => { e.preventDefault(); openTaskEditor(a.dataset.openTask, drawRel); }));
+    $$('[data-goal]', el).forEach((a) => (a.onclick = () => openGoals.add(a.dataset.goal))); // l'objectif s'ouvre déplié
+  };
+  $('#ink-assoc').onclick = () => {
+    meta.title = $('#title').value.trim() || meta.title;
+    assoc.picker(modal, meta, drawRel, { kinds: assoc.PAGE_KINDS, save: assoc.savePage });
+  };
+  drawRel();
   const setTool = (t) => {
     ed.setTool(t);
     $$('[data-tool]').forEach((x) => x.classList.toggle('on', x.dataset.tool === t));
@@ -2896,6 +2920,7 @@ async function renderGoals() {
   const free = tasks.filter((t) => !t.goalId && !t.done).sort(sortM);
   const everyNote = await brain.allNotes();
   const relNotes = everyNote.filter((x) => !x.archived && (x.rel?.goals || []).length); // notes associées à des objectifs
+  const relPages = (await db.all('pages')).filter((p) => (p.rel?.goals || []).length); // pages manuscrites associées
   const allProjects = brain.projectsOf(everyNote, { withArchived: true }).sort((a, b) => a.title.localeCompare(b.title));
   const projects = allProjects.filter((p) => !p.archived);
   // Un projet archivé n'est plus proposé, sauf pour l'objectif qui y est déjà lié
@@ -2950,7 +2975,7 @@ async function renderGoals() {
           <label class="goal-proj" title="Projet">🚀 <select class="g-proj" aria-label="Projet du Cerveau">${projOptions(g.projectId)}</select></label>
         </div>
         ${allProjects.length ? '' : '<p class="empty-sm" style="padding:0">Pour regrouper des objectifs, crée une note de type 🚀 Projet dans le Cerveau.</p>'}
-        ${(() => { const ln = relNotes.filter((x) => (x.rel?.goals || []).includes(g.id)); return ln.length ? `<div class="assoc-list"><span class="muted">🧠 Notes :</span>${assoc.noteChips(ln)}</div>` : ''; })()}
+        ${(() => { const ln = relNotes.filter((x) => (x.rel?.goals || []).includes(g.id)), lp = relPages.filter((p) => p.rel.goals.includes(g.id)); return ln.length || lp.length ? `<div class="assoc-list"><span class="muted">🧠 Notes :</span>${assoc.noteChips(ln)}${assoc.pageChips(lp)}</div>` : ''; })()}
         ${ms.length ? `<ul class="tasks">${ms.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>`
           : '<p class="empty-sm">Découpe cet objectif en missions : sa progression avancera toute seule à chaque mission accomplie.</p>'}
         <button type="button" class="btn sm-text g-addm">+ Mission</button>

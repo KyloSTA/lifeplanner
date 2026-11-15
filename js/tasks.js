@@ -373,6 +373,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
     const sd = subs.filter((s) => s.done).length;
     // Notes du Cerveau associées à cette mission (« 🧷 Associé à » dans une note)
     const linked = (await db.all('notes')).filter((x) => (x.rel?.tasks || []).includes(t.id)); // y compris la note archivée devenue mission
+    const linkedPages = (await db.all('pages')).filter((p) => (p.rel?.tasks || []).includes(t.id)); // pages manuscrites associées
     const remOn = !!(await db.get('settings', 'gcalReminders')); // rappels copiés dans Google Agenda
     box.innerHTML = `
       <div class="tm-head">
@@ -433,11 +434,14 @@ export async function openTaskEditor(id, onChange = () => {}) {
       </section>
       ${linked.length ? `<section class="tm-sec"><h3>🧠 Notes du Cerveau <span class="muted">${linked.length}</span></h3>
         <div class="assoc-list">${linked.map((x) => `<a class="assoc-chip" href="#/note/${x.id}" data-go="${x.id}">${esc(x.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
+      ${linkedPages.length ? `<section class="tm-sec"><h3>✍️ Pages manuscrites <span class="muted">${linkedPages.length}</span></h3>
+        <div class="assoc-list">${linkedPages.map((p) => `<a class="assoc-chip" href="#/page/${encodeURIComponent(p.id)}" data-go-page="${esc(p.id)}">✍️ ${esc(p.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
       <div class="modal-actions tm-actions">
         <button class="btn danger tm-del">🗑 Supprimer</button>
         <button class="btn primary tm-ok">Terminé</button>
       </div>`;
 
+    box.querySelectorAll('[data-go-page]').forEach((a) => (a.onclick = async (e) => { e.preventDefault(); await close(); location.hash = '#/page/' + encodeURIComponent(a.dataset.goPage); }));
     box.querySelectorAll('[data-go]').forEach((a) => (a.onclick = async (e) => { e.preventDefault(); await close(); location.hash = '#/note/' + a.dataset.go; }));
     const title = box.querySelector('.tm-title');
     const grow = () => { title.style.height = 'auto'; title.style.height = title.scrollHeight + 'px'; };
