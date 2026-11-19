@@ -68,5 +68,6 @@ export function debounce(fn, ms) {
       return run();
     }
   };
+  d.cancel = () => { clearTimeout(t); t = null; args = null; }; // abandonne l'appel en attente
   return d;
 }
