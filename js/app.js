@@ -1570,6 +1570,7 @@ async function renderBrain() {
   const idOf = (card) => card.getAttribute('href')?.replace('#/note/', '');
   const markSel = () => $$('#ng .note-card').forEach((c) => c.classList.toggle('sel', sel.has(idOf(c))));
   const allProjects = brain.projectsOf(everything).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  const rbqModules = (await db.all('study')).filter((x) => x.kind === 'module').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const drawBulk = () => {
     const bar = $('#bulk');
     bar.hidden = !selecting;
@@ -1586,6 +1587,7 @@ async function renderBrain() {
       <div class="bulk-acts">
         <select data-b="type" ${dis} aria-label="Changer le type"><option value="">Type…</option>${brain.TYPES.map((t) => `<option value="${t.id}">${t.icon} ${t.name}</option>`).join('')}</select>
         ${allProjects.length ? `<select data-b="proj" ${dis} aria-label="Associer à un projet"><option value="">Projet…</option>${allProjects.map((p) => `<option value="${p.id}">🚀 ${esc(p.title || 'Projet')}</option>`).join('')}</select>` : ''}
+        ${rbqModules.length ? `<select data-b="rbq" ${dis} aria-label="Associer à un module du cours RBQ"><option value="">Cours RBQ…</option>${rbqModules.map((m) => `<option value="${m.id}">📘 ${esc(m.title || 'Module')}</option>`).join('')}</select>` : ''}
         <input data-b="tag" ${dis} placeholder="+ étiquette" aria-label="Ajouter une étiquette (Entrée)" autocomplete="off">
         <button type="button" class="btn" data-b="ok" ${dis} title="Retirer de « À classer »">✓ Classé</button>
         <button type="button" class="btn" data-b="pin" ${dis}>📌 Épingler</button>
@@ -1604,6 +1606,13 @@ async function renderBrain() {
     bar.querySelector('[data-b="none"]')?.addEventListener('click', () => { sel.clear(); markSel(); drawBulk(); });
     bar.querySelector('[data-b="type"]').onchange = (e) => { const t = e.target.value; if (t) each(classify((c) => { c.type = t; }), `${brain.typeOf(t).icon} ${brain.typeOf(t).name}`); };
     bar.querySelector('[data-b="proj"]')?.addEventListener('change', (e) => { const p = e.target.value; if (p) each(classify((c) => { c.rel ||= {}; c.rel.projects = [...new Set([...(c.rel.projects || []), p])]; }), '🚀 Associés au projet'); });
+    // Cours RBQ : les éléments vont dans la cellule « 🧠 Du Cerveau » du module (comme « 🧷 Associé à »)
+    bar.querySelector('[data-b="rbq"]')?.addEventListener('change', (e) => {
+      const mid = e.target.value;
+      if (!mid) return;
+      const mod = rbqModules.find((m) => m.id === mid);
+      each(async (c) => { await assoc.toggle(c, 'rbq', mid, true); await classify(() => {})(c); }, `📘 Associés à « ${mod?.title || 'module'} »`);
+    });
     bar.querySelector('[data-b="tag"]').onkeydown = (e) => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
