@@ -1189,14 +1189,14 @@ function bindCapture(form, after) {
   };
   const add = (list) => {
     for (const blob of list) files.push({ blob, url: URL.createObjectURL(blob) });
-    if (list.length) { drawImgs(); form.t.focus(); }
+    if (list.length) drawImgs(); // pas de focus sur la zone de texte : le clavier ne s'ouvre pas pour une simple photo
   };
   const addDocs = (list) => {
     for (const blob of list) {
       if (blob.size > docs.MAX_MB * 1024 * 1024) { toast(`« ${blob.name} » dépasse ${docs.MAX_MB} Mo`, 'err'); continue; }
       files.push({ blob, doc: true });
     }
-    if (list.length) { drawImgs(); form.t.focus(); }
+    if (list.length) drawImgs();
   };
   form._addImages = add; // utilisé par le « coller » global de la page
   let busy = false;
