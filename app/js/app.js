@@ -2151,7 +2151,7 @@ function plannerTabs(active, d = new Date()) {
     : active === 'year' ? now.getFullYear() === d.getFullYear()
     : active === 'activities';
   const dayLink = hasToday ? t : day;
-  const tabs = [['day', 'Jour', `#/day/${dayLink}`], ['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', '#/journal'], ['activities', '🎟 Activités', '#/activities']];
+  const tabs = [['day', 'Jour', `#/day/${dayLink}`], ['week', 'Semaine', `#/week/${day}`], ['month', 'Mois', `#/month/${day.slice(0, 7)}`], ['year', 'Année', `#/year/${d.getFullYear()}`], ['journal', '📖 Journal', `#/journal/${dayLink}`] /* s'ouvre sur la date affichée */, ['activities', '🎟 Activités', '#/activities']];
   return `<nav class="seg planner-tabs" aria-label="Vues du planificateur">${tabs.map(([k, l, h]) => `<a href="${h}" class="${k === active ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
 }
 const moodOf = (j) => MOODS.find((m) => m.v === j?.mood);
