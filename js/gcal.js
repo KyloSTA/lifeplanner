@@ -61,7 +61,10 @@ export async function ensure() {
         window.dispatchEvent(new Event('lp-google'));
         return true;
       } catch (err) {
-        if (err.code === 'invalid_grant' || err.code === 'invalid_client' || err.code === 'unauthorized_client') dropRefresh(); // révoqué ou expiré : il faudra se reconnecter
+        if (err.code) { // Google refuse (révoqué, expiré, code secret changé…) : on oublie ce jeton, il faudra se reconnecter
+          dropRefresh();
+          if (err.code === 'invalid_client') setCodeError('Code secret du client refusé par Google');
+        }
         return false;
       }
     })().finally(() => { renewing = null; });
@@ -95,6 +98,11 @@ export async function preload() {
 export const hasScope = (s) => !!(tok?.scope || '').split(' ').includes(s);
 export const token = () => (valid() ? tok.t : null);
 
+// Dernier échec de la connexion durable (code secret refusé, etc.) : affiché dans les Réglages
+const CODE_ERR_KEY = 'lp.gcodeerr';
+export function codeError() { try { return localStorage.getItem(CODE_ERR_KEY) || ''; } catch { return ''; } }
+export function setCodeError(msg) { try { msg ? localStorage.setItem(CODE_ERR_KEY, msg) : localStorage.removeItem(CODE_ERR_KEY); } catch { /* ignore */ } }
+
 /**
  * Ouvre la fenêtre de connexion Google (à appeler depuis un clic).
  * silent = true : reconnexion discrète (pas d'écran de consentement si déjà accordé).
@@ -105,8 +113,10 @@ export async function connect({ silent = false } = {}) {
   if (silent && (await ensure())) return; // renouvelé sans fenêtre
   const secret = await db.get('settings', 'clientSecret');
   await loadGis();
-  // Avec le code secret : connexion « code » qui donne un jeton de renouvellement (on reste connecté)
-  if (secret) {
+  // Avec le code secret : connexion « code » qui donne un jeton de renouvellement (on reste connecté).
+  // Jamais en reconnexion discrète (elle ouvrirait l'écran d'autorisation à chaque toucher), ni après un échec :
+  // on revient alors à la connexion simple jusqu'à ce que le code secret soit corrigé dans les Réglages.
+  if (secret && !silent && !codeError()) {
     return new Promise((resolve, reject) => {
       const client = google.accounts.oauth2.initCodeClient({
         client_id: clientId,
@@ -116,9 +126,15 @@ export async function connect({ silent = false } = {}) {
           if (r.error) return reject(new Error(r.error_description || r.error));
           try {
             keep(await tokenCall({ code: r.code, client_id: clientId, client_secret: secret, redirect_uri: 'postmessage', grant_type: 'authorization_code' }));
+            setCodeError(refresh ? '' : 'Google n’a pas donné d’autorisation durable : retire l’app sur myaccount.google.com/permissions, puis reconnecte-toi.');
             window.dispatchEvent(new Event('lp-google'));
             resolve();
-          } catch (err) { reject(err.code === 'invalid_client' ? new Error('Code secret du client invalide : vérifie-le dans Réglages › Google Agenda') : err); }
+          } catch (err) {
+            const msg = err.code === 'invalid_client' ? 'Code secret du client invalide : vérifie-le dans Réglages › Google Agenda'
+              : err instanceof TypeError ? 'Google n’a pas pu être joint pour l’autorisation durable (' + err.message + ')' : err.message;
+            setCodeError(msg);
+            reject(new Error(msg + ' — clique « Connecter » à nouveau pour une connexion simple.'));
+          }
         },
         error_callback: (e) => reject(new Error(e.type === 'popup_closed' ? 'Connexion annulée' : e.message || e.type)),
       });
