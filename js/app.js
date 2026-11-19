@@ -26,6 +26,7 @@ import { withTeamLogos } from './teams.js';
 import * as assoc from './assoc.js';
 import * as news from './news.js';
 import * as finance from './finance.js';
+import * as shots from './shots.js';
 import * as usage from './usage.js';
 import * as activities from './activities.js';
 import * as reminders from './reminders.js';
@@ -3584,6 +3585,8 @@ async function renderSettings() {
 
       <section class="card logo-card" id="logo-card"></section>
 
+      <section class="card shot-set" id="shot-card"></section>
+
       <section class="card us-link">
         <div class="card-head"><h2>📊 Ton utilisation</h2></div>
         <p class="muted" style="margin-top:0">L’app note quelles pages et quels boutons tu utilises (jamais le contenu de tes notes) et te propose des façons de la simplifier : ordre du menu, pages ou cartes à retirer, page d’ouverture…</p>
@@ -3745,6 +3748,36 @@ async function renderSettings() {
     $('#lg-emoji', el)?.addEventListener('input', (e) => { if (e.target.value.trim()) deb({ emoji: e.target.value.trim() }); });
   };
   drawLogo();
+
+  // 📸 Captures d'écran → Cerveau (réglages propres à cet appareil)
+  const drawShots = async () => {
+    const el = $('#shot-card');
+    if (!el) return;
+    const st = await shots.dirStatus();
+    el.innerHTML = `<div class="card-head"><h2>📸 Captures → Cerveau</h2><span class="muted">Sur cet appareil</span></div>
+      <p class="muted" style="margin-top:0">Quand tu reviens dans Life Planner après une capture d’écran (Win + Maj + S), elle t’est proposée : un toucher l’ajoute au Cerveau, dans « À classer ». Rien n’est ajouté sans ton accord.</p>
+      <div class="shot-opts">
+        <div class="shot-opt"><div><b>📋 Presse-papiers</b><small class="muted">La capture que Win + Maj + S vient de copier.</small></div>
+          ${!shots.canClip() ? '<span class="muted">Non disponible dans ce navigateur</span>'
+            : shots.clipOn() ? '<span class="chip ok">Activé</span><button class="btn" id="sh-clip-off">Désactiver</button>' : '<button class="btn primary" id="sh-clip-on">Activer</button>'}</div>
+        <div class="shot-opt"><div><b>📁 Dossier des captures</b><small class="muted">${st.on ? `« ${esc(st.name)} »${st.perm !== 'granted' ? ' · accès à confirmer' : ''}` : 'Ex. Images › Captures d’écran (aussi la touche Impr. écran).'}</small></div>
+          ${!shots.canWatchDir() ? '<span class="muted">Non disponible dans ce navigateur</span>'
+            : st.on ? `${st.perm !== 'granted' ? '<button class="btn primary" id="sh-dir-perm">Autoriser</button>' : '<span class="chip ok">Activé</span>'}<button class="btn" id="sh-dir-off">Arrêter</button>` : '<button class="btn primary" id="sh-dir-on">Choisir le dossier</button>'}</div>
+      </div>
+      <p class="hint muted">Windows enregistre aussi dans le dossier la capture qu’il copie : avec les deux options, chaque capture n’est proposée qu’une fois.</p>`;
+    $('#sh-clip-on', el)?.addEventListener('click', async () => {
+      try { await shots.enableClip(); toast('📋 Captures du presse-papiers activées'); } catch { toast('Edge n’a pas permis de lire le presse-papiers : autorise-le quand il le demande', 'err'); }
+      drawShots();
+    });
+    $('#sh-clip-off', el)?.addEventListener('click', () => { shots.disableClip(); drawShots(); });
+    $('#sh-dir-on', el)?.addEventListener('click', async () => {
+      try { await shots.chooseDir(); toast('📁 Dossier des captures surveillé : les prochaines captures te seront proposées'); } catch (err) { if (err.name !== 'AbortError') toast(err.message, 'err'); }
+      drawShots();
+    });
+    $('#sh-dir-perm', el)?.addEventListener('click', async () => { await shots.check({ ask: true, force: true }); drawShots(); });
+    $('#sh-dir-off', el)?.addEventListener('click', async () => { await shots.stopDir(); drawShots(); });
+  };
+  drawShots();
 
   $('#ak-del')?.addEventListener('click', async () => { await db.del('settings', 'anthropicKey'); toast('Clé retirée'); renderSettings(); });
   $('#cs-del')?.addEventListener('click', async () => { await db.del('settings', 'clientSecret'); gcal.setCodeError(''); await gcal.disconnect(); toast('Code secret retiré'); renderSettings(); });
@@ -4210,6 +4243,14 @@ game.init().catch(console.error).finally(async () => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
     if (route === 'today') refreshToday();
     else if ((route === 'habits' || route === 'hero') && !$('#modal-root').children.length) router();
+  });
+  // Captures d'écran → Cerveau : proposées quand tu reviens dans l'app (presse-papiers et dossier des captures)
+  shots.start({
+    toast,
+    onAdded: () => {
+      const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
+      if ((route === 'brain' || route === 'today') && !$('#modal-root').children.length) router();
+    },
   });
   // Posts Reddit et vidéos YouTube sauvegardés avec le bouton « 🧠 Cerveau » (extension extension-edge).
   // L'app couple ne les reçoit pas : ils vont dans le Cerveau de Life Planner (ou attendent son ouverture).
