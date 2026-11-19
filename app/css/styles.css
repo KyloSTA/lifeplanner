@@ -1966,6 +1966,12 @@ h2 { font-weight: 600; }
 .card.is-folded .card-head { margin-bottom: 18px; }
 .card.is-folded .fold-btn svg { transform: rotate(-90deg); }
 @media (pointer: coarse) { .fold-btn { width: 36px; height: 36px; } .card.is-folded { max-height: 70px; } }
+/* Carte du haut d'Aujourd'hui : réduite = héros et tuiles seulement */
+.today-top { position: relative; }
+.top-fold { position: absolute; top: 8px; right: 8px; z-index: 2; }
+.today-top .today-summary { padding-right: 34px; }
+.today-top.collapsed .top-agenda, .today-top.collapsed .sum-focus-row { display: none; }
+.today-top.collapsed .top-fold svg { transform: rotate(-90deg); }
 .today-cols .card-head > h2 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today-cols .card-head > span, .today-cols .card-head > a { white-space: nowrap; flex: none; }
 /* Menu : onglets retirés ; cartes d'Aujourd'hui masquées */
