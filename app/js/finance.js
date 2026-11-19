@@ -515,6 +515,38 @@ async function drawShopping(ctx, el) {
   });
 }
 
+/** Carte « 🛒 Achats » de la page Aujourd'hui : prochains articles à cocher et ajout rapide. */
+export async function shopCard(el) {
+  if (!el) return;
+  const todo = (await shopLoad()).filter((x) => !x.del && !x.done).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const shown = todo.slice(0, 6);
+  el.innerHTML = `<div class="card-head"><h2>🛒 Achats</h2><a href="#/finance/achats">${todo.length ? `${todo.length} à acheter →` : 'Ouvrir →'}</a></div>
+    ${shown.length ? `<ul class="sh-list sh-mini">${shown.map((x) => `<li class="sh-item" data-id="${x.id}">
+      <label class="sh-check"><input type="checkbox" aria-label="Acheté : ${esc(x.name)}"></label>
+      <span class="sh-name"><a class="sh-link" href="https://www.amazon.ca/s?k=${encodeURIComponent(x.name)}" target="_blank" rel="noopener" title="Chercher « ${esc(x.name)} » sur Amazon">${esc(x.name)}</a>${Number(x.qty) > 1 ? ` <span class="sh-qty">×${Number(x.qty)}</span>` : ''}</span></li>`).join('')}</ul>
+      ${todo.length > shown.length ? `<p class="muted sh-more"><a href="#/finance/achats">+ ${todo.length - shown.length} autre${todo.length - shown.length > 1 ? 's' : ''}</a></p>` : ''}`
+      : '<p class="empty-sm">Rien à acheter pour l’instant.</p>'}
+    <form class="sh-quick"><input name="n" placeholder="+ Ajouter à la liste…" autocomplete="off" aria-label="Ajouter une chose à acheter"><button class="btn icon" aria-label="Ajouter">+</button></form>`;
+  el.querySelectorAll('.sh-item input[type="checkbox"]').forEach((cb) => (cb.onchange = async () => {
+    const id = cb.closest('.sh-item').dataset.id;
+    const cur = await shopLoad();
+    const x = cur.find((i) => i.id === id);
+    if (x) { x.done = cb.checked; x.at = Date.now(); await shopSave(cur); }
+    cb.closest('.sh-item').classList.toggle('done', cb.checked);
+    setTimeout(() => shopCard(el), 700); // laisse voir la case cochée un instant
+  }));
+  el.querySelector('.sh-quick').onsubmit = async (e) => {
+    e.preventDefault();
+    const name = e.target.n.value.trim();
+    if (!name) return;
+    const cur = await shopLoad();
+    cur.push({ id: U.uid(), name, qty: 1, price: 0, cat: guessCat(name), done: false, at: Date.now() });
+    await shopSave(cur);
+    await shopCard(el);
+    el.querySelector('.sh-quick input')?.focus();
+  };
+}
+
 function emptyState() {
   return `<section class="card fi-empty">
     <h2>Suis tes dépenses et garde le cap 💰</h2>
