@@ -1981,6 +1981,7 @@ h2 { font-weight: 600; }
 .rc-row .redisc { min-width: 0; margin: 0; }
 .rc-row .redisc b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rc-thumb { display: block; width: 100%; height: 96px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; background: var(--surface-2); }
+.rc-thumb.contain { object-fit: contain; background: #fff; padding: 4px; } /* produit Amazon : photo entière sur fond blanc */
 
 /* Ton utilisation */
 .us-kpis { margin-bottom: 14px; }
