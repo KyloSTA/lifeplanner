@@ -449,7 +449,7 @@ async function drawShopping(ctx, el) {
   const sugg = [...seen.values()].slice(0, 14);
   const row = (x) => `<li class="sh-item ${x.done ? 'done' : ''}" data-id="${x.id}">
     <label class="sh-check"><input type="checkbox" ${x.done ? 'checked' : ''} aria-label="${x.done ? 'Remettre à acheter' : 'Acheté'} : ${esc(x.name)}"></label>
-    <span class="sh-name">${esc(x.name)}${Number(x.qty) > 1 ? ` <span class="sh-qty">×${Number(x.qty)}</span>` : ''}</span>
+    <span class="sh-name"><a class="sh-link" href="https://www.amazon.ca/s?k=${encodeURIComponent(x.name)}" target="_blank" rel="noopener" title="Chercher « ${esc(x.name)} » sur Amazon">${esc(x.name)}</a>${Number(x.qty) > 1 ? ` <span class="sh-qty">×${Number(x.qty)}</span>` : ''}</span>
     ${Number(x.price) > 0 ? `<span class="sh-price">${$$$((Number(x.price) || 0) * (Number(x.qty) || 1))}</span>` : ''}
     <button class="x" data-del aria-label="Retirer ${esc(x.name)}">×</button></li>`;
   const groups = SHOP_CATS.map(([k, l]) => [l, todo.filter((x) => (SHOP_CATS.some(([c]) => c === x.cat) ? x.cat : 'autre') === k)]).filter(([, g]) => g.length);
