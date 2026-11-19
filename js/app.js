@@ -1687,11 +1687,16 @@ async function renderBrain() {
     recentIdx = Math.min(Math.max(recentIdx, 0), recent.length - 1);
     const n = recent[recentIdx];
     const v = youtubeVideos(n.body)[0];
+    const pic = images.refsIn(n.body)[0];
+    // Miniature : image de l'élément (Amazon, actualité, Reddit, Facebook), photo de la note ou vidéo YouTube
+    const thumb = n.source?.img ? `<img class="rc-thumb ${n.source.kind === 'amazon' ? 'contain' : ''}" src="${esc(n.source.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
+      : pic ? `<img class="rc-thumb" data-img="${pic}" alt="">`
+      : v ? `<img class="rc-thumb" src="https://i.ytimg.com/vi/${v.id}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">` : '';
     el.innerHTML = `<div class="card-head"><h2>🕘 Consultés récemment</h2><span class="muted">${recentIdx + 1}/${recent.length}</span></div>
       <div class="rc-row">
         <button class="rc-arrow" id="rc-prev" ${recentIdx === 0 ? 'disabled' : ''} aria-label="Élément plus récent" title="Plus récent">‹</button>
         <a class="redisc" href="#/note/${n.id}">
-          ${v ? `<img class="rc-thumb" src="https://i.ytimg.com/vi/${v.id}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+          ${thumb}
           <b>${brain.typeOf(n.type).icon} ${esc(n.title || 'Sans titre')}</b>
           <p>${esc(brain.excerpt(cardText(n.body), 140)) || '<span class="muted">Note vide</span>'}</p></a>
         <button class="rc-arrow" id="rc-next" ${recentIdx === recent.length - 1 ? 'disabled' : ''} aria-label="Élément consulté avant" title="Consulté avant">›</button>
