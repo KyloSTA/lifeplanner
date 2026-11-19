@@ -9,7 +9,7 @@ import { APP } from './config.js';
 
 const STORES = ['tasks', 'journal', 'pages', 'ink', 'goals', 'notes', 'xp', 'settings', 'habits', 'study', 'workouts', 'files', 'money'];
 const LOCAL_ONLY = new Set(['anthropicKey', 'clientId', 'clientSecret', 'xpInit', 'ticketmasterKey']); // réglages propres à cet appareil
-const MERGED = { lastLevel: 'max', lastEvo: 'max', badges: 'union', taskTrash: 'byId' }; // réglages fusionnés plutôt que remplacés
+const MERGED = { lastLevel: 'max', lastEvo: 'max', badges: 'union', taskTrash: 'byId', shopList: 'byAt' }; // réglages fusionnés plutôt que remplacés
 const P = APP.filePrefix; // « lp- » (Life Planner) ou « cp- » (app couple) : chaque édition a ses fichiers
 const FILE = (s) => `${P}${s}.json`;
 const DRIVE = 'https://www.googleapis.com/drive/v3';
@@ -87,6 +87,15 @@ function mergeSpecial(key, a, b) {
     for (const x of [...(a || []), ...(b || [])]) {
       const cur = by.get(x.id);
       if (!cur || (x.trashAt || x.deletedAt || 0) > (cur.trashAt || cur.deletedAt || 0)) by.set(x.id, x);
+    }
+    return [...by.values()];
+  }
+  if (MERGED[key] === 'byAt') {
+    // Liste d'achats : chaque article garde sa version la plus récente (« at »), retraits compris
+    const by = new Map();
+    for (const x of [...(a || []), ...(b || [])]) {
+      const cur = by.get(x.id);
+      if (!cur || (x.at || 0) > (cur.at || 0)) by.set(x.id, x);
     }
     return [...by.values()];
   }
