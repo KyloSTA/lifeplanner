@@ -611,7 +611,13 @@ ul { margin: 0; padding: 0; list-style: none; }
 .tm-sec .sub .x { opacity: .5; }
 .tm-sec .add-sub input { min-height: 38px; }
 .tm-sec .notes { min-height: 90px; font-size: 14px; resize: vertical; }
-.task-modal .tm-actions { justify-content: space-between; margin-top: 0; }
+.task-modal .tm-actions { justify-content: space-between; margin-top: 0; flex-wrap: wrap; gap: 8px; }
+/* « Devenir une étape » : choix de la mission */
+.tm-pick-title { font-size: 17px; margin: 0; flex: 1; min-width: 0; }
+.tm-pick-q { width: 100%; margin: 12px 0 8px; }
+.tm-pick-row { width: 100%; text-align: left; font: inherit; color: inherit; background: none; border-bottom: 1px solid var(--border); }
+.tm-pick-row:hover { background: var(--surface-2); }
+.tm-pick-row .pick-txt { display: grid; }
 .task .exp { font-size: 20px; }
 
 /* ---------- Minuteur de focus ---------- */
