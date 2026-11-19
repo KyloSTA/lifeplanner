@@ -121,6 +121,7 @@ const routes = {
   news: () => news.renderPage(pageCtx()),
   finance: (tab) => finance.renderPage(pageCtx(), tab),
   usage: renderUsage,
+  changelog: renderChangelog,
   activities: () => activities.renderPage(pageCtx(), { tabs: plannerTabs('activities'), addEvent: (day, pre) => eventModal(day, null, pre) }),
   quest: () => rpg.renderPage(pageCtx()),
   rbq: (id) => rbq.renderPage(pageCtx(), id),
@@ -129,13 +130,14 @@ const routes = {
 };
 const NAV_PARENT = {
   page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', projects: 'missions', habits: 'workout', stretch: 'workout',
-  setup: 'settings', usage: 'settings', activities: 'week', quest: 'hero', day: 'week', month: 'week', year: 'week', journal: 'week',
+  setup: 'settings', usage: 'settings', changelog: 'settings', activities: 'week', quest: 'hero', day: 'week', month: 'week', year: 'week', journal: 'week',
 };
 // Onglets en haut des sections qui regroupent plusieurs pages (le menu n'a qu'une entrée par section)
 const SECTION_TABS = {
   missions: [['missions', '✅ Missions'], ['goals', '🎯 Objectifs'], ['projects', '🚀 Projets']],
   brain: [['brain', '🧠 Notes'], ['news', '📰 Actualités'], ['notebook', '✏️ Carnet']],
   workout: [['workout', '🏋️ Workout'], ['stretch', '🧘 Étirements'], ['habits', '🔁 Habitudes']],
+  settings: [['settings', '⚙ Réglages'], ['changelog', '🕘 Historique']],
 };
 let tabsWatch = null;
 function sectionTabs(name) {
@@ -3797,6 +3799,99 @@ async function usageApply(a) {
   else if (a.type === 'startPage') await db.put('settings', a.key, 'startPage');
   await applyNavOrder();
 }
+/* =========================================================
+   Vue : Historique des modifications (onglet de Réglages)
+   Lu directement dans l'historique du projet sur GitHub (dépôt public), gardé en cache une heure.
+   ========================================================= */
+const REPO = 'KyloSTA/lifeplanner';
+const LOG_KEY = 'changelog';
+async function loadChangelog(force = false) {
+  const cached = await db.get('cache', LOG_KEY).catch(() => null);
+  if (!force && cached && Date.now() - cached.at < 3600_000) return { list: cached.list, at: cached.at };
+  try {
+    const list = [];
+    for (let page = 1; page <= 5; page++) {
+      const r = await fetch(`https://api.github.com/repos/${REPO}/commits?sha=main&per_page=100&page=${page}`, { headers: { Accept: 'application/vnd.github+json' } });
+      if (!r.ok) throw new Error(r.status === 403 ? 'GitHub limite les demandes : réessaie dans une heure' : 'GitHub : erreur ' + r.status);
+      const arr = await r.json();
+      for (const c of arr) {
+        // Seulement le message et la date (pas d'adresse courriel)
+        const msg = (c.commit?.message || '').replace(/\r/g, '').split('\n').filter((l) => !/^Co-Authored-By:/i.test(l.trim())).join('\n').trim();
+        if (!msg || /^Mise a jour de Life Planner$/i.test(msg)) continue; // envois sans description (Publier.bat)
+        list.push({ sha: c.sha, date: c.commit?.author?.date || c.commit?.committer?.date, msg, url: c.html_url });
+      }
+      if (arr.length < 100) break;
+    }
+    await db.put('cache', { at: Date.now(), list }, LOG_KEY);
+    return { list, at: Date.now() };
+  } catch (err) {
+    if (cached) return { list: cached.list, at: cached.at, error: err.message };
+    throw err;
+  }
+}
+
+/** Corps d'un message : listes « - » en puces, le reste en paragraphes (lignes suivantes recollées). */
+function changeBody(body) {
+  const out = [];
+  let list = null, para = null;
+  for (const raw of body.split('\n')) {
+    const l = raw.trim();
+    if (!l) { list = null; para = null; continue; }
+    const m = l.match(/^[-•*]\s+(.*)$/);
+    if (m) { para = null; if (!list) { list = []; out.push({ ul: list }); } list.push(m[1]); continue; }
+    if (list && raw.startsWith('  ')) { list[list.length - 1] += ' ' + l; continue; } // suite d'une puce
+    list = null;
+    if (para) para.p += ' ' + l; else { para = { p: l }; out.push(para); }
+  }
+  return out.map((b) => (b.ul ? `<ul>${b.ul.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p>${esc(b.p)}</p>`)).join('');
+}
+
+let changelogQ = '';
+async function renderChangelog() {
+  view.innerHTML = `
+    <header class="page-head"><div><p class="eyebrow">Réglages</p><h1>Historique</h1></div>
+      <div class="head-actions"><button class="btn" id="cl-refresh">↻ Actualiser</button></div></header>
+    <p class="muted cl-intro">Toutes les modifications apportées à Life Planner, des plus récentes aux plus anciennes.</p>
+    <input class="pick-search cl-search" id="cl-q" placeholder="🔍 Chercher une modification (ex. Workout, montre, Cerveau)…" autocomplete="off" value="${esc(changelogQ)}">
+    <div id="cl-body"><p class="empty-sm">Chargement…</p></div>`;
+  const body = $('#cl-body');
+  let data;
+  try { data = await loadChangelog(); } catch (err) {
+    body.innerHTML = `<div class="card empty-card"><p>Impossible de lire l’historique : ${esc(err.message)}. Vérifie ta connexion.</p></div>`;
+    return;
+  }
+  const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const draw = () => {
+    const q = norm(changelogQ.trim());
+    const list = data.list.filter((c) => !q || norm(c.msg).includes(q));
+    const today = iso(new Date()), yest = iso(U.addDays(new Date(), -1));
+    const groups = [];
+    for (const c of list) {
+      const d = iso(new Date(c.date));
+      if (groups[groups.length - 1]?.d !== d) groups.push({ d, items: [] });
+      groups[groups.length - 1].items.push(c);
+    }
+    body.innerHTML = (data.error ? `<p class="warn-text">⚠ ${esc(data.error)} — affichage de la dernière copie.</p>` : '')
+      + (groups.map((g) => `<section class="cl-day"><h3 class="section-title">${g.d === today ? 'Aujourd’hui' : g.d === yest ? 'Hier' : U.cap(U.fmtLong(U.parseISO(g.d)))} <small class="muted">${g.items.length}</small></h3>
+        <div class="card cl-list">${g.items.map((c) => {
+          const [subject, ...rest] = c.msg.split('\n');
+          const more = rest.join('\n').trim();
+          const [area, ...title] = subject.split(/\s:\s/);
+          const head = title.length ? `<span class="cl-area">${esc(area)}</span><b>${esc(title.join(' : '))}</b>` : `<b>${esc(subject)}</b>`;
+          return more ? `<details class="cl-item"><summary><span class="cl-time">${U.fmtTime(new Date(c.date))}</span><span class="cl-head">${head}</span></summary><div class="cl-more">${changeBody(more)}<a href="${esc(c.url)}" target="_blank" rel="noopener" class="cl-link">Voir sur GitHub ↗</a></div></details>`
+            : `<div class="cl-item"><span class="cl-time">${U.fmtTime(new Date(c.date))}</span><span class="cl-head">${head}</span></div>`;
+        }).join('')}</div></section>`).join('') || '<p class="empty-sm">Aucune modification ne correspond.</p>')
+      + `<p class="hint muted">${data.list.length} modifications · mis à jour ${U.fmtTime(new Date(data.at))}</p>`;
+  };
+  draw();
+  $('#cl-q').oninput = (e) => { changelogQ = e.target.value; draw(); };
+  $('#cl-refresh').onclick = async (e) => {
+    e.target.disabled = true;
+    try { data = await loadChangelog(true); draw(); toast('Historique à jour'); } catch (err) { toast(err.message, 'err'); }
+    e.target.disabled = false;
+  };
+}
+
 const USAGE_SYSTEM = 'Tu es un expert UX qui aide une personne à simplifier son application personnelle de planification. Réponds en français québécois, de façon concrète et brève.';
 async function renderUsage() {
   await usage.renderPage(pageCtx(), {
