@@ -3274,6 +3274,7 @@ async function renderSettings() {
           ${connected
             ? '<button class="btn" id="g-off">Déconnecter</button>'
             : `<button class="btn primary" data-gconnect ${clientId ? '' : 'disabled'}>Connecter Google Agenda</button>`}
+          ${clientId && cSecret && !APP.couple ? '<button class="btn" id="g-watch" title="Crée une autorisation pour l’app Life Planner de ta Galaxy Watch (dossier de synchro seulement)">⌚ Lier ma montre</button>' : ''}
         </div>
         <div id="cals"></div>
       </section>
@@ -3458,6 +3459,18 @@ async function renderSettings() {
 
   $('#ak-del')?.addEventListener('click', async () => { await db.del('settings', 'anthropicKey'); toast('Clé retirée'); renderSettings(); });
   $('#cs-del')?.addEventListener('click', async () => { await db.del('settings', 'clientSecret'); gcal.setCodeError(''); await gcal.disconnect(); toast('Code secret retiré'); renderSettings(); });
+  // ⌚ Lier ma montre : autorisation propre à la montre, enregistrée dans un fichier que l'outil d'installation copie sur la montre
+  $('#g-watch')?.addEventListener('click', async () => {
+    try {
+      const data = await gcal.linkWatch();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+      a.download = 'lifeplanner-montre.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast('⌚ Fichier « lifeplanner-montre.json » enregistré dans Téléchargements : il sert une seule fois à lier ta montre. Garde-le privé.');
+    } catch (err) { toast(err.message, 'err'); }
+  });
   $('#g-off')?.addEventListener('click', async () => { await gcal.disconnect(); toast('Déconnecté'); renderSettings(); });
 
   // Choix des agendas
