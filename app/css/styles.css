@@ -2243,6 +2243,9 @@ h2 { font-weight: 600; }
 .sum-focus-txt small:first-child { color: var(--gold-text, var(--accent)); font-weight: 700; font-size: 11px; }
 .sum-focus-txt small.muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sum-focus:hover { border-color: var(--gold, var(--accent)); }
+/* Focus (objectif, projets épinglés) : une bande sur toute la largeur du résumé, côte à côte */
+.sum-focus-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; padding-top: 12px; border-top: 1px solid var(--border); }
+.sum-focus-row .sum-focus { margin-top: 0; flex: 1 1 260px; max-width: 440px; min-width: 0; }
 /* Photos d'une mission : pastille 📷 cliquable et galerie */
 button.chip.t-photos { border: 0; font: inherit; font-size: 12px; min-height: 0; }
 .img-gallery .ig-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0 0 4px; }
