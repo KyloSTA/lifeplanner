@@ -447,6 +447,7 @@ async function renderToday() {
           <section class="card t-hint" id="c-hint" hidden></section>
           <section class="card t-habits" id="c-habits"></section>
           <section class="card t-money" id="c-money" hidden></section>
+          <section class="card t-shop" id="c-shop"></section>
           <section class="card t-workout" id="c-workout"></section>
           <section class="card t-rbq" id="c-rbq" hidden></section>
           <section class="card t-news" id="c-news"></section>
@@ -556,6 +557,7 @@ async function renderToday() {
 
   news.todayCard($('#c-news'), toast); // en parallèle (réseau) : ne retarde pas le reste de la page
   finance.todayCard($('#c-money')).catch(console.error);
+  finance.shopCard($('#c-shop')).catch(console.error);
   usageState().then((st) => usage.todayHint($('#c-hint'), st)).catch(console.error);
   await Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), ink(), goals(), heroCard(), brainCard(), quoteCard()]);
   agenda();

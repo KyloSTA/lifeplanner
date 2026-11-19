@@ -1778,6 +1778,13 @@ a.assoc-chip { padding: 4px 11px; }
 .sh-item.done .sh-link { text-decoration: none; }
 .sh-bought { opacity: .85; }
 .sh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Carte « 🛒 Achats » de la page Aujourd'hui */
+.sh-mini .sh-item { min-height: 38px; padding: 5px 0; }
+.sh-mini .sh-name { font-size: 14px; }
+.sh-more { margin: 4px 0 0; font-size: 13px; }
+.sh-quick { display: flex; gap: 6px; margin-top: 10px; }
+.sh-quick input { flex: 1; min-width: 0; }
+@media (max-width: 900px) { .t-shop { order: 3; } }
 @media (max-width: 600px) { .sh-add .sh-p { width: 80px; } .sh-add select { flex: 1 1 120px; } .sh-add .btn { flex: 1 1 100%; } }
 .fi-month { display: flex; align-items: center; gap: 8px; }
 .fi-month b { min-width: 130px; text-align: center; text-transform: capitalize; }
