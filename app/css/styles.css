@@ -1217,6 +1217,24 @@ a.assoc-chip { padding: 4px 11px; }
 .logo-opt:hover { border-color: var(--accent); }
 .logo-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: var(--accent-soft); }
 .logo-opt svg, .logo-opt img { width: 52px; height: 52px; }
+/* 📸 Captures → Cerveau : fenêtre de proposition et réglages */
+#shot-root .shot-card { position: fixed; z-index: 70; right: 18px; bottom: 18px; width: min(380px, calc(100vw - 24px)); display: grid; gap: 10px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--gold-border); border-radius: 16px; box-shadow: 0 14px 44px rgba(0, 0, 0, .32); padding: 12px 14px; animation: fade .15s; }
+#shot-root .shot-perm { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.shot-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shot-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 260px; overflow-y: auto; }
+.shot-thumbs:has(> :only-child) { grid-template-columns: 1fr; }
+.shot-thumb { position: relative; display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; }
+.shot-thumb img { display: block; width: 100%; height: 100%; max-height: 200px; object-fit: contain; }
+.shot-thumbs:not(:has(> :only-child)) .shot-thumb img { height: 80px; object-fit: cover; }
+.shot-thumb input { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; accent-color: var(--accent); }
+.shot-title { width: 100%; }
+.shot-acts { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 600px) { #shot-root .shot-card { right: 12px; left: 12px; width: auto; bottom: calc(76px + env(safe-area-inset-bottom)); } }
+.shot-opts { display: grid; gap: 10px; }
+.shot-opt { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.shot-opt > div { flex: 1 1 220px; display: grid; gap: 2px; min-width: 0; }
+.shot-opt small { font-size: 12px; }
 /* Logo importé (« Mon image ») */
 .logo-img { object-fit: cover; border-radius: 22%; display: block; }
 .logo-upload { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
