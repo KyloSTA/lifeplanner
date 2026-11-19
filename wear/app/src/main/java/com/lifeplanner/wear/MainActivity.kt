@@ -20,7 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -79,10 +78,12 @@ class MainActivity : ComponentActivity() {
 fun ListScreen(content: ScalingLazyListScope.() -> Unit) {
     val state = rememberScalingLazyListState()
     Scaffold(timeText = { TimeText() }, positionIndicator = { PositionIndicator(scalingLazyListState = state) }) {
+        // Marge du haut : le premier élément commence sous l'heure (TimeText) au lieu de la chevaucher
         ScalingLazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = state,
-            autoCentering = AutoCenteringParams(itemIndex = 0),
+            autoCentering = null,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 10.dp, end = 10.dp, top = 34.dp, bottom = 44.dp),
             content = content,
         )
     }

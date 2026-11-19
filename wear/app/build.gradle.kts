@@ -1,17 +1,11 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Identifiant du client Google « TV et appareils à entrée limitée » : dans local.properties (jamais publié)
-val local = Properties().apply {
-    val f = rootProject.file("local.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
-}
-fun prop(name: String) = (local.getProperty(name) ?: "").replace("\"", "")
+// Compilation hors de OneDrive : la synchro OneDrive verrouille les fichiers générés pendant la compilation
+System.getenv("LOCALAPPDATA")?.let { layout.buildDirectory.set(file("$it/LifePlannerWear/build")) }
 
 android {
     namespace = "com.lifeplanner.wear"
@@ -23,8 +17,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-        buildConfigField("String", "CLIENT_ID", "\"${prop("lp.clientId")}\"")
-        buildConfigField("String", "CLIENT_SECRET", "\"${prop("lp.clientSecret")}\"")
     }
 
     buildTypes {

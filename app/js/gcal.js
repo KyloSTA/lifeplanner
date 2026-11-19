@@ -107,6 +107,34 @@ export function setCodeError(msg) { try { msg ? localStorage.setItem(CODE_ERR_KE
  * Ouvre la fenêtre de connexion Google (à appeler depuis un clic).
  * silent = true : reconnexion discrète (pas d'écran de consentement si déjà accordé).
  */
+/**
+ * Autorisation durable propre à la montre (app Galaxy Watch) : accès au seul dossier de synchro (drive.appdata).
+ * Ne remplace pas la connexion de cette page. Renvoie { clientId, clientSecret, refresh } à transférer sur la montre.
+ */
+export async function linkWatch() {
+  const [clientId, secret] = await Promise.all([db.get('settings', 'clientId'), db.get('settings', 'clientSecret')]);
+  if (!clientId) throw new Error('Configure d’abord l’ID client Google ci-dessus');
+  if (!secret) throw new Error('Ajoute d’abord le code secret du client ci-dessus (connexion durable)');
+  await loadGis();
+  return new Promise((resolve, reject) => {
+    const client = google.accounts.oauth2.initCodeClient({
+      client_id: clientId,
+      scope: DRIVE_SCOPE,
+      ux_mode: 'popup',
+      callback: async (r) => {
+        if (r.error) return reject(new Error(r.error_description || r.error));
+        try {
+          const j = await tokenCall({ code: r.code, client_id: clientId, client_secret: secret, redirect_uri: 'postmessage', grant_type: 'authorization_code' });
+          if (!j.refresh_token) throw new Error('Google n’a pas donné d’autorisation durable : réessaie');
+          resolve({ app: 'lifeplanner-watch', clientId, clientSecret: secret, refresh: j.refresh_token });
+        } catch (err) { reject(err); }
+      },
+      error_callback: (e) => reject(new Error(e.type === 'popup_closed' ? 'Connexion annulée' : e.message || e.type)),
+    });
+    client.requestCode({ prompt: 'consent' }); // l'écran d'autorisation garantit une autorisation durable
+  });
+}
+
 export async function connect({ silent = false } = {}) {
   const clientId = await db.get('settings', 'clientId');
   if (!clientId) throw new Error('NO_CLIENT_ID');

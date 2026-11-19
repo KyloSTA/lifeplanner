@@ -17,6 +17,7 @@ class LpApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         App.ctx = this
+        if (Auth.importLink()) Store.clear() // nouvelle liaison : on repart des données de Drive
         Store.load()
     }
 }
@@ -59,51 +60,27 @@ object Http {
 }
 
 /**
- * Connexion Google « par code » (OAuth pour appareils à entrée limitée) : la montre affiche un code
- * à entrer sur google.com/device depuis le cellulaire. Seul accès demandé : le dossier privé de l'app
- * dans Google Drive (drive.appdata), celui de la synchronisation de Life Planner.
+ * Connexion Google de la montre : une autorisation durable créée par Life Planner sur le PC
+ * (Réglages › Google Agenda › « ⌚ Lier ma montre »), limitée au dossier de synchro dans Drive (drive.appdata).
+ * Le fichier de liaison (link.json) est copié une fois dans les fichiers de l'app, importé puis effacé.
  */
 object Auth {
-    private const val SCOPE = "https://www.googleapis.com/auth/drive.appdata"
     private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
     private val prefs get() = App.ctx.getSharedPreferences("lp_auth", Context.MODE_PRIVATE)
 
-    val configured get() = BuildConfig.CLIENT_ID.isNotBlank()
     val signedIn get() = prefs.getString("refresh", null) != null
 
-    class DeviceCode(val deviceCode: String, val userCode: String, val url: String, val interval: Int, val expiresAt: Long)
-
-    suspend fun startDevice(): DeviceCode = withContext(Dispatchers.IO) {
-        val r = Http.form("https://oauth2.googleapis.com/device/code", mapOf("client_id" to BuildConfig.CLIENT_ID, "scope" to SCOPE))
-        val j = r.json()
-        if (!r.ok) throw Exception(j.optString("error_description", j.optString("error", "Erreur ${r.code}")))
-        DeviceCode(
-            j.getString("device_code"), j.getString("user_code"),
-            j.optString("verification_url", "https://www.google.com/device"),
-            j.optInt("interval", 5), System.currentTimeMillis() + j.optLong("expires_in", 1800) * 1000,
-        )
-    }
-
-    /** Attend que tu acceptes sur le cellulaire. true = connecté. */
-    suspend fun waitForUser(dc: DeviceCode): Boolean = withContext(Dispatchers.IO) {
-        var interval = dc.interval.coerceAtLeast(5)
-        while (System.currentTimeMillis() < dc.expiresAt) {
-            delay(interval * 1000L)
-            val r = Http.form(TOKEN_URL, mapOf(
-                "client_id" to BuildConfig.CLIENT_ID, "client_secret" to BuildConfig.CLIENT_SECRET,
-                "device_code" to dc.deviceCode, "grant_type" to "urn:ietf:params:oauth:grant-type:device_code",
-            ))
-            val j = r.json()
-            if (r.ok) { keep(j); return@withContext true }
-            when (j.optString("error")) {
-                "authorization_pending" -> {}
-                "slow_down" -> interval += 5
-                "access_denied" -> throw Exception("Connexion refusée")
-                "expired_token" -> return@withContext false
-                else -> throw Exception(j.optString("error_description", j.optString("error", "Erreur ${r.code}")))
-            }
-        }
-        false
+    /** Importe le fichier de liaison s'il est là. true = une nouvelle liaison a été importée. */
+    fun importLink(): Boolean {
+        val f = java.io.File(App.ctx.filesDir, "link.json")
+        if (!f.exists()) return false
+        val ok = runCatching {
+            val j = JSONObject(f.readText())
+            val cid = j.getString("clientId"); val secret = j.getString("clientSecret"); val refresh = j.getString("refresh")
+            prefs.edit().clear().putString("cid", cid).putString("secret", secret).putString("refresh", refresh).apply()
+        }.isSuccess
+        f.delete() // le fichier ne sert qu'une fois
+        return ok
     }
 
     private fun keep(j: JSONObject) {
@@ -121,7 +98,7 @@ object Auth {
         if (access != null && p.getLong("exp", 0) > System.currentTimeMillis()) return access
         val refresh = p.getString("refresh", null) ?: return null
         val r = Http.form(TOKEN_URL, mapOf(
-            "client_id" to BuildConfig.CLIENT_ID, "client_secret" to BuildConfig.CLIENT_SECRET,
+            "client_id" to (p.getString("cid", null) ?: return null), "client_secret" to (p.getString("secret", null) ?: return null),
             "refresh_token" to refresh, "grant_type" to "refresh_token",
         ))
         val j = r.json()

@@ -26,48 +26,32 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/* ---------- Connexion (code à entrer sur le cellulaire) ---------- */
+/* ---------- Liaison avec Life Planner (faite depuis le PC) ---------- */
 @Composable
 fun LoginScreen(onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
-    var code by remember { mutableStateOf<Auth.DeviceCode?>(null) }
     var busy by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf("") }
 
-    fun start() {
+    fun check() {
         busy = true; err = ""
         scope.launch {
-            try {
-                val dc = Auth.startDevice()
-                code = dc
-                if (Auth.waitForUser(dc)) {
-                    Store.sync()
-                    onDone()
-                } else { err = "Code expiré : recommence."; code = null }
-            } catch (e: Exception) {
-                err = e.message ?: "Erreur"; code = null
-            }
+            Auth.importLink()
+            if (Auth.signedIn) {
+                val e = Store.sync()
+                if (e == null || e != "login") { onDone(); return@launch }
+                err = "Google refuse l’autorisation : refais « Lier ma montre »."
+            } else err = "Pas encore liée."
             busy = false
         }
     }
 
     ListScreen {
-        item { Title("Life Planner", "Connexion Google") }
-        if (!Auth.configured) {
-            item { Note("Il manque l’identifiant du client Google dans local.properties. Ajoute-le, puis réinstalle l’app.", C.goldText) }
-        } else if (code == null) {
-            item { Note("Ta montre lit tes missions, habitudes et séances dans ton Google Drive (dossier privé de Life Planner).") }
-            item {
-                Chip(onClick = { if (!busy) start() }, label = { Text(if (busy) "Un instant…" else "Se connecter") },
-                    colors = ChipDefaults.primaryChipColors(), modifier = Modifier.fillMaxWidth())
-            }
-        } else {
-            val dc = code!!
-            item { Note("Sur ton cellulaire, ouvre") }
-            item { Text(dc.url.removePrefix("https://").removePrefix("www."), color = C.goldText, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
-            item { Note("et entre ce code :") }
-            item { Text(dc.userCode, color = C.text, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center) }
-            item { Note("La montre attend ta confirmation…") }
+        item { Title("Life Planner", "Montre à lier") }
+        item { Note("Sur ton PC, dans Life Planner : Réglages › Google Agenda › « ⌚ Lier ma montre ». Le fichier créé s’installe ensuite sur la montre.") }
+        item {
+            Chip(onClick = { if (!busy) check() }, label = { Text(if (busy) "Un instant…" else "Vérifier") },
+                colors = ChipDefaults.primaryChipColors(), modifier = Modifier.fillMaxWidth())
         }
         if (err.isNotEmpty()) item { Note("⚠ $err", C.goldText) }
     }
