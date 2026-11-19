@@ -116,6 +116,7 @@ const routes = {
   // Habitudes : onglet de la section Corps (elles restent aussi dans la page du héros)
   habits: () => habits.renderPage(pageCtx()),
   missions: () => missions.renderPage(pageCtx()),
+  projects: renderProjects,
   month: renderMonth, year: renderYear, day: renderDay,
   news: () => news.renderPage(pageCtx()),
   finance: (tab) => finance.renderPage(pageCtx(), tab),
@@ -127,12 +128,12 @@ const routes = {
   stretch: () => stretch.renderPage(pageCtx()),
 };
 const NAV_PARENT = {
-  page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', habits: 'workout', stretch: 'workout',
+  page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', projects: 'missions', habits: 'workout', stretch: 'workout',
   setup: 'settings', usage: 'settings', activities: 'week', quest: 'hero', day: 'week', month: 'week', year: 'week', journal: 'week',
 };
 // Onglets en haut des sections qui regroupent plusieurs pages (le menu n'a qu'une entrée par section)
 const SECTION_TABS = {
-  missions: [['missions', '✅ Missions'], ['goals', '🎯 Objectifs']],
+  missions: [['missions', '✅ Missions'], ['goals', '🎯 Objectifs'], ['projects', '🚀 Projets']],
   brain: [['brain', '🧠 Notes'], ['news', '📰 Actualités'], ['notebook', '✏️ Carnet']],
   workout: [['workout', '🏋️ Workout'], ['stretch', '🧘 Étirements'], ['habits', '🔁 Habitudes']],
 };
@@ -889,13 +890,26 @@ async function heroCard() {
 
 /** Rappel de l'objectif en focus (page Aujourd'hui) : titre, progression et prochaine mission. */
 async function focusLine() {
-  const fg = (await db.all('goals')).find((g) => g.focus && !isGoalDone(g));
-  if (!fg) return '';
-  const next = (await db.all('tasks')).filter((t) => t.goalId === fg.id && !t.done)
-    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt)[0];
-  return `<a class="sum-focus" href="#/goals" title="Objectif en focus">
-    <span class="gc-ring sm" style="--p:${fg.progress || 0}%"><span>${fg.progress || 0}</span></span>
-    <span class="sum-focus-txt"><small>⭐ Focus</small><b>${esc(fg.title)}</b>${next ? `<small class="muted">Prochaine : ${esc(next.title)}</small>` : ''}</span></a>`;
+  const goals = await db.all('goals');
+  const tasks = await db.all('tasks');
+  const fg = goals.find((g) => g.focus && !isGoalDone(g));
+  let html = '';
+  if (fg) {
+    const next = tasks.filter((t) => t.goalId === fg.id && !t.done)
+      .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt)[0];
+    html += `<a class="sum-focus" href="#/goals" title="Objectif en focus">
+      <span class="gc-ring sm" style="--p:${fg.progress || 0}%"><span>${fg.progress || 0}</span></span>
+      <span class="sum-focus-txt"><small>⭐ Focus</small><b>${esc(fg.title)}</b>${next ? `<small class="muted">Prochaine : ${esc(next.title)}</small>` : ''}</span></a>`;
+  }
+  // Projets épinglés : aussi en focus (au plus deux)
+  for (const p of brain.projectsOf(await brain.allNotes()).filter((x) => x.pinned).slice(0, 2)) {
+    const st = brain.projectStats(p.id, goals, tasks);
+    const next = projectMissions(p.id, goals, tasks).find((t) => !t.done);
+    html += `<a class="sum-focus" href="#/projects" title="Projet en focus">
+      <span class="gc-ring sm" style="--p:${st.pct}%"><span>${st.pct}</span></span>
+      <span class="sum-focus-txt"><small>📌 Projet</small><b>${esc(p.title || 'Projet')}</b>${next ? `<small class="muted">Prochaine : ${esc(next.title)}</small>` : ''}</span></a>`;
+  }
+  return html;
 }
 
 /* ---------- Logo personnel (menu + onglet du navigateur) ---------- */
@@ -2912,6 +2926,105 @@ async function concludeGoal(id, after) {
     };
   });
 }
+/* =========================================================
+   Vue : Projets (onglet de Missions) — les notes 🚀 Projet du Cerveau ; un projet épinglé est en focus
+   ========================================================= */
+/** Missions d'un projet (directes ou par ses objectifs), à faire d'abord, par date. */
+function projectMissions(pid, goals, tasks) {
+  const gids = new Set(goals.filter((g) => g.projectId === pid).map((g) => g.id));
+  return tasks.filter((t) => t.projectId === pid || (t.goalId && gids.has(t.goalId)))
+    .sort((a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
+}
+
+async function setProjectPin(id, on) {
+  const n = await db.get('notes', id);
+  if (!n) return;
+  n.pinned = on;
+  await brain.saveNote(n, { touch: false });
+  toast(on ? `📌 Focus : « ${n.title || 'projet'} »` : 'Projet désépinglé');
+}
+
+async function renderProjects() {
+  const goals = await loadGoals();
+  const tasks = await db.all('tasks');
+  const today = iso(new Date());
+  const all = brain.projectsOf(await brain.allNotes(), { withArchived: true });
+  const active = all.filter((p) => !p.archived).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const pinned = active.filter((p) => p.pinned);
+  const others = active.filter((p) => !p.pinned);
+  const archived = all.filter((p) => p.archived);
+
+  const ring = (pct, cls = '') => `<span class="gc-ring ${cls}" style="--p:${pct}%"><span>${pct}%</span></span>`;
+  // Projet épinglé : grande carte en haut, avec ses prochaines missions et l'ajout rapide
+  const focusCard = (p) => {
+    const st = brain.projectStats(p.id, goals, tasks);
+    const ms = projectMissions(p.id, goals, tasks);
+    const next = ms.filter((t) => !t.done).slice(0, 4);
+    const meta = [st.goals.length ? `${st.goals.length} objectif${st.goals.length > 1 ? 's' : ''}` : '', st.missions ? `${st.done}/${st.missions} missions` : 'aucune mission'].filter(Boolean).join(' · ');
+    return `<section class="card gfocus pj-focus" data-pid="${p.id}">
+      <div class="gf-head">
+        <div class="gc-ring big" style="--p:${st.pct}%"><span>${st.pct}%</span></div>
+        <div class="gf-txt"><p class="eyebrow">📌 Projet en focus</p><h2><a href="#/note/${p.id}">${esc(p.title || 'Projet sans titre')}</a></h2><p class="muted">${esc(meta)}</p></div>
+        <button type="button" class="btn pj-unpin" title="Retirer le focus">☆ Désépingler</button>
+      </div>
+      ${next.length ? `<p class="gf-label">Prochaines missions</p><ul class="tasks pj-tasks">${next.map((t) => taskHTML(t, today, { showDate: true, hideProject: true })).join('')}</ul>`
+        : `<p class="empty-sm">${st.missions ? 'Toutes les missions sont faites : ajoute la suite.' : 'Découpe ce projet en missions : la première étape commence ici.'}</p>`}
+      <form class="add-mission pj-add"><input name="t" placeholder="Prochaine mission pour ce projet…" autocomplete="off"><input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
+    </section>`;
+  };
+  const card = (p) => {
+    const st = brain.projectStats(p.id, goals, tasks);
+    const ms = projectMissions(p.id, goals, tasks);
+    const late = ms.filter((t) => !t.done && t.date && t.date < today).length;
+    const next = ms.find((t) => !t.done);
+    return `<article class="card pj-card ${p.archived ? 'archived' : ''}">
+      <a class="pj-main" href="#/note/${p.id}">
+        ${ring(st.pct)}
+        <span class="pj-txt"><b>${p.archived ? '🗄' : '🚀'} ${esc(p.title || 'Projet sans titre')}</b>
+          <small class="muted">${st.missions ? `${st.done}/${st.missions} missions` : 'aucune mission'}${st.goals.length ? ` · ${st.goals.length} objectif${st.goals.length > 1 ? 's' : ''}` : ''}${late ? ` · <span class="gc-late">⚠ ${late} en retard</span>` : ''}</small>
+          ${next ? `<small class="pj-next">Prochaine : ${esc(next.title)}</small>` : ''}</span>
+      </a>
+      ${p.archived ? '' : `<button type="button" class="btn icon pj-pin" data-pin="${p.id}" title="Épingler : mettre ce projet en focus" aria-label="Épingler « ${esc(p.title || 'projet')} »">📌</button>`}
+    </article>`;
+  };
+
+  view.innerHTML = `
+    <header class="page-head"><div><p class="eyebrow">Gestion</p><h1>Projets</h1></div></header>
+    <form class="card ms-add" id="add-proj">
+      <input name="title" placeholder="Nouveau projet…" autocomplete="off" required style="flex:3 1 240px">
+      <button class="btn primary">Créer le projet</button>
+    </form>
+    ${pinned.map(focusCard).join('')}
+    ${others.length ? `<div class="pj-grid">${others.map(card).join('')}</div>`
+      : active.length ? '' : '<div class="card empty-card"><p>Aucun projet pour l’instant : crée le premier ci-dessus. Un projet regroupe des objectifs et des missions.</p></div>'}
+    ${archived.length ? `<details class="goal-old pj-old"><summary>🗄 Projets archivés <small class="muted">${archived.length}</small></summary><div class="pj-grid">${archived.map(card).join('')}</div></details>` : ''}
+    <p class="hint muted">📌 Épingle un projet pour le mettre en focus : il passe en haut avec ses prochaines missions et apparaît dans Aujourd’hui. Touche un projet pour ouvrir sa page (objectifs, missions, notes).</p>`;
+
+  $('#add-proj').onsubmit = async (e) => {
+    e.preventDefault();
+    const title = e.target.title.value.trim();
+    if (!title) return;
+    await brain.createNote({ title, body: '', type: 'projet' });
+    toast(`🚀 Projet créé : « ${title} »`);
+    renderProjects();
+  };
+  $$('[data-pin]').forEach((b) => (b.onclick = async () => { await setProjectPin(b.dataset.pin, true); await renderProjects(); view.scrollTo?.({ top: 0, behavior: 'smooth' }); }));
+  $$('.pj-focus').forEach((sec) => {
+    const pid = sec.dataset.pid;
+    sec.querySelector('.pj-unpin').onclick = async () => { await setProjectPin(pid, false); renderProjects(); };
+    const list = sec.querySelector('.pj-tasks');
+    if (list) bindTaskList(list, renderProjects);
+    sec.querySelector('.pj-add').onsubmit = async (e) => {
+      e.preventDefault();
+      const v = e.target.t.value.trim();
+      if (!v) return;
+      await addTask(v, e.target.d.value || null, null, pid);
+      await renderProjects();
+      $(`.pj-focus[data-pid="${pid}"] .pj-add input`)?.focus();
+    };
+  });
+}
+
 let goalsView = 'hz'; // page Objectifs : 'hz' (par échéance) ou 'proj' (par projet)
 
 async function renderGoals() {

@@ -2214,6 +2214,25 @@ h2 { font-weight: 600; }
 .gf-add input[name="t"] { flex: 1; min-width: 0; }
 .gf-add input[type="date"] { width: auto; }
 @media (max-width: 600px) { .gf-head { flex-wrap: wrap; } .gf-head .gf-off { margin-left: auto; } .gf-add input[type="date"] { display: none; } }
+/* Projets (onglet de Missions) : projet épinglé en focus, puis la grille des projets */
+.pj-focus .gf-txt h2 a { color: inherit; text-decoration: none; }
+.pj-focus .gf-txt h2 a:hover { text-decoration: underline; }
+.pj-add { display: flex; gap: 8px; }
+.pj-add input[name="t"] { flex: 1; min-width: 0; }
+.pj-add input[type="date"] { width: auto; }
+@media (max-width: 600px) { .pj-focus .pj-unpin { margin-left: auto; } .pj-add input[type="date"] { display: none; } }
+.pj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.pj-card { display: flex; align-items: center; gap: 8px; padding: 14px; }
+.pj-card.archived { opacity: .7; }
+.pj-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+.pj-main .gc-ring { pointer-events: none; }
+.pj-txt { display: grid; gap: 2px; min-width: 0; }
+.pj-txt b { overflow-wrap: anywhere; }
+.pj-next { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-pin { flex: none; opacity: .55; }
+.pj-pin:hover { opacity: 1; }
+.pj-old { margin-top: 8px; }
+@media (max-width: 600px) { .pj-grid { grid-template-columns: 1fr; } }
 /* Aujourd'hui : rappel du focus */
 .sum-focus { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 12px; border-radius: 12px; text-decoration: none; color: var(--text);
   background: color-mix(in srgb, var(--gold, #c9a24a) 9%, var(--surface-2)); border: 1px solid var(--gold-border, var(--border)); }
