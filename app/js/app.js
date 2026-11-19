@@ -1436,6 +1436,7 @@ async function quickTriage(onDone = () => {}) {
 }
 
 // Affichage du Cerveau (gardé sur cet appareil) : 'list', 'grid' ou 'cards'
+let brainKeepSel = null; // après une action groupée : rester en mode sélection avec ces éléments
 const brainView = () => { try { return ['list', 'grid', 'cards'].includes(localStorage.getItem('lp.brainView')) ? localStorage.getItem('lp.brainView') : 'cards'; } catch { return 'cards'; } };
 
 async function renderBrain() {
@@ -1489,13 +1490,15 @@ async function renderBrain() {
           ['grid', 'Grille', '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'],
           ['cards', 'Cartes', '<rect x="3" y="3" width="8" height="18" rx="2"/><rect x="13" y="3" width="8" height="18" rx="2"/>'],
         ].map(([k, l, svg]) => `<button type="button" data-bview="${k}" class="${brainView() === k ? 'on' : ''}" aria-pressed="${brainView() === k}" title="${l}" aria-label="Affichage ${l}"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg></button>`).join('')}</div>
+        <button type="button" class="btn brain-select" id="bsel" aria-pressed="false" title="Sélectionner plusieurs éléments pour les classer d’un coup">☑ Sélectionner</button>
       </div>
       ${brainState.arch ? `<div class="arch-banner">🗄 <b>Archives</b> · ${archivedCount} note${archivedCount > 1 ? 's' : ''} archivée${archivedCount > 1 ? 's' : ''}, rangée${archivedCount > 1 ? 's' : ''} par catégorie d’origine. <button class="btn" id="arch-exit">← Retour aux notes</button></div>` : ''}
       <div class="brain-filters">${filters.map(([id, l, c]) => `<button class="chip-btn ${brainState.f === id ? 'on' : ''}" data-f="${id}">${l} <small>${c}</small></button>`).join('')}
         ${archivedCount && !brainState.arch ? `<button class="chip-btn arch-chip" id="arch-open" title="Notes archivées">🗄 Archives <small>${archivedCount}</small></button>` : ''}</div>
       ${topTags.length ? `<div class="brain-tags"><span>Étiquettes</span>${topTags.map(([t, c]) => `<button class="chip-btn tagf ${brainState.tag === t ? 'on' : ''}" data-tag="${esc(t)}">#${esc(t)} <small>${c}</small></button>`).join('')}</div>` : ''}
     </div>
-    <div class="note-grid view-${brainView()}" id="ng"></div>`;
+    <div class="note-grid view-${brainView()}" id="ng"></div>
+    <div class="bulk-bar" id="bulk" hidden></div>`;
   $$('[data-bview]').forEach((b) => (b.onclick = () => {
     try { localStorage.setItem('lp.brainView', b.dataset.bview); } catch { /* ignore */ }
     $$('[data-bview]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
@@ -1522,8 +1525,89 @@ async function renderBrain() {
           <li><b>Relie</b> tes notes en écrivant <code>[[Titre d’une autre note]]</code>.</li>
           <li><b>Redécouvre</b> tes anciennes notes pour qu’elles restent en mémoire.</li></ol>
           <p class="muted">Chaque action donne des points de Savoir : ton avatar gagne des étincelles, un compagnon hibou, une aura… jusqu’au stade Archisage.</p></div>`);
+    markSel();
   };
+
+  /* ---------- Sélection multiple : classer plusieurs éléments d'un coup ---------- */
+  let selecting = false;
+  const sel = new Set();
+  const idOf = (card) => card.getAttribute('href')?.replace('#/note/', '');
+  const markSel = () => $$('#ng .note-card').forEach((c) => c.classList.toggle('sel', sel.has(idOf(c))));
+  const allProjects = brain.projectsOf(everything).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  const drawBulk = () => {
+    const bar = $('#bulk');
+    bar.hidden = !selecting;
+    $('#ng').classList.toggle('selecting', selecting);
+    $('#bsel').classList.toggle('on', selecting);
+    $('#bsel').setAttribute('aria-pressed', String(selecting));
+    $('#bsel').textContent = selecting ? '✕ Terminer' : '☑ Sélectionner';
+    if (!selecting) return;
+    const n = sel.size, dis = n ? '' : 'disabled';
+    bar.innerHTML = `
+      <div class="bulk-top"><b>${n ? `${n} sélectionné${n > 1 ? 's' : ''}` : 'Touche des éléments pour les sélectionner'}</b>
+        <button type="button" class="btn sm-text" data-b="all">Tout sélectionner (${brainState.order.length})</button>
+        ${n ? '<button type="button" class="btn sm-text" data-b="none">Aucun</button>' : ''}</div>
+      <div class="bulk-acts">
+        <select data-b="type" ${dis} aria-label="Changer le type"><option value="">Type…</option>${brain.TYPES.map((t) => `<option value="${t.id}">${t.icon} ${t.name}</option>`).join('')}</select>
+        ${allProjects.length ? `<select data-b="proj" ${dis} aria-label="Associer à un projet"><option value="">Projet…</option>${allProjects.map((p) => `<option value="${p.id}">🚀 ${esc(p.title || 'Projet')}</option>`).join('')}</select>` : ''}
+        <input data-b="tag" ${dis} placeholder="+ étiquette" aria-label="Ajouter une étiquette (Entrée)" autocomplete="off">
+        <button type="button" class="btn" data-b="ok" ${dis} title="Retirer de « À classer »">✓ Classé</button>
+        <button type="button" class="btn" data-b="pin" ${dis}>📌 Épingler</button>
+        <button type="button" class="btn" data-b="arch" ${dis}>${brainState.arch ? '↩ Désarchiver' : '🗄 Archiver'}</button>
+        <button type="button" class="btn danger" data-b="del" ${dis}>🗑 Supprimer</button>
+      </div>`;
+    // Applique un changement à chaque élément sélectionné, puis redessine
+    const each = async (fn, msg) => {
+      const ids = [...sel];
+      for (const id of ids) { const cur = await db.get('notes', id); if (cur) await fn(cur); }
+      toast(`${msg} · ${ids.length} élément${ids.length > 1 ? 's' : ''}`);
+      await renderBrainKeep(ids);
+    };
+    const classify = (fn) => async (cur) => { fn(cur); cur.inbox = false; await brain.saveNote(cur); }; // classer = sortir de « À classer »
+    bar.querySelector('[data-b="all"]').onclick = () => { brainState.order.forEach((id) => sel.add(id)); markSel(); drawBulk(); };
+    bar.querySelector('[data-b="none"]')?.addEventListener('click', () => { sel.clear(); markSel(); drawBulk(); });
+    bar.querySelector('[data-b="type"]').onchange = (e) => { const t = e.target.value; if (t) each(classify((c) => { c.type = t; }), `${brain.typeOf(t).icon} ${brain.typeOf(t).name}`); };
+    bar.querySelector('[data-b="proj"]')?.addEventListener('change', (e) => { const p = e.target.value; if (p) each(classify((c) => { c.rel ||= {}; c.rel.projects = [...new Set([...(c.rel.projects || []), p])]; }), '🚀 Associés au projet'); });
+    bar.querySelector('[data-b="tag"]').onkeydown = (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const t = e.target.value.replace(/^#/, '').trim().toLowerCase().replace(/\s+/g, '-');
+      if (t) each(classify((c) => { if (!(c.tags || []).includes(t)) c.body = (c.body || '').trimEnd() + '\n\n#' + t; }), `#${t} ajoutée`);
+    };
+    bar.querySelector('[data-b="ok"]').onclick = () => each(classify(() => {}), '✓ Classés');
+    bar.querySelector('[data-b="pin"]').onclick = () => each(async (c) => { c.pinned = true; await brain.saveNote(c, { touch: false }); }, '📌 Épinglés');
+    bar.querySelector('[data-b="arch"]').onclick = () => each(async (c) => { await brain.setArchived(c.id, !brainState.arch); }, brainState.arch ? '↩ Désarchivés' : '🗄 Archivés');
+    const del = bar.querySelector('[data-b="del"]');
+    del.onclick = async () => {
+      if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = `Confirmer (${sel.size})`; return; }
+      const ids = [...sel];
+      for (const id of ids) await brain.deleteNote(id);
+      sel.clear();
+      toast(`🗑 ${ids.length} élément${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`);
+      await renderBrainKeep([]);
+    };
+  };
+  // Redessine le Cerveau en restant en mode sélection (les éléments encore visibles restent sélectionnés)
+  const renderBrainKeep = async (ids) => { brainKeepSel = ids; await renderBrain(); };
+  if (brainKeepSel) {
+    selecting = true;
+    for (const id of brainKeepSel) if (notes.some((x) => x.id === id)) sel.add(id);
+    brainKeepSel = null;
+  }
+  $('#bsel').onclick = () => { selecting = !selecting; if (!selecting) sel.clear(); markSel(); drawBulk(); };
+  // En mode sélection, toucher une carte la sélectionne au lieu de l'ouvrir
+  $('#ng').addEventListener('click', (e) => {
+    if (!selecting) return;
+    const card = e.target.closest('.note-card');
+    if (!card) return;
+    e.preventDefault();
+    const id = idOf(card);
+    sel.has(id) ? sel.delete(id) : sel.add(id);
+    card.classList.toggle('sel', sel.has(id));
+    drawBulk();
+  });
   drawList();
+  drawBulk();
 
   $('#bq').oninput = (e) => { brainState.q = e.target.value; drawList(); };
   $('#arch-open')?.addEventListener('click', () => { brainState.arch = true; brainState.f = 'all'; brainState.tag = ''; renderBrain(); });
@@ -2235,6 +2319,52 @@ async function renderMonth(arg) {
     cell.querySelector('.mc-evs').innerHTML = list.slice(0, 3).map((e) => `<li title="${esc(e.title)}">${e.allDay ? '' : `<small>${U.fmtTime(new Date(e.start))}</small> `}${withTeamLogos(esc(e.title))}</li>`).join('')
       + (list.length > 3 ? `<li class="more">+ ${list.length - 3}</li>` : '');
   });
+
+  // Survol d'un jour (stylet Surface ou souris) : petite fenêtre avec le détail de la journée
+  document.getElementById('mc-tip')?.remove();
+  let tipT = null;
+  const hideTip = () => { clearTimeout(tipT); document.getElementById('mc-tip')?.remove(); };
+  const showTip = (cell) => {
+    const k = cell.dataset.day;
+    if (!cell.isConnected || location.hash.split('/')[1] !== 'month') return;
+    const ds = +U.parseISO(k), de = +U.addDays(ds, 1);
+    const evs = events.filter((e) => e.start < de && e.end > ds).sort((a, b) => a.start - b.start);
+    const ts = tasks.filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15));
+    const j = jBy[k], m = moodOf(j);
+    const note = j && (j.intention || j.text || '').trim();
+    const d = U.parseISO(k);
+    hideTip();
+    const tip = document.createElement('div');
+    tip.id = 'mc-tip';
+    tip.className = 'mc-tip';
+    tip.setAttribute('role', 'tooltip');
+    tip.innerHTML = `
+      <div class="mct-head"><b>${cap(U.fmtLong(d))}</b>${k === today ? '<span class="chip">Aujourd’hui</span>' : ''}${m ? `<span class="mct-mood" title="${esc(m.l)}">${m.e}</span>` : ''}</div>
+      ${note ? `<p class="mct-note">${j.intention ? '🎯 ' : '📝 '}${esc(note.length > 140 ? note.slice(0, 139) + '…' : note)}</p>` : ''}
+      ${evs.length ? `<ul class="mct-evs">${evs.map((e) => `<li style="--c:${esc(e.color || 'var(--accent)')}"><span class="mct-time">${e.allDay ? 'Journée' : `${U.fmtTime(new Date(e.start))}–${U.fmtTime(new Date(e.end))}`}</span><span>${withTeamLogos(esc(e.title))}</span></li>`).join('')}</ul>` : ''}
+      ${ts.length ? `<p class="mct-lbl">Missions ${ts.filter((t) => t.done).length}/${ts.length}</p><ul class="mct-tasks">${ts.slice(0, 8).map((t) => `<li class="${t.done ? 'done' : ''}">${t.done ? '☑' : '☐'} ${esc(t.title)}</li>`).join('')}${ts.length > 8 ? `<li class="muted">+ ${ts.length - 8} autres</li>` : ''}</ul>` : ''}
+      ${!evs.length && !ts.length && !note ? '<p class="muted mct-empty">Journée libre</p>' : ''}`;
+    document.body.appendChild(tip);
+    // À droite du jour s'il y a de la place, sinon à gauche ; toujours dans l'écran
+    const r = cell.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight, gap = 10;
+    let x = r.right + gap;
+    if (x + w > innerWidth - 8) x = r.left - w - gap;
+    if (x < 8) x = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    let y = Math.max(8, Math.min(innerHeight - h - 8, r.top));
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  };
+  $$('.mc-day').forEach((cell) => {
+    cell.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'touch') return; // au doigt : le toucher ouvre le jour comme avant
+      clearTimeout(tipT);
+      tipT = setTimeout(() => showTip(cell), e.pointerType === 'pen' ? 150 : 450);
+    });
+    cell.addEventListener('pointerleave', hideTip);
+    cell.addEventListener('pointerdown', hideTip);
+  });
+  addEventListener('hashchange', hideTip, { once: true });
+  view.addEventListener('scroll', hideTip, { once: true, passive: true });
 }
 
 /* =========================================================
