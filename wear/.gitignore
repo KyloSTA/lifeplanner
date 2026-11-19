@@ -1,0 +1,9 @@
+# local.properties contient le chemin du SDK et ton identifiant Google (jamais publié)
+local.properties
+.gradle/
+build/
+app/build/
+.idea/
+*.iml
+.kotlin/
+captures/

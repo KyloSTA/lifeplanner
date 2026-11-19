@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône : cercle bordeaux, coche dorée (couleurs de Life Planner) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#7A1E2C" android:pathData="M24,0a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" />
+    <path android:fillColor="#00000000" android:strokeColor="#C9A24A" android:strokeWidth="2"
+        android:pathData="M24,6a18,18 0,1 1,0 36a18,18 0,1 1,0 -36z" />
+    <path android:fillColor="#00000000" android:strokeColor="#F2EDE6" android:strokeWidth="4.5"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M15,24.5 L21.5,31 L33.5,18" />
+</vector>
