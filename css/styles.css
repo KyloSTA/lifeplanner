@@ -2285,3 +2285,6 @@ a.md-where.md-none:hover { text-decoration: underline; }
 .act-media.act-gen span { font-size: 26px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.3)); }
 .act-media.act-gen small { font-size: 10px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; opacity: .92; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 700px) { .act-media.act-gen span { font-size: 20px; } .act-media.act-gen small { font-size: 8.5px; } }
+
+/* Cerveau : la carte d’évolution du savoir est retirée sur cellulaire (la page Ton héros la garde) */
+@media (max-width: 600px) { #c-evo { display: none; } }
