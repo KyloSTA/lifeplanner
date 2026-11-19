@@ -147,6 +147,34 @@ export async function setSubDone(taskId, subId, done) {
   if (finish || reopen) await syncGoalProgress(t.goalId);
 }
 
+/**
+ * Transforme une mission en étape d'une autre : son titre devient une étape (ses propres étapes suivent),
+ * ses notes et photos sont ajoutées à l'autre mission, et ce qui lui était associé (notes du Cerveau,
+ * pages manuscrites) suit. L'ancienne mission va dans « Supprimées » (on peut la restaurer).
+ */
+export async function makeStep(id, targetId) {
+  const src = await db.get('tasks', id);
+  const tgt = await db.get('tasks', targetId);
+  if (!src || !tgt || id === targetId) return null;
+  const steps = [{ id: U.uid(), title: src.title, done: !!src.done },
+    ...(src.subtasks || []).map((s) => ({ id: U.uid(), title: s.title, done: !!s.done }))];
+  tgt.subtasks = [...(tgt.subtasks || []), ...steps];
+  if ((src.notes || '').trim()) tgt.notes = [(tgt.notes || '').trim(), `— ${src.title} —\n${src.notes.trim()}`].filter(Boolean).join('\n\n');
+  if ((src.images || []).length) tgt.images = [...new Set([...(tgt.images || []), ...src.images])];
+  await db.put('tasks', tgt);
+  // Associations : les notes et pages liées à l'ancienne mission pointent vers la nouvelle
+  for (const store of ['notes', 'pages']) {
+    for (const x of await db.all(store)) {
+      const ids = x.rel?.tasks || [];
+      if (!ids.includes(id)) continue;
+      x.rel.tasks = [...new Set(ids.map((t) => (t === id ? targetId : t)))];
+      await db.put(store, x);
+    }
+  }
+  await deleteTask(id);
+  return tgt;
+}
+
 async function editTask(id, fn) {
   const t = await db.get('tasks', id);
   if (!t) return;
@@ -438,6 +466,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
         <div class="assoc-list">${linkedPages.map((p) => `<a class="assoc-chip" href="#/page/${encodeURIComponent(p.id)}" data-go-page="${esc(p.id)}">✍️ ${esc(p.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
       <div class="modal-actions tm-actions">
         <button class="btn danger tm-del">🗑 Supprimer</button>
+        <button class="btn tm-tostep" title="Faire de cette mission une étape d’une autre mission">↳ Devenir une étape</button>
         <button class="btn primary tm-ok">Terminé</button>
       </div>`;
 
@@ -543,9 +572,47 @@ export async function openTaskEditor(id, onChange = () => {}) {
       host.innerHTML = '';
       changed();
     };
+    box.querySelector('.tm-tostep').onclick = async () => { await flush(); pickParent(); };
     box.querySelector('.tm-ok').onclick = close;
     box.querySelector('.tm-close').onclick = close;
     if (focus) box.querySelector(focus)?.focus();
+  };
+
+  // ↳ Devenir une étape : choisir la mission qui la recevra (recherche ; à faire d'abord, par date)
+  const pickParent = async () => {
+    const me = await db.get('tasks', id);
+    if (!me) return close();
+    const all = (await db.all('tasks')).filter((x) => x.id !== id)
+      .sort((a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15));
+    const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    box.innerHTML = `
+      <div class="tm-head"><h2 class="tm-pick-title">↳ « ${esc(me.title)} » devient une étape de…</h2><button class="tm-close" aria-label="Retour">×</button></div>
+      <input class="pick-search tm-pick-q" placeholder="🔍 Chercher une mission…" autocomplete="off">
+      <div class="pick-list tm-pick-list"></div>
+      ${(me.subtasks || []).length || (me.notes || '').trim() || (me.images || []).length ? '<p class="hint muted">Ses étapes, notes et photos vont aussi dans la mission choisie.</p>' : ''}
+      <div class="modal-actions"><button class="btn tm-pick-back">Retour</button></div>`;
+    const list = box.querySelector('.tm-pick-list');
+    const drawList = (q = '') => {
+      const rows = all.filter((x) => !q || norm(x.title).includes(norm(q))).slice(0, 60);
+      list.innerHTML = rows.map((x) => `<button type="button" class="pick-row tm-pick-row" data-to="${x.id}"><span class="pick-txt"><b>${esc(x.title)}</b>
+        <small class="muted">${x.done ? '✓ faite' : x.date ? U.fmtShort(U.parseISO(x.date)) : 'sans date'}${(x.subtasks || []).length ? ` · ${(x.subtasks || []).length} étape${x.subtasks.length > 1 ? 's' : ''}` : ''}</small></span></button>`).join('')
+        || '<p class="empty-sm">Aucune autre mission.</p>';
+      list.querySelectorAll('[data-to]').forEach((b) => (b.onclick = async () => {
+        if (closed) return;
+        closed = true;
+        document.removeEventListener('keydown', onKey);
+        await makeStep(id, b.dataset.to);
+        host.innerHTML = '';
+        changed();
+        openTaskEditor(b.dataset.to, onChange); // on ouvre la mission qui a reçu l'étape
+      }));
+    };
+    drawList();
+    const q = box.querySelector('.tm-pick-q');
+    q.oninput = () => drawList(q.value);
+    q.focus();
+    box.querySelector('.tm-pick-back').onclick = () => draw();
+    box.querySelector('.tm-close').onclick = () => draw();
   };
 
   // Ajoute des images (réduites et compressées) à la mission
