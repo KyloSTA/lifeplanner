@@ -1037,6 +1037,17 @@ div.kpi { cursor: default; }
 .rbq-note-link b { font-size: 14px; overflow-wrap: anywhere; padding-right: 22px; }
 .rbq-note-link small { font-size: 12px; overflow-wrap: anywhere; }
 .rbq-note [data-unlink] { position: absolute; top: 6px; right: 6px; background: var(--surface); }
+/* « Du Cerveau » : choix Cartes / Liste */
+.rbq-brain-head { flex-wrap: wrap; gap: 8px; }
+.rbq-brain-head h2 { margin-right: auto; }
+.rbq-view button { min-width: 36px; padding: 4px 8px; font-size: 15px; }
+.rbq-notes-grid.as-list { grid-template-columns: 1fr; gap: 6px; }
+.as-list .rbq-note-link { display: grid; grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: center; padding: 8px 44px 8px 8px; min-height: 56px; }
+.as-list .rbq-note-link img { grid-row: 1 / span 2; width: 64px; height: 48px; margin: 0; border-radius: 8px; }
+.as-list .rbq-note-link b, .as-list .rbq-note-link small { grid-column: 2; padding-right: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.as-list .rbq-note-link:not(:has(img)) { grid-template-columns: minmax(0, 1fr); padding-left: 12px; }
+.as-list .rbq-note-link:not(:has(img)) b, .as-list .rbq-note-link:not(:has(img)) small { grid-column: 1; }
+.as-list .rbq-note [data-unlink] { top: 50%; transform: translateY(-50%); }
 .pick-modal { width: min(560px, 100%); }
 .pick-search { width: 100%; margin-bottom: 10px; }
 .pick-list { display: grid; gap: 4px; max-height: 50vh; overflow-y: auto; margin-bottom: 8px; }

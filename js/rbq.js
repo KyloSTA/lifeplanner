@@ -391,8 +391,15 @@ async function renderModule(ctx, id) {
     const cur = await db.get('study', id);
     const all = await brain.allNotes();
     const linked = (cur.noteIds || []).map((nid) => all.find((n) => n.id === nid)).filter(Boolean);
-    el.innerHTML = `<div class="card-head"><h2>🧠 Du Cerveau</h2><button class="btn" id="md-addnote">+ Ajouter depuis le Cerveau</button></div>
-      ${linked.length ? `<div class="rbq-notes-grid">${linked.map((n) => {
+    // Affichage Cartes ou Liste (gardé sur cet appareil)
+    let asList = false;
+    try { asList = localStorage.getItem('lp.rbqNotesView') === 'list'; } catch { /* ignore */ }
+    el.innerHTML = `<div class="card-head rbq-brain-head"><h2>🧠 Du Cerveau</h2>
+        ${linked.length ? `<div class="seg rbq-view" role="group" aria-label="Affichage">
+          <button type="button" data-rv="cards" class="${asList ? '' : 'on'}" aria-pressed="${!asList}" title="Cartes">▦</button>
+          <button type="button" data-rv="list" class="${asList ? 'on' : ''}" aria-pressed="${asList}" title="Liste">☰</button></div>` : ''}
+        <button class="btn" id="md-addnote">+ Ajouter depuis le Cerveau</button></div>
+      ${linked.length ? `<div class="rbq-notes-grid ${asList ? 'as-list' : ''}">${linked.map((n) => {
         const im = images.refsIn(n.body);
         return `<div class="rbq-note">
           <a href="#/note/${n.id}" class="rbq-note-link">
@@ -404,6 +411,10 @@ async function renderModule(ctx, id) {
         </div>`;
       }).join('')}</div>`
         : '<p class="empty-sm">Rattache ici ce que tu as capturé dans le Cerveau pour ce module : idées, photos du cours, captures d’écran, ressources.</p>'}`;
+    el.querySelectorAll('[data-rv]').forEach((b) => (b.onclick = () => {
+      try { localStorage.setItem('lp.rbqNotesView', b.dataset.rv); } catch { /* ignore */ }
+      drawBrain();
+    }));
     el.querySelector('#md-addnote').onclick = () => pickNotes(ctx, cur.noteIds || [], async (ids) => {
       await edit((x) => { x.noteIds = [...new Set([...(x.noteIds || []), ...ids])]; });
       toast(`🧠 ${ids.length} élément${ids.length > 1 ? 's' : ''} ajouté${ids.length > 1 ? 's' : ''} au module`);
