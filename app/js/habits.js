@@ -120,6 +120,7 @@ const saveRem = (r) => { try { localStorage.setItem(LS, JSON.stringify(r)); } ca
 const atTime = (day, hm) => { const d = U.parseISO(day); const [h, m] = hm.split(':').map(Number); d.setHours(h, m, 0, 0); return d.getTime(); };
 
 const pending = new Map(); // habitudes qui attendent une réponse dans cette fenêtre : id -> heure du rappel
+const GRACE = 20 * 60_000; // un rappel ne sonne que dans les 20 minutes qui suivent son heure
 
 // Rappels vus à l'écran, partagés entre appareils (réglage « habitSeen » synchronisé) : « id|jour|heure » -> appareil
 async function seenMap() { return (await db.get('settings', 'habitSeen')) || {}; }
@@ -174,9 +175,13 @@ async function check() {
       if (sz && sz <= now) { delete r['snooze|' + h.id]; ring = true; }
       for (const t of h.times || []) {
         const key = `${h.id}|${today}|${t}`;
-        if (r[key] || atTime(today, t) > now) continue;
+        const at = atTime(today, t);
+        if (r[key] || at > now) continue;
         r[key] = 1;
         if (seen[key] && seen[key] !== DEVICE) continue; // déjà vu ailleurs : pas de rappel ici
+        // Rappel manqué depuis longtemps (app fermée à l'heure prévue) : pas de rafale à l'ouverture,
+        // l'habitude reste visible dans la carte « Habitudes du jour »
+        if (now - at > GRACE) continue;
         ring = true;
       }
       if (ring) { pending.set(h.id, now); notify(h); fired = true; }
