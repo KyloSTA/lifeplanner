@@ -907,9 +907,10 @@ async function focusLine() {
     const next = projectMissions(p.id, goals, tasks).find((t) => !t.done);
     html += `<a class="sum-focus" href="#/projects" title="Projet en focus">
       <span class="gc-ring sm" style="--p:${st.pct}%"><span>${st.pct}</span></span>
-      <span class="sum-focus-txt"><small>📌 Projet</small><b>${esc(p.title || 'Projet')}</b>${next ? `<small class="muted">Prochaine : ${esc(next.title)}</small>` : ''}</span></a>`;
+      <span class="sum-focus-txt"><small>📌 Projet</small><b>${esc(p.title || 'Projet')}</b><small class="muted">${next ? `Prochaine : ${esc(next.title)}` : st.missions ? `${st.done}/${st.missions} missions faites` : 'Aucune mission : ajoute la prochaine'}</small></span></a>`;
   }
-  return html;
+  // Bande pleine largeur sous le héros et les tuiles (et non dans la colonne du héros)
+  return html ? `<div class="sum-focus-row">${html}</div>` : '';
 }
 
 /* ---------- Logo personnel (menu + onglet du navigateur) ---------- */
