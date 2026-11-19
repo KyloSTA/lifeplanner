@@ -1217,6 +1217,10 @@ a.assoc-chip { padding: 4px 11px; }
 .logo-opt:hover { border-color: var(--accent); }
 .logo-opt.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: var(--accent-soft); }
 .logo-opt svg, .logo-opt img { width: 52px; height: 52px; }
+/* Logo importé (« Mon image ») */
+.logo-img { object-fit: cover; border-radius: 22%; display: block; }
+.logo-upload { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.logo-upload .hint { flex: 1 1 100%; margin: 0; }
 .logo-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .logo-fields label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); flex: 1 1 180px; }
 .logo-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

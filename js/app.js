@@ -944,10 +944,33 @@ function logoSVG(cfg, av, size = 34) {
       <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#${uidg})"/><text x="32" y="44" text-anchor="middle" font-size="34">${esc(cfg.emoji || '🦁')}</text></svg>`;
   }
   if (cfg.mode === 'app') return `<img src="icons/icon.svg" alt="" width="${size}" height="${size}">`;
+  // Mon image : logo importé (déjà carré et réduit à l'import)
+  if (cfg.mode === 'image') return cfg.img ? `<img class="logo-img" src="${esc(cfg.img)}" alt="" width="${size}" height="${size}">` : `<img src="icons/icon.svg" alt="" width="${size}" height="${size}">`;
   // Avatar (par défaut) : ton héros, dans un cadre à ta couleur
   const inner = AV.avatarSVG(av, size - 4).replace('<svg ', '<svg x="2" y="2" ');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true"><rect x=".75" y=".75" width="${size - 1.5}" height="${size - 1.5}" rx="${size * 0.28}" fill="none" stroke="${c}" stroke-width="1.5"/>${inner}</svg>`;
 }
+/** Logo importé : recadré en carré (centré, sans déformation), 256 px, en PNG (WebP s'il est trop lourd). */
+function squareLogo(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) { reject(new Error('Choisis un fichier image')); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const S = 256, w = img.naturalWidth || S, h = img.naturalHeight || S, side = Math.min(w, h);
+      const c = document.createElement('canvas');
+      c.width = c.height = S;
+      c.getContext('2d').drawImage(img, (w - side) / 2, (h - side) / 2, side, side, 0, 0, S, S);
+      URL.revokeObjectURL(url);
+      let data = c.toDataURL('image/png');
+      if (data.length > 180_000) data = c.toDataURL('image/webp', 0.9); // photo : plus léger pour la synchro
+      resolve(data);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')); };
+    img.src = url;
+  });
+}
+
 async function applyLogo(s) {
   const cfg = await getLogo();
   const av = await getAvatar(s);
@@ -957,12 +980,16 @@ async function applyLogo(s) {
   if (name) name.textContent = cfg.title || APP.name;
   document.title = cfg.title || APP.name;
   // Icône de l'onglet du navigateur
-  if (cfg.mode !== 'app') {
-    const svg = logoSVG(cfg, av, 64);
+  if (cfg.mode !== 'app' && !(cfg.mode === 'image' && !cfg.img)) {
     let link = document.querySelector('link[rel="icon"]');
     if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
-    link.type = 'image/svg+xml';
-    link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+    if (cfg.mode === 'image') {
+      link.type = cfg.img.slice(5, cfg.img.indexOf(';')) || 'image/png';
+      link.href = cfg.img;
+    } else {
+      link.type = 'image/svg+xml';
+      link.href = 'data:image/svg+xml,' + encodeURIComponent(logoSVG(cfg, av, 64));
+    }
   }
 }
 
@@ -3679,7 +3706,7 @@ async function renderSettings() {
     if (!el) return;
     const cfg = await getLogo();
     const av = await getAvatar();
-    const modes = [['avatar', 'Mon avatar'], ['mono', 'Mes initiales'], ['emoji', 'Un emoji'], ['app', 'Logo d’origine']];
+    const modes = [['avatar', 'Mon avatar'], ['mono', 'Mes initiales'], ['emoji', 'Un emoji'], ['image', 'Mon image'], ['app', 'Logo d’origine']];
     el.innerHTML = `<div class="card-head"><h2>🎨 Mon logo</h2><span class="muted">Menu et onglet du navigateur · un clic sur le logo ouvre Aujourd’hui</span></div>
       <div class="logo-modes">${modes.map(([m, l]) => `<button type="button" class="logo-opt ${cfg.mode === m ? 'on' : ''}" data-lmode="${m}">${logoSVG({ ...cfg, mode: m }, av, 52)}<span>${l}</span></button>`).join('')}</div>
       <div class="logo-fields">
@@ -3687,15 +3714,29 @@ async function renderSettings() {
         ${cfg.mode === 'mono' ? `<label>Initiales<input id="lg-text" value="${esc(cfg.text || initialsOf(av.name))}" maxlength="3" autocomplete="off" style="text-transform:uppercase"></label>` : ''}
         ${cfg.mode === 'emoji' ? `<label>Emoji<input id="lg-emoji" value="${esc(cfg.emoji)}" maxlength="4" autocomplete="off"></label>` : ''}
       </div>
-      ${cfg.mode !== 'app' ? `<div class="logo-colors"><span class="muted">Couleur</span>${LOGO_COLORS.map((c) => `<button type="button" class="logo-col ${cfg.color === c ? 'on' : ''}" data-lcol="${c}" style="--sw:${c}" aria-label="Couleur ${c}"></button>`).join('')}
+      ${cfg.mode === 'image' ? `<div class="logo-upload">
+          <label class="btn primary"><input type="file" id="lg-file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" hidden>📁 ${cfg.img ? 'Changer d’image' : 'Importer mon logo'}</label>
+          ${cfg.img ? '<button type="button" class="btn" id="lg-img-del">Retirer</button>' : ''}
+          <p class="hint muted">PNG, JPG, SVG ou WebP. L’image est recadrée en carré et réduite (256 px) ; elle suit sur tes autres appareils. Une image carrée avec un fond transparent rend le mieux.</p>
+        </div>` : ''}
+      ${cfg.mode !== 'app' && cfg.mode !== 'image' ? `<div class="logo-colors"><span class="muted">Couleur</span>${LOGO_COLORS.map((c) => `<button type="button" class="logo-col ${cfg.color === c ? 'on' : ''}" data-lcol="${c}" style="--sw:${c}" aria-label="Couleur ${c}"></button>`).join('')}
         <input type="color" id="lg-color" value="${esc(cfg.color)}" aria-label="Autre couleur"></div>` : ''}
       ${cfg.mode === 'avatar' ? '<p class="hint muted">Ton logo suit ton héros : change son apparence dans la page Ton héros, il évolue avec toi.</p>' : ''}`;
     const set = async (patch, redraw = true) => {
       await db.put('settings', { ...(await getLogo()), ...patch }, 'logo');
       await applyLogo();
-      if (redraw) drawLogo();
+      if (redraw) await drawLogo();
     };
-    $$('[data-lmode]', el).forEach((b) => (b.onclick = () => set({ mode: b.dataset.lmode })));
+    $$('[data-lmode]', el).forEach((b) => (b.onclick = async () => {
+      await set({ mode: b.dataset.lmode });
+      if (b.dataset.lmode === 'image' && !cfg.img) $('#lg-file', el)?.click(); // pas encore d'image : on en choisit une tout de suite
+    }));
+    $('#lg-file', el)?.addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try { await set({ mode: 'image', img: await squareLogo(f) }); toast('🎨 Logo importé'); } catch (err) { toast(err.message, 'err'); }
+    });
+    $('#lg-img-del', el)?.addEventListener('click', () => set({ mode: 'avatar', img: '' }));
     $$('[data-lcol]', el).forEach((b) => (b.onclick = () => set({ color: b.dataset.lcol })));
     $('#lg-color', el)?.addEventListener('change', (e) => set({ color: e.target.value }));
     const deb = U.debounce((patch) => set(patch, false), 400);
