@@ -434,7 +434,8 @@ async function renderToday() {
       </div>
     </header>
     <div class="today">
-      <section class="card today-top">
+      <section class="card today-top ${foldedSet().has('today-top') ? 'collapsed' : ''}">
+        <button type="button" class="fold-btn top-fold" id="top-fold" aria-expanded="${!foldedSet().has('today-top')}" title="${foldedSet().has('today-top') ? 'Afficher l’agenda et l’humeur' : 'Réduire : garder seulement le héros et les tuiles'}">${FOLD_ICON}</button>
         <div class="today-summary" id="c-hero"></div>
         <div class="top-agenda"><div id="c-agenda"><div class="skeleton"></div></div><div class="ag-journal" id="c-journal"></div></div>
       </section>
@@ -457,6 +458,17 @@ async function renderToday() {
         </div>
       </div>
     </div>`;
+  // Carte du haut repliable : réduite, elle garde le héros et les tuiles (agenda, humeur et focus masqués)
+  $('#top-fold').onclick = (e) => {
+    const card = e.currentTarget.closest('.today-top');
+    const on = !card.classList.contains('collapsed');
+    card.classList.toggle('collapsed', on);
+    const set = foldedSet();
+    on ? set.add('today-top') : set.delete('today-top');
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
+    e.currentTarget.setAttribute('aria-expanded', String(!on));
+    e.currentTarget.title = on ? 'Afficher l’agenda et l’humeur' : 'Réduire : garder seulement le héros et les tuiles';
+  };
   $('#add-ev').onclick = () => eventModal(today, renderToday);
   $('#as-open').onclick = openAssistant;
   // Mode Focus (gardé sur cet appareil) : la page ne montre que l'essentiel
