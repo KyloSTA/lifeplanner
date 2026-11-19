@@ -338,12 +338,14 @@ let txFilter = { q: '', cat: '' };
 
 export async function renderPage(ctx, arg) {
   const { view } = ctx;
-  if (arg && ['apercu', 'budget', 'transactions'].includes(arg)) tab = arg;
+  if (arg && ['apercu', 'budget', 'transactions', 'achats'].includes(arg)) tab = arg;
   const all = (await db.all('money')).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const budget = (await db.get('settings', 'budget')) || { cats: {}, savings: 0 };
   month ||= curMonth();
   const hasData = all.length > 0;
   const months = [...new Set(all.map((t) => ym(t.date)))].sort();
+  const shop = tab === 'achats'; // la liste d'achats ne dépend pas des relevés
+  const tabsHTML = `<div class="seg" role="tablist">${[['apercu', '📊 Aperçu'], ['budget', '🎯 Budget'], ['transactions', '🧾 Transactions'], ['achats', '🛒 Achats']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
 
   view.innerHTML = `
     <header class="page-head">
@@ -354,15 +356,15 @@ export async function renderPage(ctx, arg) {
       </div>
     </header>
     <div id="fi-autobar"></div>
-    ${hasData ? `<div class="fi-bar">
-      <div class="seg" role="tablist">${[['apercu', '📊 Aperçu'], ['budget', '🎯 Budget'], ['transactions', '🧾 Transactions']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>
-      <div class="fi-month">
+    <div class="fi-bar">
+      ${tabsHTML}
+      ${hasData && !shop ? `<div class="fi-month">
         <button class="btn icon" id="fi-prev" ${month <= months[0] ? 'disabled' : ''} aria-label="Mois précédent">‹</button>
         <b>${esc(monthName(month))}</b>
         <button class="btn icon" id="fi-next" ${month >= curMonth() ? 'disabled' : ''} aria-label="Mois suivant">›</button>
-      </div>
+      </div>` : ''}
     </div>
-    <div id="fi-body"></div>` : emptyState()}
+    ${hasData || shop ? '<div id="fi-body"></div>' : emptyState()}
     <div class="fi-drop" id="fi-drop" hidden><b>Dépose tes relevés .csv ici</b></div>`;
 
   const $ = (s) => view.querySelector(s), $$ = (s) => [...view.querySelectorAll(s)];
@@ -395,15 +397,122 @@ export async function renderPage(ctx, arg) {
   view.ondragover = (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); drop.hidden = false; } };
   drop.ondragleave = () => { drop.hidden = true; };
   drop.ondrop = (e) => { e.preventDefault(); drop.hidden = true; doImport(e.dataTransfer.files); };
-  if (!hasData) return;
-
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; renderPage(ctx); }));
+  const body = $('#fi-body');
+  if (shop) return drawShopping(ctx, body);
+  if (!hasData) return;
   $('#fi-prev').onclick = () => { month = monthsBack(month, 1); renderPage(ctx); };
   $('#fi-next').onclick = () => { month = monthsBack(month, -1); renderPage(ctx); };
-  const body = $('#fi-body');
   if (tab === 'budget') drawBudget(ctx, body, all, budget);
   else if (tab === 'transactions') drawTransactions(ctx, body, all);
   else drawOverview(ctx, body, all, budget);
+}
+
+/* =========================================================
+   🛒 Achats : liste de choses à acheter (réglage synchronisé « shopList », fusionné article par article)
+   Article : { id, name, qty, price, cat, done, at, del } — un article retiré reste une « trace » (del)
+   qui sert aux suggestions « Souvent achetés », effacée après 90 jours.
+   ========================================================= */
+const SHOP_KEY = 'shopList';
+const SHOP_CATS = [['epicerie', '🥦 Épicerie'], ['maison', '🏠 Maison'], ['pharmacie', '💊 Pharmacie'], ['quincaillerie', '🔨 Quincaillerie'], ['vetements', '👕 Vêtements'], ['techno', '💻 Techno'], ['autre', '🛍 Autre']];
+const SHOP_GUESS = [
+  ['pharmacie', /tylenol|advil|vitamine|médic|medic|pansement|sirop|crème solaire|creme solaire|shampo|dentifrice|brosse à dents|déodorant|deodorant|rasoir/i],
+  ['quincaillerie', /vis\b|clou|peinture|pinceau|ampoule|batterie|pile|ruban|colle|outil|perceuse|tournevis|silicone|planche|bois/i],
+  ['maison', /papier|savon|lessive|détergent|detergent|éponge|eponge|sac(s)? (à|a) ordure|vaisselle|nettoy|essuie|serviette|chandelle|filtre/i],
+  ['vetements', /chandail|pantalon|bas\b|chaussette|souliers?|bottes?|manteau|tuque|gants?|t-shirt|jeans?|sous-vêtement/i],
+  ['techno', /câble|cable|chargeur|écouteur|ecouteur|clavier|souris|usb|hdmi|écran|ecran|disque/i],
+  ['epicerie', /lait|pain|œuf|oeuf|fromage|beurre|yogourt|yaourt|viande|poulet|bœuf|boeuf|porc|poisson|pomme|banane|fruit|légume|legume|salade|tomate|patate|riz|pâtes|pates|farine|sucre|café|cafe|thé|the\b|jus|céréale|cereale|eau|bière|biere|vin\b|collation|chips|biscuit/i],
+];
+const guessCat = (name) => SHOP_GUESS.find(([, re]) => re.test(name))?.[0] || 'autre';
+const shopCatLabel = (c) => (SHOP_CATS.find(([k]) => k === c) || SHOP_CATS[SHOP_CATS.length - 1])[1];
+
+async function shopLoad() { return (await db.get('settings', SHOP_KEY)) || []; }
+async function shopSave(list) {
+  const limit = Date.now() - 90 * 864e5;
+  await db.put('settings', list.filter((x) => !x.del || (x.at || 0) > limit), SHOP_KEY);
+}
+
+async function drawShopping(ctx, el) {
+  const list = await shopLoad();
+  const items = list.filter((x) => !x.del);
+  const todo = items.filter((x) => !x.done).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const bought = items.filter((x) => x.done).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const total = todo.reduce((n, x) => n + (Number(x.price) || 0) * (Number(x.qty) || 1), 0);
+  const priced = todo.filter((x) => Number(x.price) > 0).length;
+  // Suggestions : articles déjà achetés ou retirés, qui ne sont pas dans la liste en ce moment
+  const active = new Set(items.map((x) => x.name.trim().toLowerCase()));
+  const seen = new Map();
+  for (const x of [...list].sort((a, b) => (b.at || 0) - (a.at || 0))) {
+    const k = x.name.trim().toLowerCase();
+    if ((x.del || x.done) && !active.has(k) && !seen.has(k)) seen.set(k, x);
+  }
+  const sugg = [...seen.values()].slice(0, 14);
+  const row = (x) => `<li class="sh-item ${x.done ? 'done' : ''}" data-id="${x.id}">
+    <label class="sh-check"><input type="checkbox" ${x.done ? 'checked' : ''} aria-label="${x.done ? 'Remettre à acheter' : 'Acheté'} : ${esc(x.name)}"></label>
+    <span class="sh-name">${esc(x.name)}${Number(x.qty) > 1 ? ` <span class="sh-qty">×${Number(x.qty)}</span>` : ''}</span>
+    ${Number(x.price) > 0 ? `<span class="sh-price">${$$$((Number(x.price) || 0) * (Number(x.qty) || 1))}</span>` : ''}
+    <button class="x" data-del aria-label="Retirer ${esc(x.name)}">×</button></li>`;
+  const groups = SHOP_CATS.map(([k, l]) => [l, todo.filter((x) => (SHOP_CATS.some(([c]) => c === x.cat) ? x.cat : 'autre') === k)]).filter(([, g]) => g.length);
+
+  el.innerHTML = `
+    <form class="card sh-add" id="sh-add">
+      <input name="n" placeholder="Ajouter une chose à acheter…" autocomplete="off" required>
+      <input name="q" type="number" min="1" max="99" placeholder="Qté" aria-label="Quantité" class="sh-q">
+      <input name="p" type="number" min="0" step="0.01" placeholder="Prix $" aria-label="Prix estimé (facultatif)" class="sh-p">
+      <select name="c" aria-label="Catégorie">${SHOP_CATS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+      <button class="btn primary">Ajouter</button>
+    </form>
+    <div class="sh-sum">${todo.length ? `<b>${todo.length}</b> à acheter${priced ? ` · ≈ <b>${$$$(total)}</b>${priced < todo.length ? ` <small class="muted">(${priced} avec un prix)</small>` : ''}` : ''}` : '<span class="muted">Rien à acheter pour l’instant 🎉</span>'}</div>
+    ${groups.map(([l, g]) => `<section class="card sh-group"><h3>${l} <span class="muted">${g.length}</span></h3><ul class="sh-list">${g.map(row).join('')}</ul></section>`).join('')}
+    ${sugg.length ? `<section class="card sh-sugg"><h3>↺ Souvent achetés</h3><div class="sh-chips">${sugg.map((x) => `<button type="button" class="chip-btn" data-re="${x.id}" title="Remettre dans la liste">+ ${esc(x.name)}</button>`).join('')}</div></section>` : ''}
+    ${bought.length ? `<section class="card sh-group sh-bought"><div class="card-head"><h3>✓ Dans le panier <span class="muted">${bought.length}</span></h3><button type="button" class="btn sm-text" id="sh-clear">Retirer les achetés</button></div><ul class="sh-list">${bought.map(row).join('')}</ul></section>` : ''}
+    <p class="hint muted">Coche ce que tu as mis dans le panier, puis « Retirer les achetés ». La liste se synchronise avec ton cellulaire : parfait à l’épicerie.</p>`;
+
+  const redraw = () => drawShopping(ctx, el);
+  const edit = async (id, fn) => {
+    const cur = await shopLoad();
+    const x = cur.find((i) => i.id === id);
+    if (!x) return;
+    fn(x);
+    x.at = Date.now();
+    await shopSave(cur);
+    redraw();
+  };
+  const form = el.querySelector('#sh-add');
+  let catTouched = false;
+  form.c.onchange = () => { catTouched = true; };
+  form.n.oninput = () => { if (!catTouched) form.c.value = guessCat(form.n.value); };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const name = form.n.value.trim();
+    if (!name) return;
+    const cur = await shopLoad();
+    cur.push({ id: U.uid(), name, qty: Math.max(1, Number(form.q.value) || 1), price: Number(form.p.value) || 0, cat: form.c.value, done: false, at: Date.now() });
+    await shopSave(cur);
+    await redraw();
+    el.querySelector('#sh-add input[name="n"]')?.focus();
+  };
+  el.querySelectorAll('.sh-item').forEach((li) => {
+    const id = li.dataset.id;
+    li.querySelector('input[type="checkbox"]').onchange = (e) => edit(id, (x) => { x.done = e.target.checked; });
+    li.querySelector('[data-del]').onclick = () => edit(id, (x) => { x.del = true; });
+  });
+  el.querySelectorAll('[data-re]').forEach((b) => (b.onclick = async () => {
+    const cur = await shopLoad();
+    const src = cur.find((i) => i.id === b.dataset.re);
+    if (!src) return;
+    cur.push({ id: U.uid(), name: src.name, qty: src.qty || 1, price: src.price || 0, cat: src.cat || guessCat(src.name), done: false, at: Date.now() });
+    await shopSave(cur);
+    redraw();
+  }));
+  el.querySelector('#sh-clear')?.addEventListener('click', async () => {
+    const cur = await shopLoad();
+    const now = Date.now();
+    for (const x of cur) if (x.done && !x.del) { x.del = true; x.at = now; }
+    await shopSave(cur);
+    ctx.toast('🛒 Achats retirés de la liste');
+    redraw();
+  });
 }
 
 function emptyState() {
