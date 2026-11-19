@@ -921,7 +921,13 @@ async function focusLine() {
 /* ---------- Logo personnel (menu + onglet du navigateur) ---------- */
 const LOGO_COLORS = ['#7a1e2c', '#0a0909', '#c9a24a', '#0f3d2e', '#4f46e5', '#0ea5e9', '#0c8484', '#16a34a', '#ca8a04', '#f97316', '#e11d48', '#a855f7', '#1d1d1f'];
 async function getLogo() {
-  return { mode: APP.couple ? 'app' : 'avatar', text: '', color: '#7a1e2c', emoji: '🦁', title: APP.name, ...((await db.get('settings', 'logo')) || {}) };
+  // Logo The Planner : adopté une fois sur chaque compte (après, ton choix dans Réglages › Mon logo est gardé)
+  if (!APP.couple && !(await db.get('settings', 'logoPlanner'))) {
+    const cur = await db.get('settings', 'logo');
+    if (cur && cur.mode !== 'app') await db.put('settings', { ...cur, mode: 'app' }, 'logo');
+    await db.put('settings', true, 'logoPlanner');
+  }
+  return { mode: 'app', text: '', color: '#7a1e2c', emoji: '🦁', title: APP.name, ...((await db.get('settings', 'logo')) || {}) };
 }
 const initialsOf = (name) => (name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'LP';
 function shade(hex, k) { // assombrit une couleur #rrggbb (k < 0) ou l'éclaircit (k > 0)
@@ -944,9 +950,9 @@ function logoSVG(cfg, av, size = 34) {
     return `${head}<defs><linearGradient id="${uidg}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(c, 0.3)}"/><stop offset="1" stop-color="${shade(c, -0.25)}"/></linearGradient></defs>
       <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#${uidg})"/><text x="32" y="44" text-anchor="middle" font-size="34">${esc(cfg.emoji || '🦁')}</text></svg>`;
   }
-  if (cfg.mode === 'app') return `<img src="icons/icon.svg" alt="" width="${size}" height="${size}">`;
+  if (cfg.mode === 'app') return `<img class="logo-img round" src="icons/${APP.couple ? 'icon.svg' : 'logo.png'}" alt="" width="${size}" height="${size}">`;
   // Mon image : logo importé (déjà carré et réduit à l'import)
-  if (cfg.mode === 'image') return cfg.img ? `<img class="logo-img" src="${esc(cfg.img)}" alt="" width="${size}" height="${size}">` : `<img src="icons/icon.svg" alt="" width="${size}" height="${size}">`;
+  if (cfg.mode === 'image') return cfg.img ? `<img class="logo-img" src="${esc(cfg.img)}" alt="" width="${size}" height="${size}">` : `<img src="icons/${APP.couple ? 'icon.svg' : 'logo.png'}" alt="" width="${size}" height="${size}">`;
   // Avatar (par défaut) : ton héros, dans un cadre à ta couleur
   const inner = AV.avatarSVG(av, size - 4).replace('<svg ', '<svg x="2" y="2" ');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true"><rect x=".75" y=".75" width="${size - 1.5}" height="${size - 1.5}" rx="${size * 0.28}" fill="none" stroke="${c}" stroke-width="1.5"/>${inner}</svg>`;
@@ -3709,7 +3715,7 @@ async function renderSettings() {
     if (!el) return;
     const cfg = await getLogo();
     const av = await getAvatar();
-    const modes = [['avatar', 'Mon avatar'], ['mono', 'Mes initiales'], ['emoji', 'Un emoji'], ['image', 'Mon image'], ['app', 'Logo d’origine']];
+    const modes = [['avatar', 'Mon avatar'], ['mono', 'Mes initiales'], ['emoji', 'Un emoji'], ['image', 'Mon image'], ['app', APP.couple ? 'Logo d’origine' : 'The Planner']];
     el.innerHTML = `<div class="card-head"><h2>🎨 Mon logo</h2><span class="muted">Menu et onglet du navigateur · un clic sur le logo ouvre Aujourd’hui</span></div>
       <div class="logo-modes">${modes.map(([m, l]) => `<button type="button" class="logo-opt ${cfg.mode === m ? 'on' : ''}" data-lmode="${m}">${logoSVG({ ...cfg, mode: m }, av, 52)}<span>${l}</span></button>`).join('')}</div>
       <div class="logo-fields">

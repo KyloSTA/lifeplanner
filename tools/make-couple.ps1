@@ -27,6 +27,10 @@ $config = @'
 $html = $html.Replace('<title>Life Planner</title>', '<title>Couple Life Organiser</title>')
 $html = $html.Replace('href="css/styles.css"', 'href="../css/styles.css"')
 $html = $html.Replace('src="js/app.js"', 'src="../js/app.js"')
+# L'app couple garde son propre logo (coeurs) : icons\icon.svg de son dossier
+$html = $html.Replace('href="icons/logo.png" type="image/png"', 'href="icons/icon.svg" type="image/svg+xml"')
+$html = $html.Replace('class="logo-img round" src="icons/logo.png"', 'src="icons/icon.svg"')
+$html = $html.Replace('src="icons/logo.png"', 'src="icons/icon.svg"')
 $html = $html.Replace('  <link rel="manifest"', $config + "`n" + '  <link rel="manifest"')
 if (-not $html.Contains("window.LP_APP")) { throw 'Balise manifest introuvable dans app\index.html' }
 

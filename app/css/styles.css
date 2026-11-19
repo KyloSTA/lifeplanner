@@ -1237,6 +1237,12 @@ a.assoc-chip { padding: 4px 11px; }
 .shot-opt small { font-size: 12px; }
 /* Logo importé (« Mon image ») */
 .logo-img { object-fit: cover; border-radius: 22%; display: block; }
+/* Logo rond (écusson The Planner) : plus grand dans le menu, sans cadre carré */
+.logo-img.round { border-radius: 50%; object-fit: contain; }
+.rail a.brand-logo:has(img.round) { width: 48px; height: 48px; border-radius: 50%; box-shadow: none; }
+.rail a.brand-logo img.round { width: 46px; height: 46px; filter: drop-shadow(0 0 6px rgba(201, 162, 74, .35)); }
+.rail a.brand-logo.active:has(img.round) { box-shadow: 0 0 0 2px var(--gold); }
+@media (max-width: 900px) { .rail a.brand-logo:has(img.round) { width: 40px; height: 40px; } .rail a.brand-logo img.round { width: 38px; height: 38px; } }
 .logo-upload { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .logo-upload .hint { flex: 1 1 100%; margin: 0; }
 .logo-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
