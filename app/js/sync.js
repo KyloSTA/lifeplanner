@@ -217,12 +217,14 @@ export function syncNow() {
 }
 
 // Jeton Google expiré (1 h) : on se reconnecte discrètement au prochain toucher de l'écran.
-let armed = false;
+// Au plus une tentative toutes les 10 minutes : un échec ne doit jamais rouvrir Google à chaque toucher.
+let armed = false, lastTry = 0;
 function armRelogin() {
-  if (armed || !st.on) return;
+  if (armed || !st.on || Date.now() - lastTry < 10 * 60_000) return;
   armed = true;
   addEventListener('pointerdown', () => {
     armed = false;
+    lastTry = Date.now();
     gcal.connect({ silent: true }).then(() => syncNow()).catch(() => {});
   }, { once: true, capture: true });
 }

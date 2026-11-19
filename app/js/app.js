@@ -3251,7 +3251,8 @@ async function renderSettings() {
         <p class="muted" style="margin:0">${esc(couple.nameOf('a'))} et ${esc(couple.nameOf('b'))} · sur cet appareil : <b>${couple.me() ? esc(couple.nameOf(couple.me())) : 'à choisir'}</b>. Les deux utilisez le même compte Google : connectez-vous avec lui dans Synchronisation et Google Agenda.</p></section>` : ''}
       <section class="card">
         <div class="card-head"><h2>Google Agenda</h2>${connected ? `<span class="sync live">${gcal.staysConnected() ? 'Connecté · reste connecté' : 'Connecté'}</span>` : ''}</div>
-        ${connected && cSecret && !gcal.staysConnected() ? '<p class="warn-text" style="margin-top:0">Pour ne plus avoir à te reconnecter : clique « Déconnecter », puis reconnecte-toi une fois.</p>' : ''}
+        ${cSecret && gcal.codeError() ? `<p class="warn-text" style="margin-top:0">⚠ Connexion durable impossible : ${esc(gcal.codeError())}. L’app utilise la connexion simple en attendant ; corrige le code secret puis « Enregistrer » pour réessayer.</p>`
+          : connected && cSecret && !gcal.staysConnected() ? '<p class="warn-text" style="margin-top:0">Pour ne plus avoir à te reconnecter : clique « Déconnecter », puis reconnecte-toi une fois.</p>' : ''}
         <p class="muted" style="margin-top:0">Une seule fois : crée ton propre identifiant Google (gratuit, ~5 minutes).</p>
         <ol class="steps">
           <li>Va sur <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">console.cloud.google.com</a> et crée un projet (ex. « Life Planner »).</li>
@@ -3333,7 +3334,7 @@ async function renderSettings() {
     const sec = e.target.secret.value.trim();
     if (sec && !/^GOCSPX-[\w-]{10,}$/.test(sec)) { toast('Ce code ne ressemble pas à un code secret de client Google (GOCSPX-…)', 'err'); return; }
     await db.put('settings', v, 'clientId');
-    if (sec) await db.put('settings', sec, 'clientSecret');
+    if (sec) { await db.put('settings', sec, 'clientSecret'); gcal.setCodeError(''); } // nouveau code : on réessaie la connexion durable
     if (v !== clientId || sec) await gcal.disconnect(); // nouvelle connexion avec le jeton de renouvellement
     toast(sec ? 'Enregistré — reconnecte-toi une fois et tu resteras connecté' : 'ID enregistré');
     gcal.preload();
@@ -3454,7 +3455,7 @@ async function renderSettings() {
   drawLogo();
 
   $('#ak-del')?.addEventListener('click', async () => { await db.del('settings', 'anthropicKey'); toast('Clé retirée'); renderSettings(); });
-  $('#cs-del')?.addEventListener('click', async () => { await db.del('settings', 'clientSecret'); await gcal.disconnect(); toast('Code secret retiré'); renderSettings(); });
+  $('#cs-del')?.addEventListener('click', async () => { await db.del('settings', 'clientSecret'); gcal.setCodeError(''); await gcal.disconnect(); toast('Code secret retiré'); renderSettings(); });
   $('#g-off')?.addEventListener('click', async () => { await gcal.disconnect(); toast('Déconnecté'); renderSettings(); });
 
   // Choix des agendas
