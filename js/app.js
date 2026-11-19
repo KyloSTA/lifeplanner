@@ -17,6 +17,7 @@ import * as clips from './clips.js';
 import * as habits from './habits.js';
 import * as rbq from './rbq.js';
 import * as workout from './workout.js';
+import * as stretch from './stretch.js';
 import * as images from './images.js';
 import * as missions from './missions.js';
 import * as docs from './docs.js';
@@ -123,16 +124,17 @@ const routes = {
   quest: () => rpg.renderPage(pageCtx()),
   rbq: (id) => rbq.renderPage(pageCtx(), id),
   workout: (tab) => workout.renderPage(pageCtx(), tab),
+  stretch: () => stretch.renderPage(pageCtx()),
 };
 const NAV_PARENT = {
-  page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', habits: 'workout',
+  page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', habits: 'workout', stretch: 'workout',
   setup: 'settings', usage: 'settings', activities: 'week', quest: 'hero', day: 'week', month: 'week', year: 'week', journal: 'week',
 };
 // Onglets en haut des sections qui regroupent plusieurs pages (le menu n'a qu'une entrée par section)
 const SECTION_TABS = {
   missions: [['missions', '✅ Missions'], ['goals', '🎯 Objectifs']],
   brain: [['brain', '🧠 Notes'], ['news', '📰 Actualités'], ['notebook', '✏️ Carnet']],
-  workout: [['workout', '🏃 Workout'], ['habits', '🔁 Habitudes']],
+  workout: [['workout', '🏋️ Workout'], ['stretch', '🧘 Étirements'], ['habits', '🔁 Habitudes']],
 };
 let tabsWatch = null;
 function sectionTabs(name) {

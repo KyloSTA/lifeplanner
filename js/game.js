@@ -5,7 +5,7 @@
 import { db } from './db.js';
 import { iso, addDays, parseISO } from './util.js';
 
-export const XP = { task: 10, sub: 3, journal: 15, mood: 5, ink: 10, goal: 10, goalDone: 50, note: 5, link: 2, review: 3, triage: 2, pomo: 5, habit: 3, study: 1, workout: 25 };
+export const XP = { task: 10, sub: 3, journal: 15, mood: 5, ink: 10, goal: 10, goalDone: 50, note: 5, link: 2, review: 3, triage: 2, pomo: 5, habit: 3, study: 1, workout: 25, stretch: 10 };
 
 /* ---------- Évolution de l'avatar (second cerveau) ---------- */
 // Les points gagnés dans le Cerveau forment ton « Savoir », qui fait évoluer l'avatar.
