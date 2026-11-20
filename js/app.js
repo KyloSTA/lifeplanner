@@ -1277,8 +1277,10 @@ function bindCapture(form, after) {
   form.onsubmit = (e) => { e.preventDefault(); submit(); };
   form.t.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); } };
   form.addEventListener('paste', (e) => {
-    const imgs = images.imageFiles(e.clipboardData), ds = docs.docFiles(e.clipboardData?.files);
-    if (imgs.length || ds.length) { e.preventDefault(); add(imgs); addDocs(ds); }
+    const ds = docs.docFiles(e.clipboardData?.files);
+    // Texte et photos ensemble : le texte dans la zone, les photos en pièces jointes
+    if (richPaste(e, (txt) => insertAtCursor(form.t, txt), add)) { if (ds.length) addDocs(ds); return; }
+    if (ds.length) { e.preventDefault(); addDocs(ds); }
   });
   form.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); form.classList.add('drop'); } });
   form.addEventListener('dragleave', () => form.classList.remove('drop'));
@@ -1325,6 +1327,45 @@ function bindCapture(form, after) {
       toast(err.message === 'unsupported' ? 'Ton navigateur ne permet pas de lire le presse-papiers : utilise Ctrl + V' : 'Accès au presse-papiers refusé : autorise-le quand le navigateur le demande, ou utilise Ctrl + V', 'err');
     }
   };
+}
+
+/**
+ * Collage mixte : texte ET images (copiés ensemble d'une page web, d'un courriel…). Le texte va au curseur,
+ * puis les images. Les images d'une page web sont récupérées quand le site le permet.
+ * Renvoie false s'il n'y a pas d'image (collage normal du navigateur).
+ */
+function richPaste(e, insertText, addImages) {
+  const cd = e.clipboardData;
+  if (!cd) return false;
+  const files = images.imageFiles(cd);
+  const html = cd.getData('text/html') || '';
+  const srcs = html.includes('<img') ? [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('img')].map((i) => i.getAttribute('src')).filter(Boolean) : [];
+  if (!files.length && !srcs.length) return false;
+  e.preventDefault();
+  const text = cd.getData('text/plain') || '';
+  if (text.trim()) insertText(text);
+  (async () => {
+    const blobs = [...files];
+    if (!blobs.length) {
+      for (const src of srcs.slice(0, 12)) {
+        try {
+          const r = await fetch(src, { referrerPolicy: 'no-referrer' });
+          const b = r.ok ? await r.blob() : null;
+          if (b?.type.startsWith('image/')) blobs.push(b);
+        } catch { /* image protégée par le site : seul le texte est collé */ }
+      }
+    }
+    if (blobs.length) addImages(blobs);
+    else if (srcs.length && !text.trim()) toast('Ce site ne permet pas de copier ses images : enregistre l’image, puis colle-la', 'err');
+  })();
+  return true;
+}
+/** Insère du texte au curseur d'une zone de texte (et prévient la page qu'elle a changé). */
+function insertAtCursor(ta, txt) {
+  const at = ta.selectionStart ?? ta.value.length, end = ta.selectionEnd ?? at;
+  ta.value = ta.value.slice(0, at) + txt + ta.value.slice(end);
+  ta.selectionStart = ta.selectionEnd = at + txt.length;
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 // Coller une image n'importe où sur la page (hors champ de texte) : elle va dans la capture rapide visible
@@ -2082,7 +2123,12 @@ async function renderNote(id) {
       toast(`📷 Image${ids.length > 1 ? 's' : ''} ajoutée${ids.length > 1 ? 's' : ''} — passe en mode Lire pour la voir`);
     } catch (err) { toast('Impossible d’ajouter l’image : ' + err.message, 'err'); }
   };
-  ta.addEventListener('paste', (e) => { const f = images.imageFiles(e.clipboardData); if (f.length) { e.preventDefault(); insertImages(f); } });
+  // Coller : texte et photos ensemble (le texte au curseur, puis les photos)
+  ta.addEventListener('paste', (e) => {
+    const d = docs.docFiles(e.clipboardData?.files);
+    if (richPaste(e, (txt) => insertAtCursor(ta, txt), insertImages)) return;
+    if (d.length) { e.preventDefault(); insertDocs(d); }
+  });
   ta.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
   ta.addEventListener('drop', (e) => {
     const f = images.imageFiles(e.dataTransfer), d = docs.docFiles(e.dataTransfer?.files);
