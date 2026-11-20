@@ -491,6 +491,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
       <div class="modal-actions tm-actions">
         <button class="btn danger tm-del">🗑 Supprimer</button>
         <button class="btn tm-tostep" title="Faire de cette mission une étape d’une autre mission">↳ Devenir une étape</button>
+        <button class="btn tm-toevent" title="Créer un événement Google Agenda à partir de cette mission">📅 En événement</button>
         <button class="btn primary tm-ok">Terminé</button>
       </div>`;
 
@@ -597,9 +598,62 @@ export async function openTaskEditor(id, onChange = () => {}) {
       changed();
     };
     box.querySelector('.tm-tostep').onclick = async () => { await flush(); pickParent(); };
+    box.querySelector('.tm-toevent').onclick = async () => { await flush(); toEvent(); };
     box.querySelector('.tm-ok').onclick = close;
     box.querySelector('.tm-close').onclick = close;
     if (focus) box.querySelector(focus)?.focus();
+  };
+
+  // 📅 En événement : crée un événement Google Agenda (titre, date, heure, notes et étapes en description)
+  const toEvent = async () => {
+    const me = await db.get('tasks', id);
+    if (!me) return close();
+    const subs = me.subtasks || [];
+    const desc = [(me.notes || '').trim(), subs.length ? 'Étapes :\n' + subs.map((s) => `${s.done ? '☑' : '☐'} ${s.title}`).join('\n') : ''].filter(Boolean).join('\n\n');
+    const day = me.date || U.iso(new Date());
+    const hm = me.alarmAt ? new Date(me.alarmAt) : null;
+    const start = hm ? `${String(hm.getHours()).padStart(2, '0')}:${String(hm.getMinutes()).padStart(2, '0')}` : '09:00';
+    const endH = (Number(start.slice(0, 2)) + 1) % 24;
+    box.innerHTML = `
+      <div class="tm-head"><h2 class="tm-pick-title">📅 Transformer en événement</h2><button class="tm-close" aria-label="Retour">×</button></div>
+      <form class="form tm-ev" id="tm-ev">
+        <label>Titre<input name="t" value="${esc(me.title)}" required></label>
+        <div class="tm-ev-row"><label>Date<input name="d" type="date" value="${day}" required></label>
+          <label class="tm-ev-all"><input type="checkbox" name="all"> Toute la journée</label></div>
+        <div class="tm-ev-row tm-ev-times"><label>Début<input name="s" type="time" value="${start}"></label><label>Fin<input name="e" type="time" value="${String(endH).padStart(2, '0')}${start.slice(2)}"></label></div>
+        <label>Description<textarea name="desc" rows="3">${esc(desc)}</textarea></label>
+        <label class="tm-ev-keep"><input type="checkbox" name="rm" checked> Retirer la mission ensuite (elle va dans Supprimées)</label>
+        <p class="warn-text tm-ev-err" hidden></p>
+        <div class="modal-actions"><button type="button" class="btn tm-ev-back">Retour</button><button class="btn primary">📅 Créer l’événement</button></div>
+      </form>`;
+    const f = box.querySelector('#tm-ev');
+    const times = box.querySelector('.tm-ev-times');
+    f.all.onchange = () => { times.hidden = f.all.checked; };
+    box.querySelector('.tm-ev-back').onclick = () => draw();
+    box.querySelector('.tm-close').onclick = () => draw();
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = f.querySelector('button.primary');
+      btn.disabled = true;
+      const err = box.querySelector('.tm-ev-err');
+      try {
+        const gcal = await import('./gcal.js');
+        await gcal.createEvent({ title: f.t.value.trim() || me.title, date: f.d.value, allDay: f.all.checked, start: f.s.value || '09:00', end: f.e.value || '10:00', description: f.desc.value.trim() });
+        const remove = f.rm.checked;
+        closed = true;
+        document.removeEventListener('keydown', onKey);
+        if (remove) await deleteTask(id);
+        host.innerHTML = '';
+        changed();
+        showUndo(remove ? `📅 Événement créé · « ${me.title} » retirée des missions` : '📅 Événement créé dans Google Agenda',
+          async () => { if (remove) { await restoreTask(id); changed(); } }, remove ? 5000 : 2500);
+      } catch (ex) {
+        btn.disabled = false;
+        err.hidden = false;
+        err.textContent = ex.message === 'NOT_CONNECTED' || ex.message === 'NO_CLIENT_ID'
+          ? 'Google Agenda n’est pas connecté : connecte-le dans Réglages, puis réessaie.' : 'Impossible de créer l’événement : ' + ex.message;
+      }
+    };
   };
 
   // ↳ Devenir une étape : choisir la mission qui la recevra (recherche ; à faire d'abord, par date)

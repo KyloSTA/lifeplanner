@@ -1000,13 +1000,83 @@ function chartSVG(all, m, total, upto) {
 }
 
 /* ---------- Budget : proposition et réglage ---------- */
+/* ---------- Budget : vue Semaine (budget mensuel ramené à la semaine : × 12 ÷ 52) ---------- */
+let budgetView = (() => { try { return localStorage.getItem('lp.budgetView') === 'semaine' ? 'semaine' : 'mois'; } catch { return 'mois'; } })();
+let bwStart = null; // lundi de la semaine affichée
+const budgetSwitch = () => `<div class="seg fi-bview" role="tablist" aria-label="Vue du budget">
+  <button role="tab" data-bv="mois" class="${budgetView === 'mois' ? 'on' : ''}" aria-selected="${budgetView === 'mois'}">📆 Mois</button>
+  <button role="tab" data-bv="semaine" class="${budgetView === 'semaine' ? 'on' : ''}" aria-selected="${budgetView === 'semaine'}">🗓 Semaine</button></div>`;
+
+function drawBudgetWeek(ctx, el, all, budget) {
+  bwStart ||= U.startOfWeek(new Date());
+  const ws = U.iso(bwStart), we = U.iso(U.addDays(bwStart, 7));
+  const today = U.iso(new Date());
+  const thisWeek = ws === U.iso(U.startOfWeek(new Date()));
+  const W = 12 / 52;
+  const cats = budget.cats || {};
+  const weekBudget = Object.fromEntries(Object.entries(cats).map(([k, v]) => [k, (Number(v) || 0) * W]));
+  const totalBudget = Object.values(weekBudget).reduce((a, b) => a + b, 0);
+  // Dépenses de la semaine, par catégorie et par jour
+  const spent = {}, perDay = Array(7).fill(0);
+  let total = 0;
+  for (const t of all) {
+    if (t.date < ws || t.date >= we) continue;
+    const s = spendOf(t);
+    if (!s) continue;
+    const c = spendCat(t, all);
+    spent[c] = (spent[c] || 0) + s;
+    total += s;
+    perDay[Math.round((U.parseISO(t.date) - U.parseISO(ws)) / 864e5)] += s;
+  }
+  const left = totalBudget - total;
+  const daysLeft = thisWeek ? Math.max(1, 7 - Math.round((U.parseISO(today) - U.parseISO(ws)) / 864e5)) : 0;
+  const maxDay = Math.max(1, ...perDay, totalBudget / 7);
+  const ids = [...new Set([...Object.keys(weekBudget), ...Object.keys(spent)])]
+    .map((id) => ({ ...catOf(id), id, b: weekBudget[id] || 0, s: spent[id] || 0 }))
+    .filter((r) => r.b || r.s > 0.5)
+    .sort((a, b) => (b.s / (b.b || 1)) - (a.s / (a.b || 1)));
+  const last = all.map((t) => t.date).sort().pop();
+  const dayNames = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+
+  el.innerHTML = `${budgetSwitch()}
+    <section class="card fi-week">
+      <div class="card-head"><h2>🗓 Semaine du ${U.fmtShort(bwStart)}</h2>
+        <span class="fi-month"><button class="btn icon" id="bw-prev" aria-label="Semaine précédente">‹</button>
+        ${thisWeek ? '' : '<button class="btn" id="bw-now">Cette semaine</button>'}
+        <button class="btn icon" id="bw-next" ${thisWeek ? 'disabled' : ''} aria-label="Semaine suivante">›</button></span></div>
+      ${totalBudget ? `<div class="fi-plan-top">
+        <div class="kpi"><b>${$$$(total, true)}</b><span>dépensé cette semaine</span></div>
+        <div class="kpi"><b>${$$$(totalBudget, true)}</b><span>budget de la semaine</span></div>
+        <div class="kpi ${left < 0 ? 'bad' : 'ok'}"><b>${left < 0 ? '−' : ''}${$$$(Math.abs(left), true)}</b><span>${left < 0 ? 'de dépassement' : 'qui reste'}</span></div>
+        ${thisWeek && left > 0 ? `<div class="kpi"><b>${$$$(left / daysLeft, true)}</b><span>par jour jusqu’à dimanche</span></div>` : ''}
+      </div>
+      <div class="fi-meter fi-week-meter"><i style="width:${Math.min(100, (total / totalBudget) * 100)}%" class="${total > totalBudget ? 'over' : ''}"></i></div>`
+        : '<p class="empty-sm">Aucun budget encore : crée ton budget mensuel dans la vue 📆 Mois. La semaine en découle (× 12 ÷ 52).</p>'}
+      <div class="fi-days">${perDay.map((v, i) => { const d = U.iso(U.addDays(bwStart, i)); return `<div class="fi-day ${d === today ? 'today' : ''} ${d > today ? 'future' : ''}" title="${dayNames[i]} : ${$$$(v)}">
+        <span class="fi-day-v">${v ? $$$(v, true) : ''}</span><span class="fi-day-bar"><i class="${totalBudget && v > totalBudget / 7 ? 'over' : ''}" style="height:${(v / maxDay) * 100}%"></i></span><small>${dayNames[i]}</small></div>`; }).join('')}</div>
+      ${totalBudget ? `<p class="hint muted" style="margin:6px 0 0">Budget moyen par jour : ${$$$(totalBudget / 7, true)} · en rouge, les jours au-dessus.</p>` : ''}
+    </section>
+    ${ids.length ? `<section class="card"><div class="card-head"><h2>Par catégorie</h2><span class="muted">dépensé / budget de la semaine</span></div>
+      <div class="fi-wk-rows">${ids.map((r) => { const p = r.b ? (r.s / r.b) * 100 : 100; return `<div class="fi-wk-row">
+        <span class="fi-wk-name">${r.emoji} ${esc(r.name)}</span>
+        <span class="fi-wk-nums"><b class="${r.b && r.s > r.b ? 'over' : ''}">${$$$(r.s, true)}</b><small class="muted"> / ${r.b ? $$$(r.b, true) : 'hors budget'}</small></span>
+        <div class="fi-wk-bar"><i class="${r.b && r.s > r.b ? 'over' : p > 85 ? 'warn' : ''}" style="width:${Math.min(100, p)}%"></i></div></div>`; }).join('')}</div></section>` : ''}
+    ${last && last < we && thisWeek ? `<p class="hint muted">Dépenses connues jusqu’au ${U.fmtShort(U.parseISO(last))} (dernier relevé importé) : importe le plus récent pour une semaine complète.</p>` : ''}`;
+
+  el.querySelectorAll('[data-bv]').forEach((b) => (b.onclick = () => { budgetView = b.dataset.bv; try { localStorage.setItem('lp.budgetView', budgetView); } catch { /* ignore */ } drawBudget(ctx, el, all, budget); }));
+  el.querySelector('#bw-prev').onclick = () => { bwStart = U.addDays(bwStart, -7); drawBudgetWeek(ctx, el, all, budget); };
+  el.querySelector('#bw-next').onclick = () => { bwStart = U.addDays(bwStart, 7); drawBudgetWeek(ctx, el, all, budget); };
+  el.querySelector('#bw-now')?.addEventListener('click', () => { bwStart = U.startOfWeek(new Date()); drawBudgetWeek(ctx, el, all, budget); });
+}
+
 function drawBudget(ctx, el, all, budget) {
+  if (budgetView === 'semaine') return drawBudgetWeek(ctx, el, all, budget);
   const avg = averages(all, curMonth());
   const cur = budget.cats || {};
   const round5 = (v) => Math.ceil(v / 5) * 5;
   const rows = CATS.map(([id]) => ({ ...catOf(id), avg: avg.cats[id] || 0, value: cur[id] ?? '' }))
     .sort((a, b) => b.avg - a.avg);
-  el.innerHTML = `
+  el.innerHTML = `${budgetSwitch()}
     <section class="card fi-plan">
       <div class="card-head"><h2>🎯 Ton budget mensuel</h2><span class="muted">${avg.months.length ? `Moyennes : ${avg.months.map((m) => monthName(m).split(' ')[0]).join(', ')}` : ''}</span></div>
       <div class="fi-plan-top">
@@ -1031,6 +1101,7 @@ function drawBudget(ctx, el, all, budget) {
       <div class="modal-actions"><button class="btn primary" id="fi-save">Enregistrer le budget</button></div>
       <p class="hint muted">Conseils : commence par les catégories où tu dépenses le plus. Viser 10 à 20 % de moins que ta moyenne est réaliste ; plus serré, c’est souvent abandonné au bout de deux semaines. Mets l’épargne en premier : traite-la comme une dépense fixe.</p>
     </section>`;
+  el.querySelectorAll('[data-bv]').forEach((b) => (b.onclick = () => { budgetView = b.dataset.bv; try { localStorage.setItem('lp.budgetView', budgetView); } catch { /* ignore */ } drawBudget(ctx, el, all, budget); }));
   const inputs = [...el.querySelectorAll('[data-b]')];
   const sav = el.querySelector('#fi-sav');
   const totals = () => {

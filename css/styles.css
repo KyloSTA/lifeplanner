@@ -626,6 +626,13 @@ ul { margin: 0; padding: 0; list-style: none; }
 .tm-sec .add-sub input { min-height: 38px; }
 .tm-sec .notes { min-height: 90px; font-size: 14px; resize: vertical; }
 .task-modal .tm-actions { justify-content: space-between; margin-top: 0; flex-wrap: wrap; gap: 8px; }
+/* « En événement » : formulaire dans la fenêtre de la mission */
+.tm-ev { margin-top: 10px; }
+.tm-ev-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.tm-ev-row > label { flex: 1 1 140px; }
+.tm-ev-all, .tm-ev-keep { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px; font-weight: 500; }
+.tm-ev-all input, .tm-ev-keep input { width: 18px; height: 18px; flex: none; }
+.tm-ev-times[hidden] { display: none; }
 /* « Devenir une étape » : choix de la mission */
 .tm-pick-title { font-size: 17px; margin: 0; flex: 1; min-width: 0; }
 .tm-pick-q { width: 100%; margin: 12px 0 8px; }
@@ -1874,6 +1881,28 @@ a.assoc-chip { padding: 4px 11px; }
 .fi-empty ol { line-height: 1.6; padding-left: 20px; }
 .fi-drop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 18%, rgba(0,0,0,.4)); border: 3px dashed var(--accent); font-size: 20px; color: #fff; }
 .fi-report { line-height: 1.6; padding-left: 18px; }
+/* Budget › vue Semaine */
+.fi-bview { margin-bottom: 12px; }
+.fi-week .fi-month { display: flex; align-items: center; gap: 6px; }
+.fi-week-meter i.over { background: var(--danger); }
+.fi-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 8px; }
+.fi-day { display: grid; grid-template-rows: auto 110px auto; justify-items: center; gap: 4px; }
+.fi-day-v { font-size: 11px; color: var(--muted); min-height: 14px; font-variant-numeric: tabular-nums; }
+.fi-day-bar { width: 100%; max-width: 38px; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 8px; overflow: hidden; }
+.fi-day-bar i { display: block; width: 100%; background: var(--ok); border-radius: 8px 8px 0 0; min-height: 0; }
+.fi-day-bar i.over { background: var(--danger); }
+.fi-day small { font-size: 11px; color: var(--muted); }
+.fi-day.today small { color: var(--gold-text, var(--accent)); font-weight: 800; }
+.fi-day.future .fi-day-bar { opacity: .5; }
+.fi-wk-rows { display: grid; gap: 10px; }
+.fi-wk-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: baseline; }
+.fi-wk-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fi-wk-nums b { font-variant-numeric: tabular-nums; }
+.fi-wk-nums b.over { color: var(--danger); }
+.fi-wk-bar { grid-column: 1 / -1; height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.fi-wk-bar i { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
+.fi-wk-bar i.warn { background: var(--gold); }
+.fi-wk-bar i.over { background: var(--danger); }
 .fi-meter { position: relative; height: 12px; border-radius: 99px; background: var(--surface-2, var(--border)); overflow: visible; margin: 6px 0 10px; }
 .fi-meter i { display: block; height: 100%; border-radius: 99px; background: var(--ok); }
 .warn .fi-meter i { background: var(--warn); }
