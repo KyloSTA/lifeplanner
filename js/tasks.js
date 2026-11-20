@@ -221,10 +221,17 @@ export async function setTaskGoal(id, goalId) {
 }
 
 function goalOptions(current) {
+  // Les objectifs sans échéance (ou avec une échéance inconnue) ont leur propre groupe ;
+  // un objectif terminé n'est plus proposé, sauf celui déjà choisi
   const groups = {};
-  for (const g of goalsCache) (groups[g.horizon] ||= []).push(g);
-  return `<option value="">Aucun objectif</option>` + Object.entries(HORIZON_NAMES).filter(([h]) => groups[h])
-    .map(([h, name]) => `<optgroup label="${name}">${groups[h].map((g) => `<option value="${g.id}" ${g.id === current ? 'selected' : ''}>${esc(g.title)}</option>`).join('')}</optgroup>`).join('');
+  for (const g of goalsCache) {
+    if (g.done && g.id !== current) continue;
+    const h = HORIZON_NAMES[g.horizon] ? g.horizon : '';
+    (groups[h] ||= []).push(g);
+  }
+  const names = [...Object.entries(HORIZON_NAMES).filter(([h]) => h), ['', 'Sans échéance']];
+  return `<option value="">Aucun objectif</option>` + names.filter(([h]) => groups[h])
+    .map(([h, name]) => `<optgroup label="${name}">${groups[h].map((g) => `<option value="${g.id}" ${g.id === current ? 'selected' : ''}>${esc(g.title)}${g.done ? ' (terminé)' : ''}</option>`).join('')}</optgroup>`).join('');
 }
 
 /**
@@ -323,7 +330,7 @@ function startDrag(e, li, redraw) {
     if (z !== zone) { zone?.dispatchEvent(new CustomEvent('lp-drag-leave')); zone = z || null; li.classList.toggle('drag-out', !!zone); }
     if (zone) {
       zone.dispatchEvent(new CustomEvent('lp-drag-over', { detail: { y: ev.clientY, title } }));
-      if (ev.clientY < 60) scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) scrollBy(0, 12);
+      { const sc = document.getElementById('view') || window; if (ev.clientY < 60) sc.scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) sc.scrollBy(0, 12); }
       return;
     }
     // On place la mission avant la première voisine dont le milieu est sous le doigt
@@ -331,7 +338,7 @@ function startDrag(e, li, redraw) {
     const before = others.find((x) => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
     if (before) { if (li.nextElementSibling !== before) ul.insertBefore(li, before); } else if (ul.lastElementChild !== li) ul.appendChild(li);
     // Défilement automatique près des bords de l'écran
-    if (ev.clientY < 60) scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) scrollBy(0, 12);
+    { const sc = document.getElementById('view') || window; if (ev.clientY < 60) sc.scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) sc.scrollBy(0, 12); }
   };
   const onUp = async (ev) => {
     if (ev && ev.pointerId !== pid) return;

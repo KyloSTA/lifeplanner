@@ -76,7 +76,12 @@ export class InkEditor {
     };
     for (const [k, fn] of Object.entries(this._h)) c.addEventListener(k, fn);
     // Filet de sécurité : si le doigt se lève hors de la page, le défilement ne reste pas « coincé »
-    this._endPan = (e) => { if (this.pan && e.pointerId === this.pan.id) this.endPan(); };
+    this._endPan = (e) => {
+      if (this.pan && e.pointerId === this.pan.id) this.endPan();
+      if (this.touches?.delete(e.pointerId) && this.pinch && this.touches.size < 2) this.endPinch(); // doigt levé hors de la page
+    };
+    this._wheel = (e) => this.wheelZoom(e);
+    this.sc.addEventListener('wheel', this._wheel, { passive: false });
     window.addEventListener('pointerup', this._endPan);
     window.addEventListener('pointercancel', this._endPan);
     this.ro = new ResizeObserver(() => this.resize());
@@ -213,7 +218,65 @@ export class InkEditor {
     for (const [k, fn] of Object.entries(this._h)) this.canvas.removeEventListener(k, fn);
     window.removeEventListener('pointerup', this._endPan);
     window.removeEventListener('pointercancel', this._endPan);
+    this.sc.removeEventListener('wheel', this._wheel);
     cancelAnimationFrame(this.momentum);
+  }
+
+  /* ---------- Zoom : pincer à deux doigts (ou Ctrl + molette / pavé tactile) ---------- */
+  // Pendant le geste : simple agrandissement CSS (fluide) ; au relâchement : la page est redessinée nette.
+  startPinch() {
+    this.pan = null;
+    cancelAnimationFrame(this.momentum);
+    const [a, b] = [...this.touches.values()];
+    const r = this.canvas.getBoundingClientRect();
+    const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2;
+    this.pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z0: this.zoom || 1, cx, cy, mx: 0, my: 0, f: 1,
+      px: (cx - r.left) / this.scale, py: (cy - r.top) / this.scale };
+    this.canvas.style.transformOrigin = `${cx - r.left}px ${cy - r.top}px`;
+  }
+
+  movePinch() {
+    const p = this.pinch;
+    const [a, b] = [...this.touches.values()];
+    const z = Math.min(4, Math.max(1, (p.z0 * Math.hypot(a[0] - b[0], a[1] - b[1])) / p.d0));
+    p.f = z / p.z0;
+    p.mx = (a[0] + b[0]) / 2 - p.cx;
+    p.my = (a[1] + b[1]) / 2 - p.cy;
+    this.canvas.style.transform = `translate(${p.mx}px, ${p.my}px) scale(${p.f})`;
+  }
+
+  endPinch() {
+    const p = this.pinch;
+    if (!p) return;
+    this.pinch = null;
+    this.canvas.style.transform = '';
+    this.setZoom(p.z0 * p.f, p.cx + p.mx, p.cy + p.my, p.px, p.py);
+  }
+
+  /** Change le zoom en gardant le point (px, py) de la page sous (clientX, clientY). */
+  setZoom(z, clientX, clientY, px, py) {
+    this.zoom = Math.min(4, Math.max(1, z));
+    if (this.zoom < 1.05) this.zoom = 1;
+    this.sc.classList.toggle('ink-zoomed', this.zoom > 1);
+    this.resize(true);
+    const r = this.canvas.getBoundingClientRect();
+    this.sc.scrollLeft += r.left + px * this.scale - clientX;
+    this.sc.scrollTop += r.top + py * this.scale - clientY;
+  }
+
+  wheelZoom(e) {
+    if (!e.ctrlKey) return; // Ctrl + molette, ou pincer sur le pavé tactile (le navigateur ajoute Ctrl)
+    e.preventDefault();
+    const w = this.wz || (this.wz = { f: 1, x: 0, y: 0 });
+    w.f *= Math.exp(-e.deltaY * 0.01);
+    w.x = e.clientX; w.y = e.clientY;
+    if (w.raf) return;
+    w.raf = requestAnimationFrame(() => {
+      const r = this.canvas.getBoundingClientRect();
+      const px = (w.x - r.left) / this.scale, py = (w.y - r.top) / this.scale;
+      this.setZoom((this.zoom || 1) * w.f, w.x, w.y, px, py);
+      this.wz = null;
+    });
   }
 
   /* ---------- Défilement au doigt (avec élan) ---------- */
@@ -257,7 +320,7 @@ export class InkEditor {
   /* ---------- Taille & rendu ---------- */
   resize(force = false) {
     const avail = this.sc.clientWidth - 24;
-    const w = Math.round(Math.max(300, Math.min(avail, 1200)));
+    const w = Math.round(Math.max(300, Math.min(avail, 1200)) * (this.zoom || 1)); // zoom : pincer à deux doigts
     const h = Math.round((this.H * w) / PAGE_W);
     if (!force && w === this.cssW && h === this.cssH) return;
     this.cssW = w;
@@ -430,6 +493,15 @@ export class InkEditor {
       const hovering = now - this.lastPenHover < 600;
       const palm = Math.max(e.width || 0, e.height || 0) > 40;
       if (penBusy || (hovering && palm)) { e.preventDefault(); return; }
+      // Deux doigts : pincer pour zoomer (remplace le défilement)
+      (this.touches ||= new Map()).set(e.pointerId, [e.clientX, e.clientY]);
+      if (this.touches.size === 2 && !this.active && !this.erasing) {
+        e.preventDefault();
+        this.capture(e);
+        this.startPinch();
+        return;
+      }
+      if (this.pinch) { e.preventDefault(); return; }
       const onImage = this.tool === 'select' && this.imageAt(...this.pos(e));
       if (!this.fingerDraws && !onImage) {
         e.preventDefault();
@@ -469,6 +541,10 @@ export class InkEditor {
 
   move(e) {
     if (e.pointerType === 'pen' && !this.active && !this.erasing) this.lastPenHover = performance.now();
+    if (e.pointerType === 'touch' && this.touches?.has(e.pointerId)) {
+      this.touches.set(e.pointerId, [e.clientX, e.clientY]);
+      if (this.pinch) { e.preventDefault(); this.movePinch(); return; }
+    }
     if (this.pan && e.pointerId === this.pan.id) {
       this.movePan(e);
       return;
@@ -496,6 +572,7 @@ export class InkEditor {
 
   up(e) {
     if (e.pointerType === 'pen') this.lastPenUp = performance.now();
+    if (e.pointerType === 'touch' && this.touches?.delete(e.pointerId) && this.pinch) { if (this.touches.size < 2) this.endPinch(); return; }
     if (this.pan && e.pointerId === this.pan.id) { this.endPan(); return; }
     if (this.drag && e.pointerId === this.drag.id) { this.boxUp(e); return; }
     if (this.erasing && e.pointerId === this.erasing.id) {

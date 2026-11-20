@@ -175,7 +175,7 @@ function shopFor(day) {
    ========================================================= */
 const bonusText = (b) => Object.entries(b).map(([k, v]) => `+${v} ${STATS.find((x) => x.id === k).icon}`).join(' ');
 const itemCard = (it, extra = '') => `<div class="rpg-item" style="--rc:${RARITY[it.rarity].color}">
-  <span class="rpg-item-ico">${it.icon}</span><span class="rpg-item-txt"><b>${esc(it.name)}</b><small>${RARITY[it.rarity].name} · ${SLOTS.find((x) => x.id === it.slot).name} · ${bonusText(it.bonus)}</small></span>${extra}</div>`;
+  <span class="rpg-item-ico">${AV.itemArt(it, 44)}</span><span class="rpg-item-txt"><b>${esc(it.name)}</b><small>${RARITY[it.rarity].name} · ${SLOTS.find((x) => x.id === it.slot).name} · ${bonusText(it.bonus)}</small></span>${extra}</div>`;
 
 export async function renderPage(ctx) {
   const { view, toast, modal } = ctx;
@@ -234,7 +234,7 @@ export async function renderPage(ctx) {
           ${chs.slice(0, 6).map((c) => `<div class="rpg-chest" style="--rc:${RARITY[c.rarity].color}"><span>${c.icon}</span><span class="rpg-item-txt"><b>${esc(c.name)}</b><small>${RARITY[c.rarity].name}</small></span><button class="btn primary" data-chest="${esc(c.key)}">Ouvrir</button></div>`).join('')}
           ${chs.length > 6 ? `<p class="hint muted">+ ${chs.length - 6} autres coffres</p>` : ''}</section>` : ''}
         <section class="card rpg-inv"><div class="card-head"><h2>🎒 Équipement</h2><span class="muted">${s.inv.length} objet${s.inv.length > 1 ? 's' : ''}</span></div>
-          <div class="rpg-slots">${SLOTS.map((sl) => `<div class="rpg-slot ${eqItems[sl.id] ? 'full' : ''}" style="--rc:${eqItems[sl.id] ? RARITY[eqItems[sl.id].rarity].color : 'var(--border)'}" title="${sl.name}"><span>${eqItems[sl.id] ? eqItems[sl.id].icon : sl.icon}</span><small>${sl.name}</small></div>`).join('')}</div>
+          <div class="rpg-slots">${SLOTS.map((sl) => `<div class="rpg-slot ${eqItems[sl.id] ? 'full' : ''}" style="--rc:${eqItems[sl.id] ? RARITY[eqItems[sl.id].rarity].color : 'var(--border)'}" title="${sl.name}"><span>${eqItems[sl.id] ? AV.itemArt(eqItems[sl.id], 40) : sl.icon}</span><small>${eqItems[sl.id] ? esc(eqItems[sl.id].name) : sl.name}</small></div>`).join('')}</div>
           <div class="rpg-items">${[...s.inv].sort((a, b) => Object.keys(RARITY).indexOf(ITEM[b.id].rarity) - Object.keys(RARITY).indexOf(ITEM[a.id].rarity)).map((x) => {
             const it = ITEM[x.id], on = s.equip?.[it.slot] === x.uid;
             return itemCard(it, `<span class="rpg-item-act">${on ? '<button class="btn sm-text on" data-unequip="' + it.slot + '">Équipé ✓</button>' : `<button class="btn sm-text" data-equip="${x.uid}">Équiper</button><button class="btn sm-text" data-sell="${x.uid}" title="Vendre">${Math.floor(RARITY[it.rarity].price / 3)} 🪙</button>`}</span>`);
