@@ -32,6 +32,7 @@ import * as activities from './activities.js';
 import * as reminders from './reminders.js';
 import * as rpg from './rpg.js';
 import * as couple from './couple.js';
+import * as quick from './quickadd.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -87,6 +88,138 @@ function confirmBox(message, okLabel = 'Supprimer') {
     obs.observe($('#modal-root'), { childList: true });
   });
 }
+
+/* ---------- ＋ Ajout rapide (bouton flottant sur cellulaire, touche N sur PC) — voir quickadd.js ---------- */
+function openQuickAdd(prefill = '') {
+  if ($('#modal-root').children.length) return;
+  let forced = null; // type choisi à la main (sinon deviné)
+  modal(`<div class="qa-head"><h2>＋ Ajout rapide</h2><button class="tm-close" data-close aria-label="Fermer">×</button></div>
+    <textarea id="qa-t" rows="2" autofocus placeholder="« Appeler le garage demain », « 12 $ Tim », « acheter lait, pain », « idée : … »" enterkeyhint="done" autocapitalize="sentences">${esc(prefill)}</textarea>
+    <div class="qa-types" role="radiogroup" aria-label="Type">${quick.TYPES.map(([k, e, l]) => `<button type="button" role="radio" data-qt="${k}" class="chip">${e} ${l}</button>`).join('')}</div>
+    <p class="qa-prev" aria-live="polite"></p>
+    <div class="modal-actions"><span class="qa-hint muted">Entrée pour ajouter · Maj + Entrée : nouvelle ligne</span><button class="btn primary" id="qa-ok">Ajouter</button></div>`, (m, close) => {
+    m.classList.add('qa-modal');
+    const ta = m.querySelector('#qa-t'), prev = m.querySelector('.qa-prev'), ok = m.querySelector('#qa-ok');
+    const fmtDay = (iso, word) => (iso === U.iso(new Date()) ? 'aujourd’hui' : word || U.fmtShort(U.parseISO(iso)));
+    const draw = () => {
+      const type = forced || quick.guess(ta.value);
+      const p = quick.parse(ta.value, type);
+      m.querySelectorAll('[data-qt]').forEach((b) => { b.classList.toggle('on', b.dataset.qt === type); b.setAttribute('aria-checked', b.dataset.qt === type); });
+      ok.disabled = !p.ok;
+      prev.innerHTML = !ta.value.trim() ? '<span class="muted">Écris, l’app devine : mission, note, dépense ou achat.</span>'
+        : p.type === 'task' ? `✅ Mission <b>${esc(p.title)}</b> · ${esc(fmtDay(p.date, p.word))}`
+        : p.type === 'note' ? `🧠 Note dans le Cerveau (À classer)`
+        : p.type === 'shop' ? `🛒 ${p.items.length > 1 ? `${p.items.length} articles` : 'Article'} : <b>${esc(p.items.join(', '))}</b>`
+        : p.ok ? `💸 Dépense <b>${finance.$$$(p.amount)}</b> · ${esc(p.name)} · ${esc(fmtDay(p.date, p.word))}` : '<span class="muted">💸 Ajoute un montant, ex. « 12 $ Tim »</span>';
+    };
+    m.querySelectorAll('[data-qt]').forEach((b) => (b.onclick = () => { forced = b.dataset.qt; draw(); ta.focus(); }));
+    ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; draw(); };
+    ta.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ok.click(); } };
+    ok.onclick = async () => {
+      const p = quick.parse(ta.value, forced || quick.guess(ta.value));
+      if (!p.ok) return;
+      ok.disabled = true;
+      try {
+        let msg, route;
+        if (p.type === 'task') { await addTask(p.title, p.date); msg = `✅ Mission « ${p.title} » ajoutée (${fmtDay(p.date, p.word)})`; route = ['today', 'missions', 'week', 'month']; }
+        else if (p.type === 'note') { await brain.capture(p.text); msg = '🧠 Note ajoutée au Cerveau (À classer)'; route = ['brain']; }
+        else if (p.type === 'shop') { const n = await finance.addShopItems(p.items); msg = n ? `🛒 ${n > 1 ? `${n} articles ajoutés` : 'Article ajouté'} à la liste d’achats` : '🛒 Déjà sur ta liste d’achats'; route = ['today', 'finance']; }
+        else { await finance.addExpense(p); msg = `💸 Dépense de ${finance.$$$(p.amount)} ajoutée (${p.name})`; route = ['today', 'finance']; }
+        close();
+        toast(msg);
+        if (route.includes(location.hash.replace(/^#\/?/, '').split('/')[0] || 'today')) router();
+      } catch (err) { ok.disabled = false; toast(err.message, 'err'); }
+    };
+    draw();
+    if (prefill) ta.setSelectionRange(ta.value.length, ta.value.length);
+  });
+}
+/* ---------- 🔍 Recherche globale (Ctrl + K, « / », bouton loupe, ou « Plus » sur cellulaire) ---------- */
+const SEARCH_PAGES = [
+  ['Aujourd’hui', '#/today', '☀️'], ['Missions', '#/missions', '✅'], ['Objectifs', '#/goals', '🎯'], ['Projets', '#/projects', '🚀'],
+  ['Cerveau', '#/brain', '🧠'], ['Actualités', '#/news', '📰'], ['Carnet', '#/notebook', '✏️'], ['Agenda (semaine)', '#/week', '📅'],
+  ['Mois', '#/month', '🗓'], ['Année', '#/year', '🗓'], ['Journal', '#/journal', '📔'], ['Finances', '#/finance/apercu', '💰'],
+  ['Budget', '#/finance/budget', '🎯'], ['Transactions', '#/finance/transactions', '🧾'], ['Paiements à venir', '#/finance/avenir', '📅'],
+  ['Abonnements', '#/finance/abos', '🔁'], ['Liste d’achats', '#/finance/achats', '🛒'], ['Workout', '#/workout', '🏋️'],
+  ['Étirements', '#/stretch', '🧘'], ['Habitudes', '#/habits', '🔁'], ['Cours RBQ', '#/rbq', '📘'], ['Ton héros', '#/hero', '🦸'],
+  ['Réglages', '#/settings', '⚙'], ['Historique des modifications', '#/changelog', '🕘'], ['Ton utilisation', '#/usage', '📊'],
+];
+const fold = (s = '') => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+async function openSearch() {
+  if ($('#modal-root').children.length) return;
+  const [tasks, notes, goals, txs] = await Promise.all(['tasks', 'notes', 'goals', 'money'].map((s) => db.all(s).catch(() => [])));
+  let items = [], sel = 0;
+  modal(`<div class="gs-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+      <input id="gs-q" type="text" enterkeyhint="search" autofocus autocomplete="off" placeholder="Rechercher missions, notes, objectifs, dépenses, pages…" aria-label="Rechercher">
+      <button class="tm-close" data-close aria-label="Fermer">×</button></div>
+    <div class="gs-res" id="gs-res" role="listbox"></div>
+    <p class="gs-foot muted">↑ ↓ pour choisir · Entrée pour ouvrir · Échap pour fermer</p>`, (m, close) => {
+    m.classList.add('gs-modal');
+    const q = m.querySelector('#gs-q'), res = m.querySelector('#gs-res');
+    const go = (it) => { close(); it.run(); };
+    const draw = () => {
+      const words = fold(q.value).split(/\s+/).filter(Boolean);
+      const hit = (...f) => { const s = fold(f.join(' ')); return words.every((w) => s.includes(w)); };
+      const groups = [];
+      const add = (label, list) => list.length && groups.push([label, list]);
+      if (!words.length) {
+        add('Missions à faire', tasks.filter((t) => !t.done).sort((a, b) => (a.date || '9').localeCompare(b.date || '9')).slice(0, 5).map((t) => ({ ico: '✅', t: t.title, s: t.date ? U.fmtShort(U.parseISO(t.date)) : '', run: () => openTaskFromSearch(t.id) })));
+        add('Pages', SEARCH_PAGES.slice(0, 8).map(([l, h, e]) => ({ ico: e, t: l, s: '', run: () => (location.hash = h) })));
+      } else {
+        add('Pages', SEARCH_PAGES.filter(([l]) => hit(l)).slice(0, 4).map(([l, h, e]) => ({ ico: e, t: l, s: 'Aller à la page', run: () => (location.hash = h) })));
+        add('Missions', tasks.filter((t) => hit(t.title, t.notes, ...(t.subtasks || []).map((s) => s.title))).sort((a, b) => a.done - b.done || (b.date || '').localeCompare(a.date || '')).slice(0, 6)
+          .map((t) => ({ ico: t.done ? '☑️' : '✅', t: t.title, s: [t.done ? 'faite' : '', t.date ? U.fmtShort(U.parseISO(t.date)) : ''].filter(Boolean).join(' · '), run: () => openTaskFromSearch(t.id) })));
+        add('Cerveau', notes.filter((n) => hit(n.title, n.body, ...(n.tags || []))).sort((a, b) => !!a.archived - !!b.archived || (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 6)
+          .map((n) => ({ ico: n.archived ? '🗄' : '🧠', t: n.title || brain.excerpt(n.body, 60) || 'Sans titre', s: n.archived ? 'archivée' : brain.excerpt((n.body || '').replace(/!\[[^\]]*\]\([^)]*\)/g, ''), 70), run: () => (location.hash = '#/note/' + n.id) })));
+        add('Objectifs', goals.filter((g) => hit(g.title, g.why)).slice(0, 4).map((g) => ({ ico: '🎯', t: g.title, s: `${g.progress || 0} %`, run: () => (location.hash = '#/goals') })));
+        const seen = new Set();
+        add('Dépenses', txs.filter((t) => hit(t.merchant, finance.catOf(t.cat).name)).sort((a, b) => b.date.localeCompare(a.date)).filter((t) => !seen.has(t.key) && seen.add(t.key)).slice(0, 4)
+          .map((t) => ({ ico: finance.catOf(t.cat).emoji, t: t.merchant, s: `${finance.$$$(t.amount)} · ${U.fmtShort(U.parseISO(t.date))}`, run: () => { finance.showTransactions(t.merchant, t.date); location.hash = location.hash === '#/finance/transactions' ? '#/finance' : '#/finance/transactions'; } })));
+      }
+      items = groups.flatMap(([, l]) => l);
+      sel = Math.min(sel, Math.max(0, items.length - 1));
+      let i = 0;
+      res.innerHTML = groups.map(([label, list]) => `<div class="gs-group">${esc(label)}</div>${list.map((it) => `<button type="button" role="option" class="gs-item ${i === sel ? 'on' : ''}" data-i="${i++}" aria-selected="${i - 1 === sel}"><span class="gs-ico">${it.ico}</span><span class="gs-txt"><b>${esc(it.t)}</b>${it.s ? `<small>${esc(it.s)}</small>` : ''}</span></button>`).join('')}`).join('')
+        || `<p class="empty-sm">Rien trouvé pour « ${esc(q.value)} ». <button type="button" class="link" id="gs-add">＋ L’ajouter</button></p>`;
+      res.querySelectorAll('[data-i]').forEach((b) => (b.onclick = () => go(items[Number(b.dataset.i)])));
+      res.querySelector('#gs-add')?.addEventListener('click', () => { const v = q.value; close(); openQuickAdd(v); });
+    };
+    const move = (d) => { if (!items.length) return; sel = (sel + d + items.length) % items.length; res.querySelectorAll('[data-i]').forEach((b) => { const on = Number(b.dataset.i) === sel; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); if (on) b.scrollIntoView({ block: 'nearest' }); }); };
+    q.oninput = () => { sel = 0; draw(); };
+    q.onkeydown = (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+      else if (e.key === 'Enter' && items[sel]) { e.preventDefault(); go(items[sel]); }
+    };
+    draw();
+  });
+}
+document.addEventListener('keydown', (e) => {
+  const typing = e.target.closest?.('input, textarea, select, [contenteditable]');
+  if (((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !document.body.classList.contains('ink-mode'))) {
+    e.preventDefault();
+    openSearch(); // ne s'ouvre pas par-dessus une autre fenêtre
+  }
+});
+/** Ouvre une mission depuis la recherche : la page se rafraîchit une fois la fenêtre fermée (pas pendant). */
+function openTaskFromSearch(id) {
+  let changed = false;
+  openTaskEditor(id, () => { changed = true; });
+  const root = $('#modal-root');
+  const obs = new MutationObserver(() => { if (!root.children.length) { obs.disconnect(); if (changed && !document.body.classList.contains('ink-mode')) router(); } });
+  obs.observe(root, { childList: true });
+}
+$('#brand-search')?.addEventListener('click', () => openSearch());
+
+$('#qa-fab')?.addEventListener('click', () => openQuickAdd());
+$('#brand-add')?.addEventListener('click', () => openQuickAdd());
+// Touche N (ou +) : ajout rapide, sauf pendant une saisie, un dessin ou une fenêtre ouverte
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || (e.key !== 'n' && e.key !== 'N' && e.key !== '+')) return;
+  if (e.target.closest?.('input, textarea, select, [contenteditable], canvas') || document.body.classList.contains('ink-mode')) return;
+  e.preventDefault();
+  openQuickAdd();
+});
 
 function greeting() {
   const h = new Date().getHours();
@@ -4238,12 +4371,16 @@ $('#rail-more').onclick = () => {
     const on = b.classList.contains('active');
     return `<a href="${href}" data-close class="${on ? 'active' : ''}">${b.querySelector('svg').outerHTML}<span>${esc(b.getAttribute('aria-label'))}</span></a>`;
   }).join('');
-  modal(`<h2>Plus</h2><nav class="more-sheet">${launch}${links.map((a) => {
+  const search = `<a href="#" data-gs>${$('#brand-search svg').outerHTML}<span>Rechercher</span></a>`;
+  modal(`<h2>Plus</h2><nav class="more-sheet">${search}${launch}${links.map((a) => {
     const route = a.dataset.route;
     const label = route === 'hero' ? 'Ton héros' : a.querySelector('span')?.textContent || '';
     const icon = route === 'hero' ? (a.querySelector('svg.avatar')?.outerHTML || '') : a.querySelector('svg')?.outerHTML || '';
     return `<a href="${a.getAttribute('href')}" data-close class="${a.classList.contains('active') ? 'active' : ''}">${icon}<span>${esc(label)}</span></a>`;
-  }).join('')}</nav>`, (m, close) => $$('a', m).forEach((a) => a.addEventListener('click', close)));
+  }).join('')}</nav>`, (m, close) => {
+    $$('a', m).forEach((a) => a.addEventListener('click', close));
+    m.querySelector('[data-gs]').addEventListener('click', (e) => { e.preventDefault(); close(); openSearch(); });
+  });
 };
 
 // Plein écran : toute l'app, sans barres de Windows ni du navigateur (Échap ou le bouton pour sortir)

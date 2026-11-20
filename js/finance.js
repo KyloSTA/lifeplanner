@@ -50,7 +50,7 @@ const RULES = [
   [/dashpass|spotify|netflix|disney|crave|notion|anthropic|claude|openai|chatgpt|google \w*(services|g1|pliab|tivimate|youtube|one|storage)|tivimate|playstation|xbox|nintendo|apple\.com|icloud|prime video|patreon|twitch/, 'abonnements'],
   [/doordash|uber ?eats|ubereats|skip ?the ?dishes|skipthedishes/, 'livraison'],
   [/maxi|wal ?mart|walmart|iga\b|metro\b|super ?c\b|costco|provigo|adonis|marche|loblaws|avril/, 'epicerie'],
-  [/mcdonald|subway|tim ?hortons|starbucks|columbus|belle province|restaurant|resto|pizza|oeufrier|ben ?& ?florentine|ben florentine|cremerie|bar laitier|jugo|wetzel|amir|baran|marios|a&w|burger|poulet|sushi|cafe|frites|dairy queen|harvey|st-hubert bbq|boston pizza/, 'resto'],
+  [/mcdonald|mcdo\b|subway|tim ?hortons|^tim$|starbucks|columbus|belle province|restaurant|resto|pizza|oeufrier|ben ?& ?florentine|ben florentine|cremerie|bar laitier|jugo|wetzel|amir|baran|marios|a&w|burger|poulet|sushi|cafe|frites|dairy queen|harvey|st-hubert bbq|boston pizza/, 'resto'],
   [/sqdc|saq\b|saq\d|vape|vapo|vapeur|tabac|depanneur vape/, 'vape'],
   [/esso|petro|shell|ultramar|irving|impark|stationnement|parking|uber ?trip|ubertrip|uber canada\/uber\b|stm\b|rtl\b|exo\b|opus|bixi|communauto|saaq/, 'transport'],
   [/couche|couchetard|depanneur|boni ?soir|7 ?jours|7-eleven|bonisoir/, 'depanneur'],
@@ -232,6 +232,11 @@ export async function importFiles(files) {
         if (p.pending && p.id !== t.id && p.src === t.src && p.key === t.key && p.amount === t.amount && Math.abs(U.parseISO(p.date) - U.parseISO(t.date)) <= 4 * 864e5 && !list.some((x) => x.id === p.id)) stale.push(p.id);
       }
     }
+    // Dépense entrée à la main (ajout rapide) qui arrive maintenant dans le relevé : même montant à ±4 jours -> on garde celle du relevé
+    for (const t of list.filter((x) => x.kind === 'depense')) {
+      const q = [...byId.values()].find((p) => p.src === 'manuel' && !stale.includes(p.id) && p.amount === t.amount && Math.abs(U.parseISO(p.date) - U.parseISO(t.date)) <= 4 * 864e5);
+      if (q) { stale.push(q.id); if (q.manual && !t.manual) { t.cat = q.cat; t.manual = true; } }
+    }
     if (toPut.length) await db.putMany('money', toPut);
     for (const id of new Set(stale)) { await db.del('money', id); byId.delete(id); }
     // Classement automatique amélioré depuis le dernier import : on reclasse ce qui n'a pas été choisi à la main
@@ -336,6 +341,8 @@ function recurring(all, m) {
 let month = null;
 let tab = 'apercu';
 let txFilter = { q: '', cat: '' };
+/** Recherche globale : ouvre les transactions filtrées sur un marchand (et le mois de la transaction). */
+export function showTransactions(q, date) { txFilter = { q, cat: '' }; tab = 'transactions'; if (date) month = ym(date); }
 
 export async function renderPage(ctx, arg) {
   const { view } = ctx;
@@ -346,14 +353,15 @@ export async function renderPage(ctx, arg) {
   const hasData = all.length > 0;
   const months = [...new Set(all.map((t) => ym(t.date)))].sort();
   const shop = tab === 'achats' || tab === 'avenir' || tab === 'abos'; // la liste d'achats et les paiements à venir ne dépendent pas des relevés
-  const tabsHTML = `<div class="seg" role="tablist">${[['apercu', '📊 Aperçu'], ['budget', '🎯 Budget'], ['transactions', '🧾 Transactions'], ['avenir', '📅 À venir'], ['abos', '🔁 Abonnements'], ['achats', '🛒 Achats']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
+  // Sur cellulaire : icône + nom court sous l'icône (les 6 onglets tiennent sans défiler)
+  const tabsHTML = `<div class="seg fi-tabs" role="tablist">${[['apercu', '📊', 'Aperçu', 'Aperçu'], ['budget', '🎯', 'Budget', 'Budget'], ['transactions', '🧾', 'Transactions', 'Dépenses'], ['avenir', '📅', 'À venir', 'À venir'], ['abos', '🔁', 'Abonnements', 'Abos'], ['achats', '🛒', 'Achats', 'À acheter']].map(([k, e, l, s]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" aria-label="${l}"><span class="fi-tab-ico">${e}</span> <span class="fi-tab-l">${l}</span><span class="fi-tab-s">${s}</span></button>`).join('')}</div>`;
 
   view.innerHTML = `
     <header class="page-head">
       <div><p class="eyebrow">Argent</p><h1>Finances</h1></div>
       <div class="head-actions">
-        <button class="btn" id="fi-auto" title="Import automatique depuis ton dossier Téléchargements et rappel hebdomadaire">⚙ Import auto</button>
-        <label class="btn primary" id="fi-import" title="Relevés .csv de ta banque (compte chèques, carte de crédit)"><input type="file" accept=".csv,text/csv" multiple hidden>⬆ Importer un relevé .csv</label>
+        <button class="btn" id="fi-auto" title="Import automatique depuis ton dossier Téléchargements et rappel hebdomadaire" aria-label="Import auto">⚙<span class="fi-long"> Import auto</span></button>
+        <label class="btn primary" id="fi-import" title="Relevés .csv de ta banque (compte chèques, carte de crédit)"><input type="file" accept=".csv,text/csv" multiple hidden>⬆ <span class="fi-long">Importer un relevé .csv</span><span class="fi-short">Relevé</span></label>
       </div>
     </header>
     <div id="fi-autobar"></div>
@@ -783,6 +791,25 @@ async function drawSubs(ctx, el, all) {
     ctx.toast(`« ${x.name} » masqué des abonnements`);
     redraw();
   }));
+}
+
+/* ---------- Ajout rapide (bouton ＋ / touche N) ---------- */
+/** Dépense entrée à la main (ex. comptant). Remplacée par la vraie transaction quand le relevé est importé. */
+export async function addExpense({ name, amount, date = U.iso(new Date()) }) {
+  const rules = await db.get('settings', 'moneyRules');
+  const t = { id: 'q' + U.uid(), src: 'manuel', account: 'Ajout rapide', date, time: '', kind: 'depense', merchant: name.slice(0, 40), key: merchantKey(name), amount: -Math.abs(amount), pending: false, raw: 'Ajout rapide' };
+  t.cat = defaultCat(t, rules);
+  await db.put('money', t);
+  return t;
+}
+/** Ajoute des articles à la liste d'achats (ceux déjà sur la liste ne sont pas doublés). */
+export async function addShopItems(names) {
+  const cur = await shopLoad();
+  const open = new Set(cur.filter((x) => !x.del && !x.done).map((x) => x.name.toLowerCase()));
+  const add = names.map((n) => n.trim()).filter((n) => n && !open.has(n.toLowerCase()));
+  for (const name of add) cur.push({ id: U.uid(), name, qty: 1, price: 0, cat: guessCat(name), done: false, at: Date.now() });
+  if (add.length) await shopSave(cur);
+  return add.length;
 }
 
 /** Carte « 🛒 Achats » de la page Aujourd'hui : prochains articles à cocher et ajout rapide. */

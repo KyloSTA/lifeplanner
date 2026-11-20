@@ -402,6 +402,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
   const back = host.firstElementChild;
   const box = back.firstElementChild;
   let closed = false;
+  let moreOpen = (() => { try { return !!localStorage.getItem('lp.tmMore'); } catch { return false; } })(); // « Plus d'options » ouvert la dernière fois
 
   const changed = () => { try { onChange(); } catch { /* la liste a pu disparaître */ } };
   const saveTitle = U.debounce(async (v) => { await editTask(id, (t) => { t.title = v; }); changed(); }, 400);
@@ -430,6 +431,17 @@ export async function openTaskEditor(id, onChange = () => {}) {
     const linked = (await db.all('notes')).filter((x) => (x.rel?.tasks || []).includes(t.id)); // y compris la note archivée devenue mission
     const linkedPages = (await db.all('pages')).filter((p) => (p.rel?.tasks || []).includes(t.id)); // pages manuscrites associées
     const remOn = !!(await db.get('settings', 'gcalReminders')); // rappels copiés dans Google Agenda
+    // Fenêtre allégée : l'essentiel (date, étapes, notes, photos) toujours visible ; le reste sous « Plus d'options »,
+    // sauf ce qui est déjà rempli (objectif, projet, alarme, minuteur en cours) qui reste visible.
+    const goalSel = `<label><span>🎯 Objectif</span><select class="tm-goal">${goalOptions(t.goalId)}</select></label>`;
+    const projSel = `<label><span>🚀 Projet</span><select class="tm-proj">${projectOptions(t.projectId)}</select></label>`;
+    const focusOn = timer.current()?.taskId === t.id;
+    const hasPics = (t.images || []).length > 0;
+    const photoAdd = `<div class="tm-img-add">
+          <label class="btn"><input type="file" accept="image/*" multiple hidden class="tm-img-file">📷 Ajouter une photo</label>
+          <button type="button" class="btn tm-img-paste" title="Coller une image copiée">📋 Coller</button>
+          <small class="muted">ou Ctrl + V n’importe où dans cette fenêtre</small>
+        </div>`;
     box.innerHTML = `
       <div class="tm-head">
         <input type="checkbox" class="tm-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie" title="Mission accomplie">
@@ -438,10 +450,34 @@ export async function openTaskEditor(id, onChange = () => {}) {
       </div>
       <div class="tm-meta">
         <label><span>📅 Date</span><input type="date" class="tm-date" value="${t.date || ''}"></label>
-        <label><span>🎯 Objectif</span><select class="tm-goal">${goalOptions(t.goalId)}</select></label>
-        <label><span>🚀 Projet</span><select class="tm-proj">${projectOptions(t.projectId)}</select></label>
+        ${t.goalId ? goalSel : ''}
+        ${t.projectId ? projSel : ''}
         ${couple.ON ? `<label><span>👤 Pour</span><select class="tm-who">${couple.whoOptions(t.who || '')}</select></label>` : ''}
       </div>
+      <section class="tm-sec">
+        <h3>Étapes ${subs.length ? `<span class="muted">${sd}/${subs.length}</span>` : ''}</h3>
+        ${subs.length ? `<div class="sub-bar"><i style="width:${Math.round((sd / subs.length) * 100)}%"></i></div>` : ''}
+        <ul class="subs">${subs.map((s) => `<li class="sub ${s.done ? 'done' : ''}" data-sid="${s.id}">
+          <label><input type="checkbox" ${s.done ? 'checked' : ''}><span>${esc(s.title)}</span></label>
+          <button class="x" aria-label="Supprimer l’étape">×</button></li>`).join('')}</ul>
+        <form class="add-sub"><input name="s" placeholder="+ Ajouter une étape…" autocomplete="off"></form>
+      </section>
+      <section class="tm-sec">
+        <h3>Notes</h3>
+        <textarea class="notes" placeholder="Notes, détails, liens…">${esc(t.notes || '')}</textarea>
+      </section>
+      ${hasPics ? `<section class="tm-sec tm-photos">
+        <h3>📷 Photos <span class="muted">${t.images.length}</span></h3>
+        <div class="tm-imgs">${t.images.map((im) => `<figure class="tm-img"><img data-img="${im}" alt="Photo de la mission" title="Agrandir"><button class="x" data-rmimg="${im}" aria-label="Retirer la photo">×</button></figure>`).join('')}</div>
+        ${photoAdd}
+      </section>` : ''}
+      ${linked.length ? `<section class="tm-sec"><h3>🧠 Notes du Cerveau <span class="muted">${linked.length}</span></h3>
+        <div class="assoc-list">${linked.map((x) => `<a class="assoc-chip" href="#/note/${x.id}" data-go="${x.id}">${esc(x.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
+      ${linkedPages.length ? `<section class="tm-sec"><h3>✍️ Pages manuscrites <span class="muted">${linkedPages.length}</span></h3>
+        <div class="assoc-list">${linkedPages.map((p) => `<a class="assoc-chip" href="#/page/${encodeURIComponent(p.id)}" data-go-page="${esc(p.id)}">✍️ ${esc(p.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
+      <details class="tm-more" ${moreOpen || t.alarmAt || focusOn ? 'open' : ''}>
+        <summary>⚙ Plus d’options <small class="muted">${[!t.goalId && 'objectif', !t.projectId && 'projet', !focusOn && 'minuteur', !t.alarmAt && 'alarme', !hasPics && 'photo', 'étape, événement'].filter(Boolean).join(', ')}</small></summary>
+        ${!t.goalId || !t.projectId ? `<div class="tm-meta">${t.goalId ? '' : goalSel}${t.projectId ? '' : projSel}</div>` : ''}
       <section class="tm-sec tm-focus">
         <h3>⏱ Minuteur de focus ${t.focusMin ? `<span class="muted">${t.pomodoros ? `🍅 ${t.pomodoros} · ` : ''}${t.focusMin} min de focus</span>` : ''}</h3>
         ${timer.current()?.taskId === t.id
@@ -466,37 +502,18 @@ export async function openTaskEditor(id, onChange = () => {}) {
         ${remOn ? (t.alarmAt ? '<p class="tm-rem muted">📱 Aussi dans ton Google Agenda : ton cellulaire sonnera même si l’app est fermée.</p>' : '')
           : '<p class="tm-rem muted">💡 Pour que l’alarme sonne même app fermée : Réglages → 🔔 Rappels fiables.</p>'}
       </section>
-      <section class="tm-sec">
-        <h3>Étapes ${subs.length ? `<span class="muted">${sd}/${subs.length}</span>` : ''}</h3>
-        ${subs.length ? `<div class="sub-bar"><i style="width:${Math.round((sd / subs.length) * 100)}%"></i></div>` : ''}
-        <ul class="subs">${subs.map((s) => `<li class="sub ${s.done ? 'done' : ''}" data-sid="${s.id}">
-          <label><input type="checkbox" ${s.done ? 'checked' : ''}><span>${esc(s.title)}</span></label>
-          <button class="x" aria-label="Supprimer l’étape">×</button></li>`).join('')}</ul>
-        <form class="add-sub"><input name="s" placeholder="+ Ajouter une étape…" autocomplete="off"></form>
-      </section>
-      <section class="tm-sec">
-        <h3>Notes</h3>
-        <textarea class="notes" placeholder="Notes, détails, liens…">${esc(t.notes || '')}</textarea>
-      </section>
-      <section class="tm-sec tm-photos">
-        <h3>📷 Photos ${(t.images || []).length ? `<span class="muted">${t.images.length}</span>` : ''}</h3>
-        ${(t.images || []).length ? `<div class="tm-imgs">${t.images.map((im) => `<figure class="tm-img"><img data-img="${im}" alt="Photo de la mission" title="Agrandir"><button class="x" data-rmimg="${im}" aria-label="Retirer la photo">×</button></figure>`).join('')}</div>` : ''}
-        <div class="tm-img-add">
-          <label class="btn"><input type="file" accept="image/*" multiple hidden class="tm-img-file">📷 Ajouter une photo</label>
-          <button type="button" class="btn tm-img-paste" title="Coller une image copiée">📋 Coller</button>
-          <small class="muted">ou Ctrl + V n’importe où dans cette fenêtre</small>
-        </div>
-      </section>
-      ${linked.length ? `<section class="tm-sec"><h3>🧠 Notes du Cerveau <span class="muted">${linked.length}</span></h3>
-        <div class="assoc-list">${linked.map((x) => `<a class="assoc-chip" href="#/note/${x.id}" data-go="${x.id}">${esc(x.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
-      ${linkedPages.length ? `<section class="tm-sec"><h3>✍️ Pages manuscrites <span class="muted">${linkedPages.length}</span></h3>
-        <div class="assoc-list">${linkedPages.map((p) => `<a class="assoc-chip" href="#/page/${encodeURIComponent(p.id)}" data-go-page="${esc(p.id)}">✍️ ${esc(p.title || 'Sans titre')}</a>`).join('')}</div></section>` : ''}
-      <div class="modal-actions tm-actions">
-        <button class="btn danger tm-del">🗑 Supprimer</button>
+      ${hasPics ? '' : `<section class="tm-sec tm-photos"><h3>📷 Photos</h3>${photoAdd}</section>`}
+      <div class="tm-more-acts">
         <button class="btn tm-tostep" title="Faire de cette mission une étape d’une autre mission">↳ Devenir une étape</button>
         <button class="btn tm-toevent" title="Créer un événement Google Agenda à partir de cette mission">📅 En événement</button>
+      </div>
+      </details>
+      <div class="modal-actions tm-actions">
+        <button class="btn danger tm-del">🗑 Supprimer</button>
         <button class="btn primary tm-ok">Terminé</button>
       </div>`;
+    const more = box.querySelector('.tm-more');
+    more.ontoggle = () => { moreOpen = more.open; try { localStorage.setItem('lp.tmMore', moreOpen ? '1' : ''); } catch { /* stockage indisponible */ } };
 
     box.querySelectorAll('[data-go-page]').forEach((a) => (a.onclick = async (e) => { e.preventDefault(); await close(); location.hash = '#/page/' + encodeURIComponent(a.dataset.goPage); }));
     box.querySelectorAll('[data-go]').forEach((a) => (a.onclick = async (e) => { e.preventDefault(); await close(); location.hash = '#/note/' + a.dataset.go; }));
