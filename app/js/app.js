@@ -3134,6 +3134,25 @@ async function concludeGoal(id, after) {
 /* =========================================================
    Vue : Projets (onglet de Missions) — les notes 🚀 Projet du Cerveau ; un projet épinglé est en focus
    ========================================================= */
+/* Cartes en focus (objectif, projet épinglé) : « Afficher toutes les missions » ou seulement les 4 prochaines.
+   Choix gardé sur cet appareil, carte par carte. */
+const FOCUS_ALL_KEY = 'lp.focusAll';
+const focusAll = () => { try { return new Set(JSON.parse(localStorage.getItem(FOCUS_ALL_KEY)) || []); } catch { return new Set(); } };
+function toggleFocusAll(id) {
+  const s = focusAll();
+  s.has(id) ? s.delete(id) : s.add(id);
+  try { localStorage.setItem(FOCUS_ALL_KEY, JSON.stringify([...s].slice(-50))); } catch { /* ignore */ }
+}
+const focusAllBtn = (id, all, n, needed) => (needed || all
+  ? `<button type="button" class="gf-all" data-fall="${esc(id)}" aria-expanded="${all}">${all ? '▴ Afficher seulement les prochaines' : `▾ Afficher toutes les missions (${n})`}</button>` : '');
+// Un seul gestionnaire pour toutes les pages (Objectifs, Projets) : on redessine la page ouverte
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-fall]');
+  if (!b) return;
+  toggleFocusAll(b.dataset.fall);
+  router();
+});
+
 /** Missions d'un projet (directes ou par ses objectifs), à faire d'abord, par date. */
 function projectMissions(pid, goals, tasks) {
   const gids = new Set(goals.filter((g) => g.projectId === pid).map((g) => g.id));
@@ -3164,7 +3183,9 @@ async function renderProjects() {
   const focusCard = (p) => {
     const st = brain.projectStats(p.id, goals, tasks);
     const ms = projectMissions(p.id, goals, tasks);
-    const next = ms.filter((t) => !t.done).slice(0, 4);
+    const all = focusAll().has(p.id);
+    const openMs = ms.filter((t) => !t.done), doneMs = ms.filter((t) => t.done);
+    const next = all ? [...openMs, ...doneMs] : openMs.slice(0, 4);
     const meta = [st.goals.length ? `${st.goals.length} objectif${st.goals.length > 1 ? 's' : ''}` : '', st.missions ? `${st.done}/${st.missions} missions` : 'aucune mission'].filter(Boolean).join(' · ');
     return `<section class="card gfocus pj-focus" data-pid="${p.id}">
       <div class="gf-head">
@@ -3172,8 +3193,9 @@ async function renderProjects() {
         <div class="gf-txt"><p class="eyebrow">📌 Projet en focus</p><h2><a href="#/note/${p.id}">${esc(p.title || 'Projet sans titre')}</a></h2><p class="muted">${esc(meta)}</p></div>
         <button type="button" class="btn pj-unpin" title="Retirer le focus">☆ Désépingler</button>
       </div>
-      ${next.length ? `<p class="gf-label">Prochaines missions</p><ul class="tasks pj-tasks">${next.map((t) => taskHTML(t, today, { showDate: true, hideProject: true })).join('')}</ul>`
+      ${next.length ? `<p class="gf-label">${all ? 'Toutes les missions' : 'Prochaines missions'}</p><ul class="tasks pj-tasks">${next.map((t) => taskHTML(t, today, { showDate: true, hideProject: true })).join('')}</ul>`
         : `<p class="empty-sm">${st.missions ? 'Toutes les missions sont faites : ajoute la suite.' : 'Découpe ce projet en missions : la première étape commence ici.'}</p>`}
+      ${focusAllBtn(p.id, all, ms.length, openMs.length > 4 || doneMs.length > 0)}
       <form class="add-mission pj-add"><input name="t" placeholder="Prochaine mission pour ce projet…" autocomplete="off"><input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
     </section>`;
   };
@@ -3315,7 +3337,9 @@ async function renderGoals() {
   const focusHTML = (() => {
     if (!fg) return '';
     const ms = tasks.filter((t) => t.goalId === fg.id);
-    const nextMs = ms.filter((t) => !t.done).sort(sortM).slice(0, 4);
+    const all = focusAll().has(fg.id);
+    const openMs = ms.filter((t) => !t.done).sort(sortM), doneMs = ms.filter((t) => t.done).sort(sortM);
+    const nextMs = all ? [...openMs, ...doneMs] : openMs.slice(0, 4);
     const proj = fg.projectId && allProjects.find((p) => p.id === fg.projectId);
     const meta = [ms.length ? `${ms.filter((t) => t.done).length}/${ms.length} missions` : 'aucune mission', fg.horizon ? HZ_LABEL[fg.horizon] : '', proj ? '🚀 ' + (proj.title || 'Projet') : ''].filter(Boolean);
     return `<section class="card gfocus" data-id="${fg.id}">
@@ -3324,8 +3348,9 @@ async function renderGoals() {
         <div class="gf-txt"><p class="eyebrow">⭐ Objectif en focus</p><h2>${esc(fg.title)}</h2><p class="muted">${esc(meta.join(' · '))}</p></div>
         <button type="button" class="btn gf-off" title="Retirer le focus">☆ Retirer</button>
       </div>
-      ${nextMs.length ? `<p class="gf-label">Prochaines missions</p><ul class="tasks" id="gf-tasks">${nextMs.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>`
+      ${nextMs.length ? `<p class="gf-label">${all ? 'Toutes les missions' : 'Prochaines missions'}</p><ul class="tasks" id="gf-tasks">${nextMs.map((t) => taskHTML(t, today, { hideGoal: true, showDate: true })).join('')}</ul>`
         : `<p class="empty-sm">${ms.length ? 'Toutes les missions sont faites : conclus l’objectif ou ajoute la suite.' : 'Découpe cet objectif en missions : la première étape commence ici.'}</p>`}
+      ${focusAllBtn(fg.id, all, ms.length, openMs.length > 4 || doneMs.length > 0)}
       <form class="add-mission gf-add"><input name="t" placeholder="Prochaine mission pour cet objectif…" autocomplete="off"><input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button></form>
     </section>`;
   })();

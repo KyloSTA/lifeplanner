@@ -2426,6 +2426,8 @@ h2 { font-weight: 600; }
 .gf-txt p.muted { margin: 2px 0 0; font-size: 13px; }
 .gf-label { margin: 4px 0 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .gf-add { display: flex; gap: 8px; }
+.gf-all { justify-self: start; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--gold-text, var(--accent)); cursor: pointer; }
+.gf-all:hover { text-decoration: underline; }
 .gf-add input[name="t"] { flex: 1; min-width: 0; }
 .gf-add input[type="date"] { width: auto; }
 @media (max-width: 600px) { .gf-head { flex-wrap: wrap; } .gf-head .gf-off { margin-left: auto; } .gf-add input[type="date"] { display: none; } }
