@@ -1603,7 +1603,8 @@ async function renderBrain() {
     bar.innerHTML = `
       <div class="bulk-top"><b>${n ? `${n} sélectionné${n > 1 ? 's' : ''}` : 'Touche des éléments pour les sélectionner'}</b>
         <button type="button" class="btn sm-text" data-b="all">Tout sélectionner (${brainState.order.length})</button>
-        ${n ? '<button type="button" class="btn sm-text" data-b="none">Aucun</button>' : ''}</div>
+        ${n ? '<button type="button" class="btn sm-text" data-b="none">Aucun</button>' : ''}
+        <button type="button" class="btn icon bulk-x" data-b="close" aria-label="Fermer la sélection" title="Fermer">×</button></div>
       <div class="bulk-acts">
         <select data-b="type" ${dis} aria-label="Changer le type"><option value="">Type…</option>${brain.TYPES.map((t) => `<option value="${t.id}">${t.icon} ${t.name}</option>`).join('')}</select>
         ${allProjects.length ? `<select data-b="proj" ${dis} aria-label="Associer à un projet"><option value="">Projet…</option>${allProjects.map((p) => `<option value="${p.id}">🚀 ${esc(p.title || 'Projet')}</option>`).join('')}</select>` : ''}
@@ -1624,6 +1625,7 @@ async function renderBrain() {
     const classify = (fn) => async (cur) => { fn(cur); cur.inbox = false; await brain.saveNote(cur); }; // classer = sortir de « À classer »
     bar.querySelector('[data-b="all"]').onclick = () => { brainState.order.forEach((id) => sel.add(id)); markSel(); drawBulk(); };
     bar.querySelector('[data-b="none"]')?.addEventListener('click', () => { sel.clear(); markSel(); drawBulk(); });
+    bar.querySelector('[data-b="close"]').onclick = () => { selecting = false; sel.clear(); markSel(); drawBulk(); };
     bar.querySelector('[data-b="type"]').onchange = (e) => { const t = e.target.value; if (t) each(classify((c) => { c.type = t; }), `${brain.typeOf(t).icon} ${brain.typeOf(t).name}`); };
     bar.querySelector('[data-b="proj"]')?.addEventListener('change', (e) => { const p = e.target.value; if (p) each(classify((c) => { c.rel ||= {}; c.rel.projects = [...new Set([...(c.rel.projects || []), p])]; }), '🚀 Associés au projet'); });
     // Cours RBQ : les éléments vont dans la cellule « 🧠 Du Cerveau » du module (comme « 🧷 Associé à »)
