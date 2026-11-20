@@ -2955,3 +2955,13 @@ body.ink-mode #to-top, body:has(#modal-root > *) #to-top { display: none; }
 @media (max-width: 600px) {
   #to-top { right: auto; left: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); width: 46px; height: 46px; }
 }
+
+/* Cerveau : « Consultés récemment » prend la même hauteur que la capture rapide */
+@media (min-width: 901px) {
+  .brain-aside { display: flex; flex-direction: column; }
+  .brain-aside > #c-redisc { flex: 1; display: flex; flex-direction: column; margin: 0; }
+  #c-redisc .rc-row { flex: 1; align-items: stretch; }
+  #c-redisc .rc-arrow { height: auto; min-height: 64px; }
+  #c-redisc .rc-row .redisc { display: flex; flex-direction: column; justify-content: center; }
+  #c-redisc > .empty-sm { flex: 1; display: grid; place-items: center; text-align: center; }
+}
