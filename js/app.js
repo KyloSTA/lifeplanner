@@ -100,35 +100,87 @@ function openQuickAdd(prefill = '', type = null) {
   modal(`<div class="qa-head"><h2>＋ Ajout rapide</h2><button class="tm-close" data-close aria-label="Fermer">×</button></div>
     <textarea id="qa-t" rows="2" autofocus placeholder="« Appeler le garage demain », « 12 $ Tim », « acheter lait, pain », « idée : … »" enterkeyhint="done" autocapitalize="sentences">${esc(prefill)}</textarea>
     <div class="qa-types" role="radiogroup" aria-label="Type">${quick.TYPES.map(([k, e, l]) => `<button type="button" role="radio" data-qt="${k}" class="chip">${e} ${l}</button>`).join('')}</div>
+    <div class="qa-pics" hidden></div>
     <p class="qa-prev" aria-live="polite"></p>
-    <div class="modal-actions"><span class="qa-hint muted">Entrée pour ajouter · Maj + Entrée : nouvelle ligne</span><button class="btn primary" id="qa-ok">Ajouter</button></div>`, (m, close) => {
+    <div class="modal-actions"><label class="btn qa-pic-btn" title="Ajouter une photo (ou colle-la avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden id="qa-file">📷</label><span class="qa-hint muted">Entrée pour ajouter · Ctrl + V : coller une photo</span><button class="btn primary" id="qa-ok">Ajouter</button></div>`, (m, close) => {
     m.classList.add('qa-modal');
-    const ta = m.querySelector('#qa-t'), prev = m.querySelector('.qa-prev'), ok = m.querySelector('#qa-ok');
+    const ta = m.querySelector('#qa-t'), prev = m.querySelector('.qa-prev'), ok = m.querySelector('#qa-ok'), picsEl = m.querySelector('.qa-pics');
     const fmtDay = (iso, word) => (iso === U.iso(new Date()) ? 'aujourd’hui' : word || U.fmtShort(U.parseISO(iso)));
+    // Photos collées (Ctrl + V) ou choisies (📷) : rangées tout de suite, jointes à la note ou à la mission
+    let pics = [], saved = false;
+    const typeNow = () => forced || (pics.length && !ta.value.trim() ? 'note' : quick.guess(ta.value));
+    const parseNow = () => {
+      const type = typeNow();
+      if (type === 'note' && pics.length && !ta.value.trim()) return { type, ok: true, text: '' };
+      return quick.parse(ta.value, type);
+    };
+    const addPics = async (files) => {
+      if (!files.length) return;
+      try {
+        for (const f of files) pics.push(await images.save(f));
+        drawPics();
+        draw();
+      } catch (err) { toast('Image illisible : ' + err.message, 'err'); }
+    };
+    const drawPics = async () => {
+      picsEl.hidden = !pics.length;
+      picsEl.innerHTML = pics.map((id) => `<figure class="qa-pic"><img data-pic="${id}" alt="Photo"><button type="button" class="x" data-rm="${id}" aria-label="Retirer la photo">×</button></figure>`).join('');
+      for (const img of picsEl.querySelectorAll('[data-pic]')) img.src = (await images.url(img.dataset.pic)) || '';
+      picsEl.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { const id = b.dataset.rm; pics = pics.filter((x) => x !== id); images.removeUnused([id]); drawPics(); draw(); }));
+    };
+    ta.addEventListener('paste', (e) => {
+      const files = images.imageFiles(e.clipboardData);
+      if (!files.length) return;
+      e.preventDefault(); // une photo seule : on ne colle pas de texte
+      addPics(files);
+    });
+    m.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
+    m.addEventListener('drop', (e) => { const f = images.imageFiles(e.dataTransfer); if (f.length) { e.preventDefault(); addPics(f); } });
+    m.querySelector('#qa-file').onchange = (e) => { addPics([...e.target.files]); e.target.value = ''; ta.focus(); };
+    // Fenêtre fermée sans ajouter : les photos rangées pour rien sont retirées
+    const root = $('#modal-root');
+    const obs = new MutationObserver(() => { if (!root.contains(m)) { obs.disconnect(); if (!saved && pics.length) images.removeUnused(pics); } });
+    obs.observe(root, { childList: true });
     const draw = () => {
-      const type = forced || quick.guess(ta.value);
-      const p = quick.parse(ta.value, type);
+      const type = typeNow();
+      const p = parseNow();
       m.querySelectorAll('[data-qt]').forEach((b) => { b.classList.toggle('on', b.dataset.qt === type); b.setAttribute('aria-checked', b.dataset.qt === type); });
       ok.disabled = !p.ok;
-      prev.innerHTML = !ta.value.trim() ? '<span class="muted">Écris, l’app devine : mission, note, dépense ou achat.</span>'
+      const picNote = pics.length ? (['task', 'note'].includes(p.type) ? ` · 📷 ${pics.length > 1 ? `${pics.length} photos` : '1 photo'}` : ' · <span class="muted">(photos seulement pour une note ou une mission)</span>') : '';
+      prev.innerHTML = (!ta.value.trim() && !pics.length ? '<span class="muted">Écris, l’app devine : mission, note, dépense ou achat.</span>'
         : p.type === 'task' ? `✅ Mission <b>${esc(p.title)}</b> · ${esc(fmtDay(p.date, p.word))}`
         : p.type === 'note' ? `🧠 Note dans le Cerveau (À classer)`
         : p.type === 'shop' ? `🛒 ${p.items.length > 1 ? `${p.items.length} articles` : 'Article'} : <b>${esc(p.items.join(', '))}</b>`
-        : p.ok ? `💸 Dépense <b>${finance.$$$(p.amount)}</b> · ${esc(p.name)} · ${esc(fmtDay(p.date, p.word))}` : '<span class="muted">💸 Ajoute un montant, ex. « 12 $ Tim »</span>';
+        : p.ok ? `💸 Dépense <b>${finance.$$$(p.amount)}</b> · ${esc(p.name)} · ${esc(fmtDay(p.date, p.word))}` : '<span class="muted">💸 Ajoute un montant, ex. « 12 $ Tim »</span>') + (ta.value.trim() || pics.length ? picNote : '');
     };
     m.querySelectorAll('[data-qt]').forEach((b) => (b.onclick = () => { forced = b.dataset.qt; draw(); ta.focus(); }));
     ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; draw(); };
     ta.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ok.click(); } };
     ok.onclick = async () => {
-      const p = quick.parse(ta.value, forced || quick.guess(ta.value));
+      const p = parseNow();
       if (!p.ok) return;
       ok.disabled = true;
       try {
         let msg, route;
-        if (p.type === 'task') { await addTask(p.title, p.date); msg = `✅ Mission « ${p.title} » ajoutée (${fmtDay(p.date, p.word)})`; route = ['today', 'missions', 'week', 'month']; }
-        else if (p.type === 'note') { await brain.capture(p.text); msg = '🧠 Note ajoutée au Cerveau (À classer)'; route = ['brain']; }
+        const ph = pics.length ? ` avec ${pics.length > 1 ? `${pics.length} photos` : 'sa photo'}` : '';
+        if (p.type === 'task') {
+          const t = await addTask(p.title, p.date);
+          if (pics.length) { const mt = await db.get('tasks', t.id); if (mt) { mt.images = [...(mt.images || []), ...pics]; await db.put('tasks', mt); } }
+          msg = `✅ Mission « ${p.title} » ajoutée${ph} (${fmtDay(p.date, p.word)})`; route = ['today', 'missions', 'week', 'month'];
+        } else if (p.type === 'note') {
+          if (pics.length) {
+            // 1re ligne = titre (sinon « Photo du … »), le reste + les photos = contenu
+            const [first = '', ...rest] = p.text.split('\n');
+            const title = first.trim() || `Photo du ${U.fmtShort(new Date())}`;
+            const body = [rest.join('\n').trim(), ...pics.map(images.refLine)].filter(Boolean).join('\n');
+            await brain.createNote({ title: title.slice(0, 80), body, type: 'idee', inbox: true });
+          } else await brain.capture(p.text);
+          msg = `🧠 Note ajoutée au Cerveau${ph} (À classer)`; route = ['brain'];
+        }
         else if (p.type === 'shop') { const n = await finance.addShopItems(p.items); msg = n ? `🛒 ${n > 1 ? `${n} articles ajoutés` : 'Article ajouté'} à la liste d’achats` : '🛒 Déjà sur ta liste d’achats'; route = ['today', 'finance']; }
         else { await finance.addExpense(p); msg = `💸 Dépense de ${finance.$$$(p.amount)} ajoutée (${p.name})`; route = ['today', 'finance']; }
+        // Photos non utilisées (dépense, achat) : retirées ; sinon gardées avec la note ou la mission
+        saved = ['task', 'note'].includes(p.type);
         close();
         toast(msg);
         if (route.includes(location.hash.replace(/^#\/?/, '').split('/')[0] || 'today')) router();
