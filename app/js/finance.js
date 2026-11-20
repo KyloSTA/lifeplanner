@@ -11,6 +11,7 @@
 import { db } from './db.js';
 import * as U from './util.js';
 import * as gcal from './gcal.js';
+import { showUndo } from './tasks.js';
 
 const { esc } = U;
 
@@ -386,6 +387,7 @@ export async function renderPage(ctx, arg) {
     renderPage(ctx);
   };
   $('#fi-import input').onchange = (e) => doImport(e.target.files);
+  view.querySelector('[data-fi-pick]')?.addEventListener('click', () => $('#fi-import input').click());
   $('#fi-auto').onclick = () => autoSettings(ctx, () => renderPage(ctx));
   // Dossier surveillé : nouveaux relevés importés à l'ouverture de la page
   (async () => {
@@ -506,7 +508,11 @@ async function drawShopping(ctx, el) {
   el.querySelectorAll('.sh-item').forEach((li) => {
     const id = li.dataset.id;
     li.querySelector('input[type="checkbox"]').onchange = (e) => edit(id, (x) => { x.done = e.target.checked; });
-    li.querySelector('[data-del]').onclick = () => edit(id, (x) => { x.del = true; });
+    li.querySelector('[data-del]').onclick = async () => {
+      const name = li.querySelector('.sh-link')?.textContent?.trim() || 'Article';
+      await edit(id, (x) => { x.del = true; });
+      showUndo(`🛒 « ${name} » retiré`, () => edit(id, (x) => { x.del = false; }), 5000);
+    };
   });
   el.querySelectorAll('[data-re]').forEach((b) => (b.onclick = async () => {
     const cur = await shopLoad();
@@ -519,10 +525,16 @@ async function drawShopping(ctx, el) {
   el.querySelector('#sh-clear')?.addEventListener('click', async () => {
     const cur = await shopLoad();
     const now = Date.now();
-    for (const x of cur) if (x.done && !x.del) { x.del = true; x.at = now; }
+    const ids = [];
+    for (const x of cur) if (x.done && !x.del) { x.del = true; x.at = now; ids.push(x.id); }
     await shopSave(cur);
-    ctx.toast('🛒 Achats retirés de la liste');
     redraw();
+    showUndo(`🛒 ${ids.length > 1 ? `${ids.length} achats retirés` : 'Achat retiré'} de la liste`, async () => {
+      const back = await shopLoad();
+      for (const x of back) if (ids.includes(x.id)) { x.del = false; x.at = Date.now(); }
+      await shopSave(back);
+      redraw();
+    }, 6000);
   });
 }
 
@@ -822,7 +834,7 @@ export async function shopCard(el) {
       <label class="sh-check"><input type="checkbox" aria-label="Acheté : ${esc(x.name)}"></label>
       <span class="sh-name"><a class="sh-link" href="https://www.amazon.ca/s?k=${encodeURIComponent(x.name)}" target="_blank" rel="noopener" title="Chercher « ${esc(x.name)} » sur Amazon">${esc(x.name)}</a>${Number(x.qty) > 1 ? ` <span class="sh-qty">×${Number(x.qty)}</span>` : ''}</span></li>`).join('')}</ul>
       ${todo.length > shown.length ? `<p class="muted sh-more"><a href="#/finance/achats">+ ${todo.length - shown.length} autre${todo.length - shown.length > 1 ? 's' : ''}</a></p>` : ''}`
-      : '<p class="empty-sm">Rien à acheter pour l’instant.</p>'}
+      : '<p class="empty-sm">Rien à acheter pour l’instant. <button type="button" class="link-btn" data-qa="acheter " data-qa-type="shop">＋ Ajouter un article</button></p>'}
     <form class="sh-quick"><input name="n" placeholder="+ Ajouter à la liste…" autocomplete="off" aria-label="Ajouter une chose à acheter"><button class="btn icon" aria-label="Ajouter">+</button></form>`;
   el.querySelectorAll('.sh-item input[type="checkbox"]').forEach((cb) => (cb.onchange = async () => {
     const id = cb.closest('.sh-item').dataset.id;
@@ -847,6 +859,10 @@ export async function shopCard(el) {
 function emptyState() {
   return `<section class="card fi-empty">
     <h2>Suis tes dépenses et garde le cap 💰</h2>
+    <div class="empty-acts">
+      <button class="btn primary" data-fi-pick>⬆ Importer mon premier relevé</button>
+      <button class="btn" data-qa="" data-qa-type="expense">＋ Entrer une dépense à la main</button>
+    </div>
     <ol>
       <li>Dans ton application bancaire, exporte l’historique de ton <b>compte chèques</b> (et de ta <b>carte de crédit</b>) en fichier <b>.csv</b>.</li>
       <li>Touche <b>⬆ Importer un relevé .csv</b> (ou glisse les fichiers sur cette page).</li>
@@ -1032,7 +1048,7 @@ function drawOverview(ctx, el, all, budget) {
     <div class="fi-grid">
       <section class="card fi-cats">
         <div class="card-head"><h2>Dépenses par catégorie</h2>${avg.months.length ? `<span class="muted" title="Moyenne de ${avg.months.map(monthName).join(', ')}">vs moyenne</span>` : ''}</div>
-        ${cats.length ? cats.map((c) => catRow(c)).join('') : '<p class="empty-sm">Aucune dépense ce mois-ci.</p>'}
+        ${cats.length ? cats.map((c) => catRow(c)).join('') : '<p class="empty-sm">Aucune dépense ce mois-ci. <button type="button" class="link-btn" data-qa="" data-qa-type="expense">＋ Entrer une dépense</button></p>'}
       </section>
       <div class="fi-side">
         <section class="card">

@@ -9,7 +9,7 @@ const BASE = CFG.base || '';
 const OWN = CFG.own || ['./', 'index.html', 'widget.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/logo.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 const SHARED = [
   'css/styles.css',
-  'js/config.js', 'js/couple.js', 'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js', 'js/habits.js', 'js/rbq.js', 'js/workout.js', 'js/images.js', 'js/missions.js', 'js/docs.js', 'js/assoc.js', 'js/news.js', 'js/reminders.js', 'js/rpg.js', 'js/rpg-data.js', 'js/habs.js', 'js/finance.js', 'js/usage.js', 'js/activities.js', 'js/linkmeta.js', 'js/teams.js', 'js/stretch.js', 'js/shots.js',
+  'js/config.js', 'js/couple.js', 'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js', 'js/habits.js', 'js/rbq.js', 'js/workout.js', 'js/images.js', 'js/missions.js', 'js/docs.js', 'js/assoc.js', 'js/news.js', 'js/reminders.js', 'js/rpg.js', 'js/rpg-data.js', 'js/habs.js', 'js/finance.js', 'js/usage.js', 'js/activities.js', 'js/linkmeta.js', 'js/teams.js', 'js/stretch.js', 'js/shots.js', 'js/quickadd.js', 'js/digest.js',
 ];
 const ASSETS = [...OWN, ...SHARED.map((a) => BASE + a)];
 
@@ -64,6 +64,14 @@ self.addEventListener('notificationclick', (e) => {
   e.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const app = wins.find((w) => !w.url.includes('widget')) || wins[0];
+    // Rappel groupé (plusieurs habitudes à la même heure) : « Tout fait » / « Dans 10 min » pour toutes
+    const ids = e.notification.data?.kind === 'habits' ? e.notification.data.ids || [] : [];
+    if (ids.length && (e.action === 'done' || e.action === 'snooze')) {
+      if (app) { ids.forEach((i) => app.postMessage({ type: 'habit-action', action: e.action, id: i })); return; }
+      if (e.action === 'done') { try { for (const i of ids) await markHabitDone(i); return; } catch { /* on ouvre l'app */ } }
+      await self.clients.openWindow('./#/today');
+      return;
+    }
     // Habitude : « ✓ Fait » et « Dans 10 min » agissent sans mettre l'app au premier plan
     if (habit && id && (e.action === 'done' || e.action === 'snooze')) {
       if (app) { app.postMessage({ type: 'habit-action', action: e.action, id }); return; }

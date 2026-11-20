@@ -33,6 +33,7 @@ import * as reminders from './reminders.js';
 import * as rpg from './rpg.js';
 import * as couple from './couple.js';
 import * as quick from './quickadd.js';
+import * as digest from './digest.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -90,9 +91,9 @@ function confirmBox(message, okLabel = 'Supprimer') {
 }
 
 /* ---------- ＋ Ajout rapide (bouton flottant sur cellulaire, touche N sur PC) — voir quickadd.js ---------- */
-function openQuickAdd(prefill = '') {
+function openQuickAdd(prefill = '', type = null) {
   if ($('#modal-root').children.length) return;
-  let forced = null; // type choisi à la main (sinon deviné)
+  let forced = type; // type choisi à la main (sinon deviné)
   modal(`<div class="qa-head"><h2>＋ Ajout rapide</h2><button class="tm-close" data-close aria-label="Fermer">×</button></div>
     <textarea id="qa-t" rows="2" autofocus placeholder="« Appeler le garage demain », « 12 $ Tim », « acheter lait, pain », « idée : … »" enterkeyhint="done" autocapitalize="sentences">${esc(prefill)}</textarea>
     <div class="qa-types" role="radiogroup" aria-label="Type">${quick.TYPES.map(([k, e, l]) => `<button type="button" role="radio" data-qt="${k}" class="chip">${e} ${l}</button>`).join('')}</div>
@@ -211,8 +212,49 @@ function openTaskFromSearch(id) {
 }
 $('#brand-search')?.addEventListener('click', () => openSearch());
 
+/* ---------- 🟢 Pastille de synchro (à côté du logo sur PC, sur « Plus » sur cellulaire) ---------- */
+function syncState() {
+  const s = sync.status();
+  if (!s.on) return { c: 'off', t: 'Synchro désactivée : clique pour l’activer (Réglages)' };
+  const age = s.last ? ago(s.last) : 'jamais';
+  if (s.status === 'login') return { c: 'bad', t: 'Connexion Google expirée : clique pour te reconnecter' };
+  if (s.status === 'permission') return { c: 'bad', t: 'Accès au Drive à autoriser : clique pour autoriser' };
+  if (s.status === 'error') return { c: 'bad', t: `Erreur de synchro (${s.error}) : clique pour réessayer` };
+  if (s.status === 'syncing') return { c: 'busy', t: 'Synchronisation en cours…' };
+  if (s.status === 'offline' || !navigator.onLine) return { c: 'warn', t: `Hors ligne : reprendra au retour d’internet · dernière synchro ${age}` };
+  if (!s.last || Date.now() - s.last > 6 * 3600e3) return { c: 'warn', t: `Dernière synchro ${age} : clique pour synchroniser` };
+  return { c: 'ok', t: `Synchro à jour · ${age} · clique pour synchroniser maintenant` };
+}
+function drawSyncDot() {
+  const { c, t } = syncState();
+  const dot = $('#sync-dot');
+  if (dot) { dot.dataset.s = c; dot.title = t; dot.setAttribute('aria-label', t); }
+  const more = $('#rail-more');
+  if (more) more.dataset.sync = c; // point sur « Plus » (cellulaire) quand il faut agir
+}
+async function syncDotClick() {
+  const s = sync.status();
+  if (!s.on) { location.hash = '#/settings'; return; }
+  if (s.status === 'login' || s.status === 'permission') { try { await gcal.connect(); } catch (err) { toast(err.message, 'err'); return; } }
+  const n = await sync.syncNow().catch(() => 0);
+  toast(sync.status().status === 'ok' ? (n ? `☁️ ${n} élément${n > 1 ? 's' : ''} reçu${n > 1 ? 's' : ''}` : '☁️ Tout est à jour') : '⚠️ ' + syncState().t);
+}
+sync.onStatus(drawSyncDot);
+addEventListener('online', drawSyncDot);
+addEventListener('offline', drawSyncDot);
+setInterval(drawSyncDot, 60_000); // « il y a 5 min » reste juste
+$('#sync-dot')?.addEventListener('click', syncDotClick);
+drawSyncDot();
+
 $('#qa-fab')?.addEventListener('click', () => openQuickAdd());
 $('#brand-add')?.addEventListener('click', () => openQuickAdd());
+// Écrans vides : un bouton data-qa ouvre l'ajout rapide déjà prérempli (data-qa-type = type imposé)
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-qa]');
+  if (!b) return;
+  e.preventDefault();
+  openQuickAdd(b.dataset.qa || '', b.dataset.qaType || null);
+});
 // Touche N (ou +) : ajout rapide, sauf pendant une saisie, un dessin ou une fenêtre ouverte
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || (e.key !== 'n' && e.key !== 'N' && e.key !== '+')) return;
@@ -461,7 +503,7 @@ async function taskCard(el, date) {
         </div></div>` : ''}
       <form class="add-row"><input name="t" placeholder="Ajouter une mission…" autocomplete="off"><button class="btn icon" aria-label="Ajouter">+</button></form>
       <ul class="tasks">${items.filter((t) => !t.done).map((t) => taskHTML(t, date)).join('')
-        || `<li class="empty-sm">${done ? '🎉 Tout est fait pour aujourd’hui !' : 'Rien de prévu pour l’instant.'}</li>`}</ul>
+        || `<li class="empty-sm">${done ? '🎉 Tout est fait pour aujourd’hui !' : 'Rien de prévu pour l’instant. <button type="button" class="link-btn" data-qa="" data-qa-type="task">＋ Ajouter une mission</button>'}</li>`}</ul>
       ${done ? `<details class="done-fold" ${localStorage.getItem('lp.doneOpen') === '1' ? 'open' : ''}>
         <summary>✓ Terminées <small>${done}</small></summary>
         <ul class="tasks">${items.filter((t) => t.done).map((t) => taskHTML(t, date)).join('')}</ul></details>` : ''}
@@ -1747,7 +1789,7 @@ async function renderBrain() {
     }).sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt - a.updatedAt));
     brainState.order = list.map((x) => x.id);
     $('#ng').innerHTML = list.map((x) => noteCard(x, projStats(x))).join('') || (notes.length || brainState.arch
-      ? `<p class="empty">${brainState.arch ? 'Aucune note archivée ne correspond.' : 'Aucune note ne correspond.'}</p>`
+      ? `<p class="empty">${brainState.arch ? 'Aucune note archivée ne correspond.' : 'Aucune note ne correspond.'}</p>${brainState.arch ? '' : '<p class="empty-acts"><button type="button" class="btn" data-qa="" data-qa-type="note">＋ Nouvelle note</button></p>'}`
       : `<div class="card brain-empty"><h2>Bienvenue dans ton second cerveau 🧠</h2>
           <p>Un endroit pour tout ce que tu ne veux pas oublier : idées, choses apprises, livres, citations, personnes, projets.</p>
           <ol><li><b>Capture</b> une idée en deux secondes, sans réfléchir où la ranger.</li>
@@ -1817,7 +1859,15 @@ async function renderBrain() {
     };
     bar.querySelector('[data-b="ok"]').onclick = () => each(classify(() => {}), '✓ Classés');
     bar.querySelector('[data-b="pin"]').onclick = () => each(async (c) => { c.pinned = true; await brain.saveNote(c, { touch: false }); }, '📌 Épinglés');
-    bar.querySelector('[data-b="arch"]').onclick = () => each(async (c) => { await brain.setArchived(c.id, !brainState.arch); }, brainState.arch ? '↩ Désarchivés' : '🗄 Archivés');
+    bar.querySelector('[data-b="arch"]').onclick = async () => {
+      const ids = [...sel], to = !brainState.arch;
+      for (const id of ids) await brain.setArchived(id, to);
+      await renderBrainKeep(ids);
+      showUndo(`${to ? '🗄 Archivés' : '↩ Désarchivés'} · ${ids.length} élément${ids.length > 1 ? 's' : ''}`, async () => {
+        for (const id of ids) await brain.setArchived(id, !to);
+        router();
+      }, 6000);
+    };
     const del = bar.querySelector('[data-b="del"]');
     del.onclick = async () => {
       if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = `Confirmer (${sel.size})`; return; }
@@ -2327,8 +2377,9 @@ async function renderNote(id) {
     Object.assign(n, await brain.setArchived(n.id, to)); // garde la copie en mémoire à jour
     if (to) {
       brainState.arch = false;
-      toast(`🗄 « ${n.title || 'Sans titre'} » archivée — retrouve-la dans Cerveau → Archives`);
+      const nid = n.id;
       location.hash = '#/brain';
+      showUndo(`🗄 « ${n.title || 'Sans titre'} » archivée`, async () => { await brain.setArchived(nid, false); location.hash = '#/note/' + nid; }, 6000);
     } else {
       toast(`↩ « ${n.title || 'Sans titre'} » est de retour dans le Cerveau`);
       renderNote(n.id);
@@ -4372,7 +4423,8 @@ $('#rail-more').onclick = () => {
     return `<a href="${href}" data-close class="${on ? 'active' : ''}">${b.querySelector('svg').outerHTML}<span>${esc(b.getAttribute('aria-label'))}</span></a>`;
   }).join('');
   const search = `<a href="#" data-gs>${$('#brand-search svg').outerHTML}<span>Rechercher</span></a>`;
-  modal(`<h2>Plus</h2><nav class="more-sheet">${search}${launch}${links.map((a) => {
+  const ss = syncState();
+  modal(`<h2>Plus</h2><button type="button" class="more-sync" data-s="${ss.c}" data-sync><i></i><span>${esc(ss.t)}</span></button><nav class="more-sheet">${search}${launch}${links.map((a) => {
     const route = a.dataset.route;
     const label = route === 'hero' ? 'Ton héros' : a.querySelector('span')?.textContent || '';
     const icon = route === 'hero' ? (a.querySelector('svg.avatar')?.outerHTML || '') : a.querySelector('svg')?.outerHTML || '';
@@ -4380,6 +4432,7 @@ $('#rail-more').onclick = () => {
   }).join('')}</nav>`, (m, close) => {
     $$('a', m).forEach((a) => a.addEventListener('click', close));
     m.querySelector('[data-gs]').addEventListener('click', (e) => { e.preventDefault(); close(); openSearch(); });
+    m.querySelector('[data-sync]').addEventListener('click', () => { close(); syncDotClick(); });
   });
 };
 
@@ -4474,7 +4527,7 @@ game.init().catch(console.error).finally(async () => {
   router();
   usage.start().catch(console.error);
   // Finances : rappel hebdomadaire (après la synchro, pour ne le créer qu'une fois) et import auto du dossier surveillé
-  sync.firstSync().then(() => finance.checkReminder()).catch(console.error);
+  sync.firstSync().then(() => { finance.checkReminder(); digest.start(); }).catch(console.error);
   // App couple : prénoms des deux et « qui utilise cet appareil » au premier lancement
   if (couple.ON) couple.setup(modal, { onDone: () => router() }).catch(console.error);
   if (couple.ON) document.addEventListener('click', (e) => { if (e.target.closest('#cp-edit')) couple.setup(modal, { force: true, onDone: () => router() }); });
