@@ -853,7 +853,20 @@ async function renderNote(id) {
     el.innerHTML = `<div class="card-head"><h2>🎯 Objectifs et missions du projet</h2>
         <span class="muted">${st.goals.length || st.direct.length ? `${st.pct} %${st.missions ? ` · ${st.done}/${st.missions} missions` : ''}` : ''}</span></div>
       ${st.goals.length || st.direct.length ? `<div class="xp-bar proj-bar"><i style="width:${st.pct}%"></i></div>` : '<p class="empty-sm">Ajoute des objectifs ou des missions à ce projet : son avancement les suivra.</p>'}
-      ${[...st.goals].sort(goalSort).map((g) => {
+      ${(() => {
+        // Objectifs en cours en haut ; ceux atteints (ou abandonnés) dans une section repliable
+        const sorted = [...st.goals].sort(goalSort);
+        const closed = sorted.filter((g) => g.done);
+        const active = sorted.filter((g) => !g.done);
+        const doneKey = 'done:' + n.id;
+        return active.map(goalBlock).join('')
+          + (closed.length ? `<details class="pg-done-fold" data-pgdone="${doneKey}" ${pgOpen().has(doneKey) ? 'open' : ''}>
+              <summary><span class="exp">›</span> 🏁 ${closed.length} objectif${closed.length > 1 ? 's' : ''} terminé${closed.length > 1 ? 's' : ''}</summary>
+              ${closed.map(goalBlock).join('')}
+            </details>` : '');
+      })()}
+      ${''}`;
+    function goalBlock(g) {
         const ms = tasks.filter((t) => t.goalId === g.id).sort(sortM);
         return `<div class="pgoal ${goalClass(g)}" data-gid="${g.id}">
           <div class="pg-head"><a href="#/goals" data-opengoal="${g.id}" title="Ouvrir dans Objectifs">${goalMark(g)}${esc(g.title)}</a>
@@ -879,7 +892,8 @@ async function renderNote(id) {
           <form class="add-mission pg-add" hidden><input name="t" placeholder="Mission pour cet objectif…" autocomplete="off">
             <input name="d" type="date" value="${today}" aria-label="Date prévue (facultatif)"><button class="btn icon" aria-label="Ajouter la mission">+</button>${QUICK_DATES}</form>
         </div>`;
-      }).join('')}
+    }
+    el.innerHTML += `
       <div class="pgoal pdirect">
         <div class="pg-head"><b>📋 Missions du projet</b><span class="muted">${st.direct.length ? `${st.direct.filter((t) => t.done).length}/${st.direct.length}` : ''}</span>
           <button class="btn icon sm pd-toggle" type="button" aria-label="Ajouter une mission au projet" title="Ajouter une mission">+</button></div>
@@ -898,6 +912,8 @@ async function renderNote(id) {
         ${others.map((g) => `<option value="${g.id}">${esc(g.title)}${g.projectId ? ' (déjà dans un autre projet)' : ''}</option>`).join('')}</select>` : ''}`;
 
     bindTaskList(el, drawProject);
+    // Section « objectifs terminés » : ouverte ou fermée, le choix est gardé (comme les missions d'un objectif)
+    $$('[data-pgdone]', el).forEach((d) => (d.ontoggle = () => { if (pgOpen().has(d.dataset.pgdone) !== d.open) togglePgOpen(d.dataset.pgdone); }));
     $$('.pg-add', el).forEach((f) => (f.onsubmit = async (e) => {
       e.preventDefault();
       const v = f.t.value.trim();
