@@ -2810,3 +2810,24 @@ body.ink-mode #qa-fab, body:has(#modal-root > *) #qa-fab { display: none; }
   .page-head:has(#fi-import) { flex-wrap: nowrap; align-items: center; }
   .page-head:has(#fi-import) .head-actions { flex-wrap: nowrap; }
 }
+
+/* 🟢 Pastille de synchro */
+.sync-dot i, .more-sync i { display: block; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+[data-s="ok"] > i { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+[data-s="warn"] > i { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); }
+[data-s="bad"] > i { background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 25%, transparent); animation: syncPulse 1.6s ease-in-out infinite; }
+[data-s="busy"] > i { background: var(--accent); animation: syncPulse 1s ease-in-out infinite; }
+[data-s="off"] > i { background: transparent; border: 2px solid var(--muted); }
+@keyframes syncPulse { 50% { opacity: .35; } }
+.more-sync { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.more-sync i { flex: none; }
+#rail-more { position: relative; }
+#rail-more[data-sync="bad"]::after, #rail-more[data-sync="warn"]::after { content: ''; position: absolute; top: 6px; right: calc(50% - 16px); width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--surface); }
+#rail-more[data-sync="bad"]::after { background: var(--danger); }
+#rail-more[data-sync="warn"]::after { background: var(--warn); }
+
+/* Écrans vides : une action proposée */
+.empty-acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 4px 0 14px; }
+.fi-empty .empty-acts { justify-content: flex-start; }
+.link-btn { border: 0; background: none; padding: 0; margin-left: 4px; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }

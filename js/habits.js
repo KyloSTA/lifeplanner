@@ -145,6 +145,21 @@ async function notify(h) {
     else new Notification('🔁 C’est l’heure de ton habitude', opts);
   } catch { /* notifications indisponibles */ }
 }
+/** Plusieurs habitudes à la même heure : une seule notification (au lieu d'une rafale). */
+async function notifyGroup(hs) {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker?.ready;
+    const title = `🔁 ${hs.length} habitudes à faire`;
+    const opts = {
+      body: hs.map((h) => `${h.emoji} ${h.name}`).join('\n'), tag: 'habit-group', renotify: true, requireInteraction: true,
+      icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { kind: 'habits', ids: hs.map((h) => h.id) },
+      actions: [{ action: 'done', title: '✓ Tout fait' }, { action: 'snooze', title: '⏰ Dans 10 min' }],
+    };
+    if (reg?.showNotification) await reg.showNotification(title, opts);
+    else new Notification(title, opts);
+  } catch { /* notifications indisponibles */ }
+}
 async function closeNotification(id) {
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
@@ -167,7 +182,7 @@ async function check() {
     const now = Date.now(), today = iso(new Date());
     const r = loadRem();
     const seen = await seenMap(); // rappels déjà vus sur un autre appareil (synchronisé)
-    let fired = false;
+    const ringing = [];
     for (const h of await list()) {
       if (!isDue(h, new Date()) || doneOn(h, today)) { pending.delete(h.id); continue; }
       const sz = r['snooze|' + h.id];
@@ -184,8 +199,12 @@ async function check() {
         if (now - at > GRACE) continue;
         ring = true;
       }
-      if (ring) { pending.set(h.id, now); notify(h); fired = true; }
+      if (ring) { pending.set(h.id, now); ringing.push(h); }
     }
+    // Une seule notification, même si plusieurs habitudes sonnent en même temps
+    if (ringing.length === 1) notify(ringing[0]);
+    else if (ringing.length > 1) notifyGroup(ringing);
+    const fired = ringing.length > 0;
     // On oublie les rappels des jours passés
     for (const k of Object.keys(r)) if (!k.startsWith('snooze|') && !k.includes(`|${today}|`)) delete r[k];
     saveRem(r);
@@ -384,7 +403,7 @@ export async function renderPage(ctx) {
   view.querySelector('.hb-details')?.addEventListener('toggle', (e) => { detailsOpen = e.target.open; });
   const todayEl = view.querySelector('#hb-today');
   todayEl.innerHTML = `<div class="card-head"><h2>Aujourd’hui</h2><span class="muted">${due.filter((h) => doneOn(h, day)).length}/${due.length}</span></div>
-    ${due.length ? `<div class="hb-list">${due.map((h) => chip(h, day)).join('')}</div>` : '<p class="empty-sm">Rien de prévu aujourd’hui.</p>'}`;
+    ${due.length ? `<div class="hb-list">${due.map((h) => chip(h, day)).join('')}</div>` : '<p class="empty-sm">Rien de prévu aujourd’hui. <a href="#/habits">＋ Créer une habitude</a></p>'}`;
   bindChips(todayEl, day, redraw);
 
   view.querySelector('#hb-new').onclick = () => editor(ctx, null, redraw);
