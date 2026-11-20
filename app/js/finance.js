@@ -10,6 +10,7 @@
 
 import { db } from './db.js';
 import * as U from './util.js';
+import * as gcal from './gcal.js';
 
 const { esc } = U;
 
@@ -338,14 +339,14 @@ let txFilter = { q: '', cat: '' };
 
 export async function renderPage(ctx, arg) {
   const { view } = ctx;
-  if (arg && ['apercu', 'budget', 'transactions', 'achats'].includes(arg)) tab = arg;
+  if (arg && ['apercu', 'budget', 'transactions', 'avenir', 'achats'].includes(arg)) tab = arg;
   const all = (await db.all('money')).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const budget = (await db.get('settings', 'budget')) || { cats: {}, savings: 0 };
   month ||= curMonth();
   const hasData = all.length > 0;
   const months = [...new Set(all.map((t) => ym(t.date)))].sort();
-  const shop = tab === 'achats'; // la liste d'achats ne dépend pas des relevés
-  const tabsHTML = `<div class="seg" role="tablist">${[['apercu', '📊 Aperçu'], ['budget', '🎯 Budget'], ['transactions', '🧾 Transactions'], ['achats', '🛒 Achats']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
+  const shop = tab === 'achats' || tab === 'avenir'; // la liste d'achats et les paiements à venir ne dépendent pas des relevés
+  const tabsHTML = `<div class="seg" role="tablist">${[['apercu', '📊 Aperçu'], ['budget', '🎯 Budget'], ['transactions', '🧾 Transactions'], ['avenir', '📅 À venir'], ['achats', '🛒 Achats']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
 
   view.innerHTML = `
     <header class="page-head">
@@ -399,6 +400,7 @@ export async function renderPage(ctx, arg) {
   drop.ondrop = (e) => { e.preventDefault(); drop.hidden = true; doImport(e.dataTransfer.files); };
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; renderPage(ctx); }));
   const body = $('#fi-body');
+  if (tab === 'avenir') return drawUpcoming(ctx, body, all);
   if (shop) return drawShopping(ctx, body);
   if (!hasData) return;
   $('#fi-prev').onclick = () => { month = monthsBack(month, 1); renderPage(ctx); };
@@ -513,6 +515,194 @@ async function drawShopping(ctx, el) {
     ctx.toast('🛒 Achats retirés de la liste');
     redraw();
   });
+}
+
+/* =========================================================
+   📅 À venir : paiements prévus (abonnements, versements, factures)
+   Réglage synchronisé « upcoming », fusionné article par article (comme la liste d'achats).
+   Paiement : { id, name, amount, date: 'AAAA-MM-JJ', recur: '' | 'weekly' | 'monthly' | 'yearly', until, note, source, at, del }
+   Suggestions en direct : événements de Google Agenda qui ressemblent à un paiement, et frais réguliers des relevés.
+   ========================================================= */
+const UP_KEY = 'upcoming';
+const RECUR = [['', 'Une fois'], ['weekly', 'Chaque semaine'], ['monthly', 'Chaque mois'], ['yearly', 'Chaque année']];
+const PAY_RE = /paiement|payment|facture|abonnement|loyer|hypoth|versement|renouvellement|assurance|prélèvement|prelevement/i;
+
+async function upLoad() { return (await db.get('settings', UP_KEY)) || []; }
+async function upSave(list) {
+  const limit = Date.now() - 120 * 864e5;
+  await db.put('settings', list.filter((x) => !x.del || (x.at || 0) > limit), UP_KEY);
+}
+const isoOf = (d) => U.iso(d);
+function nextDate(date, recur) {
+  const d = U.parseISO(date);
+  if (recur === 'weekly') return isoOf(U.addDays(d, 7));
+  if (recur === 'yearly') return isoOf(new Date(d.getFullYear() + 1, d.getMonth(), d.getDate()));
+  // Mensuel : même jour le mois suivant (le 31 devient le dernier jour du mois s'il est plus court)
+  const day = d.getDate(), n = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  n.setDate(Math.min(day, new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate()));
+  return isoOf(n);
+}
+/** Dates d'échéance d'un paiement entre deux dates (récurrence et date de fin incluses). */
+function occurrences(x, from, to) {
+  const out = [];
+  let d = x.date;
+  for (let i = 0; i < 60 && d <= to; i++) {
+    if (x.until && d > x.until) break;
+    if (d >= from) out.push(d);
+    if (!x.recur) break;
+    d = nextDate(d, x.recur);
+  }
+  return out;
+}
+const amountIn = (s = '') => {
+  const m = String(s).match(/(\d{1,5}(?:[.,]\d{2}))\s*\$|\$\s*(\d{1,5}(?:[.,]\d{2}))/);
+  return m ? Number((m[1] || m[2]).replace(',', '.')) : 0;
+};
+const sameName = (a, b) => { const n = (s) => String(s).toLowerCase().replace(/^paiement\s+/, '').replace(/\(.*?\)|[^a-z0-9à-ÿ ]/g, '').trim(); return n(a) && (n(a).includes(n(b)) || n(b).includes(n(a))); };
+
+async function drawUpcoming(ctx, el, all) {
+  const today = U.iso(new Date());
+  const in30 = U.iso(U.addDays(new Date(), 30)), in90 = U.iso(U.addDays(new Date(), 90));
+  const list = (await upLoad()).filter((x) => !x.del).sort((a, b) => a.date.localeCompare(b.date));
+  const total30 = list.reduce((n, x) => n + occurrences(x, today, in30).length * (Number(x.amount) || 0), 0);
+  const late = list.filter((x) => x.date < today);
+  const weekEnd = U.iso(U.addDays(new Date(), 7));
+  const groups = [
+    ['⚠ En retard', late],
+    ['Cette semaine', list.filter((x) => x.date >= today && x.date <= weekEnd)],
+    ['Dans les 30 jours', list.filter((x) => x.date > weekEnd && x.date <= in30)],
+    ['Plus tard', list.filter((x) => x.date > in30)],
+  ].filter(([, g]) => g.length);
+  const rl = (r) => RECUR.find(([k]) => k === r)?.[1] || '';
+  const when = (d) => { const n = Math.round((U.parseISO(d) - U.parseISO(today)) / 864e5); return n === 0 ? 'Aujourd’hui' : n === 1 ? 'Demain' : n < 0 ? `il y a ${-n} j` : `dans ${n} j`; };
+  const row = (x) => `<li class="up-item ${x.date < today ? 'late' : ''}" data-id="${x.id}">
+    <span class="up-date"><b>${U.parseISO(x.date).getDate()}</b><small>${U.parseISO(x.date).toLocaleDateString('fr-CA', { month: 'short' }).replace('.', '')}</small></span>
+    <span class="up-main"><b>${esc(x.name)}</b><small class="muted">${when(x.date)}${x.recur ? ` · ${rl(x.recur)}` : ''}${x.until ? ` jusqu’au ${U.fmtShort(U.parseISO(x.until))}` : ''}${x.note ? ` · ${esc(x.note)}` : ''}</small></span>
+    <span class="up-amt">${Number(x.amount) ? $$$(Number(x.amount)) : '—'}</span>
+    <span class="up-acts"><button class="btn sm" data-paid title="Payé${x.recur ? ' : passe à la prochaine échéance' : ''}">✓</button><button class="btn sm" data-edit aria-label="Modifier">✎</button><button class="btn sm" data-del aria-label="Retirer">×</button></span>
+  </li>`;
+
+  el.innerHTML = `
+    <div class="up-sum card"><div><b>${$$$(total30)}</b><small class="muted">à payer dans les 30 prochains jours</small></div>
+      <div><b>${list.length}</b><small class="muted">paiement${list.length > 1 ? 's' : ''} suivi${list.length > 1 ? 's' : ''}</small></div>
+      ${late.length ? `<div class="warn"><b>${late.length}</b><small>en retard</small></div>` : ''}
+      <span class="grow"></span>
+      <label class="btn" title="Importer une liste de paiements (.json)"><input type="file" id="up-imp" accept=".json,application/json" hidden>⬆ Importer</label>
+    </div>
+    <form class="card up-add" id="up-add">
+      <input name="n" placeholder="Nouveau paiement (ex. Loyer, Hydro, Netflix)…" required autocomplete="off">
+      <input name="a" type="number" min="0" step="0.01" placeholder="Montant $" aria-label="Montant">
+      <input name="d" type="date" value="${today}" aria-label="Date d’échéance">
+      <select name="r" aria-label="Récurrence">${RECUR.map(([k, l]) => `<option value="${k}" ${k === 'monthly' ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <button class="btn primary">Ajouter</button>
+    </form>
+    ${groups.map(([l, g]) => `<section class="card up-group"><h3>${l} <span class="muted">${g.length}</span></h3><ul class="up-list">${g.map(row).join('')}</ul></section>`).join('')
+      || '<p class="empty-sm">Aucun paiement à venir. Ajoute-en un ci-dessus, ou accepte les suggestions ci-dessous.</p>'}
+    <div id="up-sugg"></div>
+    <p class="hint muted">✓ marque un paiement comme payé : un paiement récurrent passe à sa prochaine échéance. Les suggestions viennent de ton Google Agenda (événements « Paiement… ») et des frais qui reviennent chaque mois dans tes relevés.</p>`;
+
+  const redraw = () => drawUpcoming(ctx, el, all);
+  const edit = async (id, fn) => { const cur = await upLoad(); const x = cur.find((i) => i.id === id); if (!x) return; fn(x); x.at = Date.now(); await upSave(cur); redraw(); };
+  const form = el.querySelector('#up-add');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const cur = await upLoad();
+    cur.push({ id: U.uid(), name: form.n.value.trim(), amount: Number(form.a.value) || 0, date: form.d.value || today, recur: form.r.value, until: '', note: '', source: 'manuel', at: Date.now() });
+    await upSave(cur);
+    ctx.toast('📅 Paiement ajouté');
+    redraw();
+  };
+  el.querySelectorAll('.up-item').forEach((li) => {
+    const id = li.dataset.id;
+    li.querySelector('[data-paid]').onclick = () => edit(id, (x) => {
+      const nx = x.recur ? nextDate(x.date, x.recur) : null;
+      if (nx && (!x.until || nx <= x.until)) x.date = nx; else x.del = true; // dernier versement payé : retiré
+    });
+    li.querySelector('[data-del]').onclick = async () => { if (await ctx.confirmBox('Retirer ce paiement de la liste ?', 'Retirer')) edit(id, (x) => { x.del = true; }); };
+    li.querySelector('[data-edit]').onclick = async () => {
+      const x = (await upLoad()).find((i) => i.id === id);
+      ctx.modal(`<h2>Modifier le paiement</h2><form class="form" id="up-ed">
+        <label>Nom<input name="n" value="${esc(x.name)}" required></label>
+        <label>Montant ($)<input name="a" type="number" min="0" step="0.01" value="${Number(x.amount) || ''}"></label>
+        <label>Prochaine échéance<input name="d" type="date" value="${x.date}" required></label>
+        <label>Récurrence<select name="r">${RECUR.map(([k, l]) => `<option value="${k}" ${k === (x.recur || '') ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>Dernier paiement (facultatif)<input name="u" type="date" value="${x.until || ''}"></label>
+        <label>Note<input name="o" value="${esc(x.note || '')}" autocomplete="off"></label>
+        <div class="modal-actions"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form>`, (m, close) => {
+        m.querySelector('#up-ed').onsubmit = async (e) => {
+          e.preventDefault();
+          const f = e.target;
+          close();
+          edit(id, (y) => { y.name = f.n.value.trim(); y.amount = Number(f.a.value) || 0; y.date = f.d.value; y.recur = f.r.value; y.until = f.u.value; y.note = f.o.value.trim(); });
+        };
+      });
+    };
+  });
+  // Importer une liste (.json) : { items: [...] } — les doublons (même nom et même date) sont ignorés
+  el.querySelector('#up-imp').onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      const items = Array.isArray(data) ? data : data.items || [];
+      const cur = await upLoad();
+      let added = 0;
+      for (const it of items) {
+        if (!it?.name || !/^\d{4}-\d{2}-\d{2}$/.test(it.date || '')) continue;
+        if (cur.some((x) => !x.del && sameName(x.name, it.name))) continue;
+        cur.push({ id: U.uid(), name: String(it.name).slice(0, 80), amount: Number(it.amount) || 0, date: it.date, recur: ['weekly', 'monthly', 'yearly'].includes(it.recur) ? it.recur : '', until: /^\d{4}-\d{2}-\d{2}$/.test(it.until || '') ? it.until : '', note: String(it.note || '').slice(0, 140), source: String(it.source || 'import'), at: Date.now() });
+        added++;
+      }
+      await upSave(cur);
+      ctx.toast(`📅 ${added} paiement${added > 1 ? 's' : ''} importé${added > 1 ? 's' : ''}${items.length - added ? ` · ${items.length - added} déjà suivi${items.length - added > 1 ? 's' : ''}` : ''}`);
+      redraw();
+    } catch { ctx.toast('Fichier illisible : choisis le fichier .json des paiements', 'err'); }
+  };
+
+  // Suggestions : Google Agenda (90 jours) et frais réguliers des relevés, pas encore suivis
+  (async () => {
+    const box = el.querySelector('#up-sugg');
+    const sugg = [];
+    try {
+      const from = new Date(), to = U.addDays(new Date(), 90);
+      let evs = [];
+      try { evs = await gcal.listEvents(from, to); } catch { evs = (await gcal.cachedEvents(from, to).catch(() => null)) || []; }
+      // Un même paiement qui revient plusieurs fois dans les 90 jours est mensuel
+      const byName = new Map();
+      for (const e of (Array.isArray(evs) ? evs : evs?.events || [])) {
+        const t = e.title || '';
+        if (!PAY_RE.test(t) || /^\s*\[?fait\]?/i.test(t)) continue;
+        const name = t.replace(/^paiement\s+/i, '').replace(/\s*\(\$?\s*[\d.,]+\s*\$?\)\s*$/, '').trim();
+        if (!name || list.some((x) => sameName(x.name, name))) continue;
+        const k = name.toLowerCase();
+        if (byName.has(k)) { byName.get(k).count++; continue; }
+        byName.set(k, { name, amount: amountIn(t) || amountIn(e.description), date: U.iso(new Date(e.start)), count: 1 });
+      }
+      for (const s of byName.values()) sugg.push({ name: s.name, amount: s.amount, date: s.date, recur: s.count > 1 ? 'monthly' : '', src: '📅 Agenda' });
+    } catch { /* agenda non connecté */ }
+    for (const r of recurring(all, curMonth())) {
+      if (list.some((x) => sameName(x.name, r.name)) || sugg.some((s) => sameName(s.name, r.name))) continue;
+      const last = all.filter((t) => t.key === r.key).map((t) => t.date).sort().pop();
+      if (!last) continue;
+      let d = nextDate(last, 'monthly');
+      while (d < today) d = nextDate(d, 'monthly');
+      sugg.push({ name: r.name, amount: Math.round(r.monthly * 100) / 100, date: d, recur: 'monthly', src: '🧾 Relevés' });
+    }
+    if (!sugg.length || !box.isConnected) return;
+    box.innerHTML = `<section class="card up-group up-sugg"><h3>💡 Suggestions <span class="muted">${sugg.length}</span></h3><ul class="up-list">${sugg.slice(0, 12).map((s, i) => `<li class="up-item">
+      <span class="up-date"><b>${U.parseISO(s.date).getDate()}</b><small>${U.parseISO(s.date).toLocaleDateString('fr-CA', { month: 'short' }).replace('.', '')}</small></span>
+      <span class="up-main"><b>${esc(s.name)}</b><small class="muted">${s.src}${s.recur ? ' · chaque mois' : ''}</small></span>
+      <span class="up-amt">${s.amount ? $$$(s.amount) : '—'}</span>
+      <span class="up-acts"><button class="btn sm primary" data-follow="${i}">+ Suivre</button></span></li>`).join('')}</ul></section>`;
+    box.querySelectorAll('[data-follow]').forEach((b) => (b.onclick = async () => {
+      const s = sugg[Number(b.dataset.follow)];
+      const cur = await upLoad();
+      cur.push({ id: U.uid(), name: s.name, amount: s.amount || 0, date: s.date, recur: s.recur, until: '', note: '', source: s.src, at: Date.now() });
+      await upSave(cur);
+      ctx.toast(`📅 « ${s.name} » suivi`);
+      redraw();
+    }));
+  })();
 }
 
 /** Carte « 🛒 Achats » de la page Aujourd'hui : prochains articles à cocher et ajout rapide. */
