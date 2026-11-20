@@ -126,6 +126,11 @@ body.ink-mode main { padding: 0; overflow: hidden; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
 .eyebrow { margin: 0 0 2px; color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
 .head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Aujourd'hui : bouton image du journal (écrire à la main) */
+.journal-btn { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px 6px; border-radius: 12px; color: var(--gold-text, var(--gold)); text-decoration: none; transition: transform .12s, background .12s; }
+.journal-btn svg { width: 44px; height: 44px; display: block; filter: drop-shadow(0 2px 6px rgba(201, 162, 74, .3)); }
+.journal-btn span { font-size: 11px; font-weight: 700; letter-spacing: .03em; }
+.journal-btn:hover, .journal-btn:focus-visible { transform: translateY(-1px) scale(1.05); background: var(--surface-2); }
 
 /* ---------- Boutons & champs ---------- */
 .btn {
@@ -203,6 +208,15 @@ ul { margin: 0; padding: 0; list-style: none; }
 .day .t-chips { padding-left: 25px; }
 .day .task-meta label { flex-basis: 100%; }
 .t-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 0 6px 30px; margin-top: -4px; min-width: 0; }
+/* Étapes d'une mission : dépliées sous la mission par la pastille « ✓ n/m ▾ » */
+.t-subs-toggle { cursor: pointer; font: inherit; }
+.t-caret { display: inline-block; font-size: 10px; margin-left: 2px; transition: transform .15s; }
+.task.subs-open .t-caret { transform: rotate(180deg); }
+.t-subs { display: none; list-style: none; margin: -2px 0 8px 30px; padding: 4px 0 4px 12px; border-left: 2px solid var(--gold-border, var(--border)); }
+.task.subs-open .t-subs { display: grid; gap: 2px; }
+.t-subs label { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 14px; cursor: pointer; }
+.t-subs input { width: 16px; height: 16px; flex: none; accent-color: var(--ok); }
+.t-subs li.done span { text-decoration: line-through; color: var(--muted); }
 .t-chips .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .task.done .t-title, .sub.done span { color: var(--muted); text-decoration: line-through; }
 .exp { border: 0; background: none; color: var(--muted); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 18px; flex: none; transition: transform .15s; }
@@ -2005,14 +2019,16 @@ h2 { font-weight: 600; }
 .card.is-folded .fold-btn svg { transform: rotate(-90deg); }
 @media (pointer: coarse) { .fold-btn { width: 36px; height: 36px; } .card.is-folded { max-height: 70px; } }
 /* Carte du haut d'Aujourd'hui : réduite = héros et tuiles seulement */
-/* Petit onglet centré au bas de la carte (comme une poignée de tiroir) */
-.top-fold { display: flex; align-items: center; gap: 4px; margin: 10px auto -10px; padding: 3px 12px 3px 9px; border: 0; border-radius: 99px;
-  background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; opacity: .75; transition: opacity .15s, background .15s; }
-.top-fold:hover, .top-fold:focus-visible { opacity: 1; background: var(--surface-2); color: var(--text); }
-.top-fold svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transform: rotate(180deg); transition: transform .15s; }
+/* Bouton rond doré en haut à droite (flèche seulement) ; la carte lui garde sa place */
+.today-top { position: relative; }
+.today-top .today-summary { padding-right: 40px; }
+.top-fold { position: absolute; top: 12px; right: 12px; z-index: 2; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%;
+  background: linear-gradient(145deg, #e6c56e, var(--gold) 55%, #a8842f); color: #1a1414; cursor: pointer; box-shadow: 0 2px 8px rgba(201, 162, 74, .35); transition: transform .12s, box-shadow .12s; }
+.top-fold:hover, .top-fold:focus-visible { transform: scale(1.08); box-shadow: 0 3px 12px rgba(201, 162, 74, .5); }
+.top-fold svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; transform: rotate(180deg); transition: transform .15s; }
 .today-top.collapsed .top-fold svg { transform: none; }
 .today-top.collapsed .top-agenda, .today-top.collapsed .sum-focus-row { display: none; }
-@media (pointer: coarse) { .top-fold { padding: 6px 14px; font-size: 13px; } }
+@media (pointer: coarse) { .top-fold { width: 34px; height: 34px; } }
 .today-cols .card-head > h2 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today-cols .card-head > span, .today-cols .card-head > a { white-space: nowrap; flex: none; }
 /* Menu : onglets retirés ; cartes d'Aujourd'hui masquées */

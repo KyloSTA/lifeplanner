@@ -53,7 +53,10 @@ export async function syncGoalProgress(goalId) {
 }
 
 export async function addTask(title, date, goalId = null, projectId = null) {
-  const t = { id: U.uid(), title, date, goalId, projectId, done: false, createdAt: Date.now(), subtasks: [], notes: '' };
+  // Nouvelle mission en haut de la liste : un rang juste avant la première
+  const orders = (await db.all('tasks')).map((x) => x.order).filter((o) => typeof o === 'number');
+  const order = (orders.length ? Math.min(0, ...orders) : 0) - 10;
+  const t = { id: U.uid(), title, date, goalId, projectId, done: false, createdAt: Date.now(), subtasks: [], notes: '', order };
   await db.put('tasks', t);
   if (goalId) await syncGoalProgress(goalId);
   return t;
@@ -222,11 +225,12 @@ export function taskHTML(t, ref, opts = {}) {
     goal && !opts.hideGoal ? `<a class="chip goal-chip chip-link" href="${goal.projectId ? `#/note/${goal.projectId}` : '#/goals'}" title="Objectif : ${esc(goal.title)}${goal.projectId ? ' (ouvrir son projet)' : ''}">🎯 ${esc(goal.title)}</a>` : '',
     (() => { const p = t.projectId && !opts.hideProject && projectsCache.find((x) => x.id === t.projectId); return p ? `<a class="chip goal-chip chip-link" href="#/note/${p.id}" title="Ouvrir le projet ${esc(p.title)}">🚀 ${esc(p.title || 'Projet')}</a>` : ''; })(),
     dateChip,
-    subs.length ? `<span class="chip ${sd === subs.length ? 'ok' : ''}" title="Étapes faites">✓ ${sd}/${subs.length}</span>` : '',
+    // Étapes : la pastille déplie la liste des étapes sous la mission (à cocher sur place)
+    subs.length ? `<button type="button" class="chip chip-link t-subs-toggle ${sd === subs.length ? 'ok' : ''}" aria-expanded="${subsOpen.has(t.id)}" title="Voir les étapes">✓ ${sd}/${subs.length} <span class="t-caret" aria-hidden="true">▾</span></button>` : '',
     t.notes ? '<span class="chip" title="Contient des notes">✎</span>' : '',
     t.images?.length ? `<button type="button" class="chip chip-link t-photos" title="Voir ${t.images.length > 1 ? `les ${t.images.length} photos` : 'la photo'}" aria-label="Voir les photos de la mission">📷${t.images.length > 1 ? ' ' + t.images.length : ''}</button>` : '',
   ].join('');
-  return `<li class="task ${t.done ? 'done' : ''}" data-id="${t.id}">
+  return `<li class="task ${t.done ? 'done' : ''} ${subs.length && subsOpen.has(t.id) ? 'subs-open' : ''}" data-id="${t.id}">
     <div class="task-row">
       <div class="t-main">
         <label><input type="checkbox" class="t-cb" ${t.done ? 'checked' : ''}><span class="t-title">${esc(t.title)}</span></label>
@@ -235,8 +239,14 @@ export function taskHTML(t, ref, opts = {}) {
       <button class="x t-del" aria-label="Supprimer">×</button>
       <button type="button" class="t-drag" aria-label="Déplacer « ${esc(t.title)} » (glisser, ou flèches ↑ ↓)" title="Glisser pour déplacer"><svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></button>
     </div>
+    ${subs.length ? `<ul class="t-subs">${subs.map((s) => `<li class="${s.done ? 'done' : ''}"><label><input type="checkbox" data-sub="${s.id}" ${s.done ? 'checked' : ''}><span>${esc(s.title)}</span></label></li>`).join('')}</ul>` : ''}
   </li>`;
 }
+
+// Missions dont les étapes sont dépliées (gardé sur cet appareil)
+const SUBS_KEY = 'lp.subsOpen';
+const subsOpen = (() => { try { return new Set(JSON.parse(localStorage.getItem(SUBS_KEY)) || []); } catch { return new Set(); } })();
+const saveSubsOpen = () => { try { localStorage.setItem(SUBS_KEY, JSON.stringify([...subsOpen].slice(-100))); } catch { /* ignore */ } };
 
 /** Branche les interactions sur une liste de missions. redraw() doit re-générer la liste. */
 /* ---------- « Annuler » pendant 3 secondes après une mission accomplie ---------- */
@@ -320,6 +330,20 @@ export function bindTaskList(root, redraw) {
       showUndo(`🗑 « ${title} » déplacée dans Supprimées`, async () => { await restoreTask(id); redraw(); }, 5000);
     };
     li.querySelector('.exp')?.addEventListener('click', () => openTaskEditor(id, redraw));
+    // ✓ n/m ▾ : déplie ou replie les étapes sous la mission ; une étape se coche sur place
+    li.querySelector('.t-subs-toggle')?.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const open = !li.classList.contains('subs-open');
+      li.classList.toggle('subs-open', open);
+      e.currentTarget.setAttribute('aria-expanded', String(open));
+      open ? subsOpen.add(id) : subsOpen.delete(id);
+      saveSubsOpen();
+    });
+    li.querySelectorAll('[data-sub]').forEach((cb) => (cb.onchange = async (e) => {
+      e.stopPropagation();
+      await setSubDone(id, cb.dataset.sub, cb.checked);
+      redraw();
+    }));
     // Toucher le titre ouvre la mission ; seule la case la marque accomplie
     const title = li.querySelector('.t-title');
     if (title) {

@@ -547,7 +547,7 @@ function occurrences(x, from, to) {
   const out = [];
   let d = x.date;
   for (let i = 0; i < 60 && d <= to; i++) {
-    if (x.until && d > x.until) break;
+    if (x.until && d > x.until) { if (i && (U.parseISO(d) - U.parseISO(x.until)) / 864e5 <= 7 && x.until >= from && x.until <= to) out.push(x.until); break; }
     if (d >= from) out.push(d);
     if (!x.recur) break;
     d = nextDate(d, x.recur);
@@ -616,7 +616,10 @@ async function drawUpcoming(ctx, el, all) {
     const id = li.dataset.id;
     li.querySelector('[data-paid]').onclick = () => edit(id, (x) => {
       const nx = x.recur ? nextDate(x.date, x.recur) : null;
-      if (nx && (!x.until || nx <= x.until)) x.date = nx; else x.del = true; // dernier versement payé : retiré
+      if (nx && (!x.until || nx <= x.until)) x.date = nx;
+      // Dernier versement tombé quelques jours avant la date calculée (ex. le 1er au lieu du 2) : c'est lui
+      else if (nx && x.until && x.until > x.date && (U.parseISO(nx) - U.parseISO(x.until)) / 864e5 <= 7) x.date = x.until;
+      else x.del = true; // dernier versement payé : retiré
     });
     li.querySelector('[data-del]').onclick = async () => { if (await ctx.confirmBox('Retirer ce paiement de la liste ?', 'Retirer')) edit(id, (x) => { x.del = true; }); };
     li.querySelector('[data-edit]').onclick = async () => {
