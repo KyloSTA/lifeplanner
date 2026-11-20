@@ -339,14 +339,14 @@ let txFilter = { q: '', cat: '' };
 
 export async function renderPage(ctx, arg) {
   const { view } = ctx;
-  if (arg && ['apercu', 'budget', 'transactions', 'avenir', 'achats'].includes(arg)) tab = arg;
+  if (arg && ['apercu', 'budget', 'transactions', 'avenir', 'abos', 'achats'].includes(arg)) tab = arg;
   const all = (await db.all('money')).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const budget = (await db.get('settings', 'budget')) || { cats: {}, savings: 0 };
   month ||= curMonth();
   const hasData = all.length > 0;
   const months = [...new Set(all.map((t) => ym(t.date)))].sort();
-  const shop = tab === 'achats' || tab === 'avenir'; // la liste d'achats et les paiements à venir ne dépendent pas des relevés
-  const tabsHTML = `<div class="seg" role="tablist">${[['apercu', '📊 Aperçu'], ['budget', '🎯 Budget'], ['transactions', '🧾 Transactions'], ['avenir', '📅 À venir'], ['achats', '🛒 Achats']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
+  const shop = tab === 'achats' || tab === 'avenir' || tab === 'abos'; // la liste d'achats et les paiements à venir ne dépendent pas des relevés
+  const tabsHTML = `<div class="seg" role="tablist">${[['apercu', '📊 Aperçu'], ['budget', '🎯 Budget'], ['transactions', '🧾 Transactions'], ['avenir', '📅 À venir'], ['abos', '🔁 Abonnements'], ['achats', '🛒 Achats']].map(([k, l]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
 
   view.innerHTML = `
     <header class="page-head">
@@ -401,6 +401,7 @@ export async function renderPage(ctx, arg) {
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; renderPage(ctx); }));
   const body = $('#fi-body');
   if (tab === 'avenir') return drawUpcoming(ctx, body, all);
+  if (tab === 'abos') return drawSubs(ctx, body, all);
   if (shop) return drawShopping(ctx, body);
   if (!hasData) return;
   $('#fi-prev').onclick = () => { month = monthsBack(month, 1); renderPage(ctx); };
@@ -706,6 +707,82 @@ async function drawUpcoming(ctx, el, all) {
       redraw();
     }));
   })();
+}
+
+/* =========================================================
+   🔁 Abonnements : tableau de tous les paiements récurrents
+   — ceux suivis dans « À venir » (chaque semaine / mois / année) et ceux détectés dans les relevés.
+   Un frais détecté peut être suivi (+ Suivre) ou masqué (lp.subsHidden, propre à l'appareil).
+   ========================================================= */
+const SUBS_HIDE = 'lp.subsHidden';
+const subsHidden = () => { try { return JSON.parse(localStorage.getItem(SUBS_HIDE) || '[]'); } catch { return []; } };
+const PER_MONTH = { weekly: 52 / 12, monthly: 1, yearly: 1 / 12 };
+let subsSort = 'month';
+
+async function drawSubs(ctx, el, all) {
+  const redraw = () => drawSubs(ctx, el, all);
+  const today = U.iso(new Date());
+  const tracked = (await upLoad()).filter((x) => !x.del && x.recur && !(x.until && x.until < today));
+  const spend = all.filter((t) => t.kind === 'depense');
+  const lastFor = (name, key) => spend.filter((t) => (key ? t.key === key : sameName(t.merchant, name))).map((t) => t.date).sort().pop() || '';
+  const hidden = new Set(subsHidden());
+  const rows = tracked.map((x) => {
+    const tx = spend.find((t) => sameName(t.merchant, x.name));
+    return { id: x.id, name: x.name, cat: tx?.cat || 'abonnements', recur: x.recur, amount: Number(x.amount) || 0,
+      monthly: (Number(x.amount) || 0) * PER_MONTH[x.recur], next: x.date, last: lastFor(x.name), until: x.until, src: 'suivi' };
+  });
+  for (const r of recurring(all, curMonth())) {
+    if (hidden.has(r.key) || rows.some((x) => sameName(x.name, r.name))) continue;
+    const last = lastFor(r.name, r.key);
+    let next = last ? nextDate(last, 'monthly') : '';
+    while (next && next < today) next = nextDate(next, 'monthly');
+    rows.push({ key: r.key, name: r.name, cat: r.cat, recur: 'monthly', amount: Math.round(r.monthly * 100) / 100, monthly: r.monthly, next, last, src: 'detecte' });
+  }
+  const sorts = { month: (a, b) => b.monthly - a.monthly, name: (a, b) => a.name.localeCompare(b.name, 'fr'), next: (a, b) => (a.next || '9').localeCompare(b.next || '9') };
+  rows.sort(sorts[subsSort]);
+  const perMonth = rows.reduce((n, x) => n + x.monthly, 0);
+  const rl = (r) => ({ weekly: 'Semaine', monthly: 'Mois', yearly: 'Année' })[r] || '';
+  const d = (s) => (s ? U.fmtShort(U.parseISO(s)) : '—');
+  const th = (k, l) => `<th${k ? ` data-sort="${k}" class="sortable ${subsSort === k ? 'on' : ''}"` : ''}>${l}${subsSort === k ? ' ▾' : ''}</th>`;
+
+  el.innerHTML = `
+    <div class="up-sum card"><div><b>${$$$(perMonth)}</b><small class="muted">par mois</small></div>
+      <div><b>${$$$(perMonth * 12, true)}</b><small class="muted">par année</small></div>
+      <div><b>${rows.length}</b><small class="muted">abonnement${rows.length > 1 ? 's' : ''}</small></div>
+    </div>
+    ${rows.length ? `<div class="card subs-wrap"><table class="subs-table">
+      <thead><tr>${th('name', 'Abonnement')}<th>Fréquence</th><th class="num">Montant</th>${th('month', 'Par mois')}<th class="num">Par année</th>${th('next', 'Prochain')}<th>Dernier débit</th><th></th></tr></thead>
+      <tbody>${rows.map((x, i) => `<tr class="${x.src === 'detecte' ? 'detected' : ''}">
+        <td><span class="subs-name">${catOf(x.cat).emoji} <b>${esc(x.name)}</b></span>${x.src === 'detecte' ? '<small class="subs-tag">🧾 détecté</small>' : ''}${x.until ? `<small class="muted"> jusqu’au ${d(x.until)}</small>` : ''}</td>
+        <td>${rl(x.recur)}</td>
+        <td class="num">${x.amount ? $$$(x.amount) : '—'}</td>
+        <td class="num"><b>${$$$(x.monthly)}</b></td>
+        <td class="num">${$$$(x.monthly * 12, true)}</td>
+        <td>${d(x.next)}</td>
+        <td class="muted">${d(x.last)}</td>
+        <td class="subs-act-cell"><span class="subs-acts">${x.src === 'detecte'
+          ? `<button class="btn sm primary" data-follow="${i}" title="Suivre dans À venir">+</button><button class="btn sm" data-hide="${i}" title="Ce n’est pas un abonnement" aria-label="Masquer">×</button>`
+          : '<a class="btn sm" href="#/finance/avenir" title="Modifier dans À venir" aria-label="Modifier">✎</a>'}</span></td>
+      </tr>`).join('')}</tbody>
+      <tfoot><tr><td>Total</td><td></td><td></td><td class="num"><b>${$$$(perMonth)}</b></td><td class="num"><b>${$$$(perMonth * 12, true)}</b></td><td></td><td></td><td></td></tr></tfoot>
+    </table></div>` : '<p class="empty-sm">Aucun abonnement pour l’instant. Ajoute un paiement récurrent dans 📅 À venir, ou importe tes relevés : les frais qui reviennent chaque mois apparaîtront ici.</p>'}
+    <p class="hint muted">Les abonnements suivis viennent de 📅 À venir (paiements chaque semaine, mois ou année). Ceux marqués « détecté » reviennent au moins deux mois dans tes relevés : suis-les ou masque-les.</p>`;
+
+  el.querySelectorAll('[data-sort]').forEach((h) => (h.onclick = () => { subsSort = h.dataset.sort; redraw(); }));
+  el.querySelectorAll('[data-follow]').forEach((b) => (b.onclick = async () => {
+    const x = rows[Number(b.dataset.follow)];
+    const cur = await upLoad();
+    cur.push({ id: U.uid(), name: x.name, amount: x.amount, date: x.next || today, recur: 'monthly', until: '', note: '', source: '🧾 Relevés', at: Date.now() });
+    await upSave(cur);
+    ctx.toast(`🔁 « ${x.name} » suivi dans À venir`);
+    redraw();
+  }));
+  el.querySelectorAll('[data-hide]').forEach((b) => (b.onclick = () => {
+    const x = rows[Number(b.dataset.hide)];
+    try { localStorage.setItem(SUBS_HIDE, JSON.stringify([...hidden, x.key])); } catch { /* stockage indisponible */ }
+    ctx.toast(`« ${x.name} » masqué des abonnements`);
+    redraw();
+  }));
 }
 
 /** Carte « 🛒 Achats » de la page Aujourd'hui : prochains articles à cocher et ajout rapide. */
