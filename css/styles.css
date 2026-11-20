@@ -1781,6 +1781,7 @@ a.assoc-chip { padding: 4px 11px; }
   background: var(--surface); border: 1px solid var(--gold-border); border-radius: 16px; box-shadow: 0 10px 40px rgba(0, 0, 0, .3); padding: 10px 12px; display: grid; gap: 8px; }
 .bulk-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .bulk-top b { margin-right: auto; }
+.bulk-x { width: 32px; height: 32px; min-height: 32px; padding: 0; font-size: 18px; border-radius: 50%; }
 .bulk-acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .bulk-acts select, .bulk-acts input { width: auto; min-width: 0; flex: 1 1 130px; max-width: 200px; }
 .bulk-acts .btn { flex: none; }
