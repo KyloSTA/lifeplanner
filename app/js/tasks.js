@@ -37,14 +37,17 @@ export async function missionsOf(goalId) {
   return (await db.all('tasks')).filter((t) => t.goalId === goalId);
 }
 
-/** La progression d'un objectif suit ses missions terminées (s'il en a). */
+/** Avancement d'une mission (0 à 1) : terminée = 1, sinon la part de ses étapes cochées. */
+export const missionFrac = (t) => (t.done ? 1 : t.subtasks?.length ? t.subtasks.filter((s) => s.done).length / t.subtasks.length : 0);
+
+/** La progression d'un objectif suit ses missions (s'il en a) — les étapes cochées comptent en partie. */
 export async function syncGoalProgress(goalId) {
   if (!goalId) return;
   const g = await db.get('goals', goalId);
   if (!g) return;
   const list = await missionsOf(goalId);
   if (!list.length) return; // sans mission : progression manuelle
-  const p = Math.round((list.filter((t) => t.done).length / list.length) * 100);
+  const p = Math.round((list.reduce((n, t) => n + missionFrac(t), 0) / list.length) * 100);
   if (p !== g.progress) {
     g.progress = p;
     await db.put('goals', g);
@@ -147,7 +150,7 @@ export async function setSubDone(taskId, subId, done) {
   else await game.revoke(`sub:${taskId}:${subId}`);
   if (finish) await game.award('task:' + taskId, game.XP.task, 'Toutes les étapes faites : ' + t.title);
   if (reopen) await game.revoke('task:' + taskId);
-  if (finish || reopen) await syncGoalProgress(t.goalId);
+  await syncGoalProgress(t.goalId); // chaque étape fait avancer l'objectif
 }
 
 /**
@@ -545,6 +548,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
       sl.querySelector('.x').onclick = async () => {
         await flush();
         await editTask(id, (x) => { x.subtasks = x.subtasks.filter((s) => s.id !== sl.dataset.sid); });
+        await syncGoalProgress((await db.get('tasks', id))?.goalId);
         changed();
         draw();
       };
@@ -555,6 +559,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
       if (!v) return;
       await flush();
       await editTask(id, (x) => { x.subtasks = [...(x.subtasks || []), { id: U.uid(), title: v, done: false }]; });
+      await syncGoalProgress((await db.get('tasks', id))?.goalId);
       changed();
       draw('.add-sub input');
     };
