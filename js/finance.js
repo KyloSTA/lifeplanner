@@ -470,8 +470,8 @@ async function drawShopping(ctx, el) {
   el.innerHTML = `
     <form class="card sh-add" id="sh-add">
       <input name="n" placeholder="Ajouter une chose à acheter…" autocomplete="off" required>
-      <input name="q" type="number" min="1" max="99" placeholder="Qté" aria-label="Quantité" class="sh-q">
-      <input name="p" type="number" min="0" step="0.01" placeholder="Prix $" aria-label="Prix estimé (facultatif)" class="sh-p">
+      <input name="q" type="number" inputmode="numeric" min="1" max="99" placeholder="Qté" aria-label="Quantité" class="sh-q">
+      <input name="p" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Prix $" aria-label="Prix estimé (facultatif)" class="sh-p">
       <select name="c" aria-label="Catégorie">${SHOP_CATS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
       <button class="btn primary">Ajouter</button>
     </form>
@@ -612,7 +612,7 @@ async function drawUpcoming(ctx, el, all) {
     </div>
     <form class="card up-add" id="up-add">
       <input name="n" placeholder="Nouveau paiement (ex. Loyer, Hydro, Netflix)…" required autocomplete="off">
-      <input name="a" type="number" min="0" step="0.01" placeholder="Montant $" aria-label="Montant">
+      <input name="a" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Montant $" aria-label="Montant">
       <input name="d" type="date" value="${today}" aria-label="Date d’échéance">
       <select name="r" aria-label="Récurrence">${RECUR.map(([k, l]) => `<option value="${k}" ${k === 'monthly' ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <button class="btn primary">Ajouter</button>
@@ -647,7 +647,7 @@ async function drawUpcoming(ctx, el, all) {
       const x = (await upLoad()).find((i) => i.id === id);
       ctx.modal(`<h2>Modifier le paiement</h2><form class="form" id="up-ed">
         <label>Nom<input name="n" value="${esc(x.name)}" required></label>
-        <label>Montant ($)<input name="a" type="number" min="0" step="0.01" value="${Number(x.amount) || ''}"></label>
+        <label>Montant ($)<input name="a" type="number" inputmode="decimal" min="0" step="0.01" value="${Number(x.amount) || ''}"></label>
         <label>Prochaine échéance<input name="d" type="date" value="${x.date}" required></label>
         <label>Récurrence<select name="r">${RECUR.map(([k, l]) => `<option value="${k}" ${k === (x.recur || '') ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label>Dernier paiement (facultatif)<input name="u" type="date" value="${x.until || ''}"></label>
@@ -1215,9 +1215,9 @@ function drawBudget(ctx, el, all, budget) {
         <label class="fi-plan-row">
           <span>${r.emoji} ${esc(r.name)}</span>
           <small class="muted" title="Moyenne mensuelle">${r.avg ? 'moy. ' + $$$(r.avg, true) : '—'}</small>
-          <span class="fi-input"><input type="number" min="0" step="5" inputmode="numeric" data-b="${r.id}" data-avg="${round5(r.avg)}" value="${esc(String(r.value))}" placeholder="0"> $</span>
+          <span class="fi-input"><input type="number" inputmode="decimal" min="0" step="5" inputmode="numeric" data-b="${r.id}" data-avg="${round5(r.avg)}" value="${esc(String(r.value))}" placeholder="0"> $</span>
         </label>`).join('')}</div>
-      <label class="fi-plan-row fi-savings"><span>🐷 Épargne visée par mois</span><small class="muted">mise de côté</small><span class="fi-input"><input type="number" min="0" step="10" id="fi-sav" value="${esc(String(budget.savings || ''))}" placeholder="0"> $</span></label>
+      <label class="fi-plan-row fi-savings"><span>🐷 Épargne visée par mois</span><small class="muted">mise de côté</small><span class="fi-input"><input type="number" inputmode="decimal" min="0" step="10" id="fi-sav" value="${esc(String(budget.savings || ''))}" placeholder="0"> $</span></label>
       <div class="modal-actions"><button class="btn primary" id="fi-save">Enregistrer le budget</button></div>
       <p class="hint muted">Conseils : commence par les catégories où tu dépenses le plus. Viser 10 à 20 % de moins que ta moyenne est réaliste ; plus serré, c’est souvent abandonné au bout de deux semaines. Mets l’épargne en premier : traite-la comme une dépense fixe.</p>
     </section>`;

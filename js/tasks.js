@@ -7,6 +7,7 @@ import * as alarms from './alarms.js';
 import * as timer from './timer.js';
 import * as images from './images.js';
 import * as couple from './couple.js';
+import { swipeable } from './swipe.js';
 
 const { esc } = U;
 
@@ -378,6 +379,22 @@ export function bindTaskList(root, redraw) {
         document.querySelector(`.task[data-id="${id}"] .t-drag`)?.focus();
       };
     }
+    // Au doigt : balayer → pour accomplir, ← pour reporter à demain (avec « Annuler »)
+    const ttl = () => li.querySelector('.t-title')?.textContent || 'Mission';
+    swipeable(li, {
+      right: li.classList.contains('done') ? null : { label: '✓ Fait', run: async () => {
+        await setTaskDone(id, true);
+        redraw();
+        showUndo(`✅ « ${ttl()} » accomplie`, async () => { await setTaskDone(id, false); redraw(); });
+      } },
+      left: { label: '→ Demain', run: async () => {
+        const before = (await db.get('tasks', id))?.date || null;
+        const tomorrow = U.iso(U.addDays(new Date(), 1));
+        await editTask(id, (x) => { x.date = tomorrow; });
+        redraw();
+        showUndo(`📅 « ${ttl()} » reportée à demain`, async () => { await editTask(id, (x) => { x.date = before; }); redraw(); }, 5000);
+      } },
+    });
     // 📷 : ouvre les photos de la mission en plein écran
     const ph = li.querySelector('.t-photos');
     if (ph) ph.onclick = async (e) => {
@@ -484,7 +501,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
           ? '<p class="muted" style="margin:0">⏱ Le minuteur tourne sur cette mission (en bas de l’écran).</p>'
           : `<div class="tm-focus-row">
           ${timer.PRESETS.map(([w, b], i) => `<button type="button" class="btn ${i ? '' : 'primary'}" data-pomo="${w}|${b}" title="${w} min de focus, puis ${b} min de pause">${i ? '' : '🍅 '}${w} min</button>`).join('')}
-          <span class="tm-focus-custom"><input type="number" min="1" max="180" placeholder="min" aria-label="Durée personnalisée en minutes" class="tm-pomo-min"><button type="button" class="btn" data-pomo-custom aria-label="Démarrer la durée personnalisée">▶</button></span>
+          <span class="tm-focus-custom"><input type="number" inputmode="numeric" min="1" max="180" placeholder="min" aria-label="Durée personnalisée en minutes" class="tm-pomo-min"><button type="button" class="btn" data-pomo-custom aria-label="Démarrer la durée personnalisée">▶</button></span>
         </div>`}
       </section>
       <section class="tm-sec tm-alarm">

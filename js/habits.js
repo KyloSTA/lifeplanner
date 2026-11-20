@@ -439,7 +439,7 @@ async function editor(ctx, id, onDone) {
       <label class="hb-lbl">Jours</label>
       <div class="filters" id="hb-days">${WEEK_ORDER.map((d) => `<button type="button" class="chip-btn ${days.includes(d) ? 'on' : ''}" data-d="${d}" aria-pressed="${days.includes(d)}">${DOW_LONG[d]}</button>`).join('')}</div>
       <label class="hb-lbl" for="hb-target">Combien de fois par jour</label>
-      <input type="number" id="hb-target" name="target" min="1" max="20" value="${h.target || 1}" style="max-width:110px">
+      <input type="number" inputmode="numeric" id="hb-target" name="target" min="1" max="20" value="${h.target || 1}" style="max-width:110px">
       <label class="hb-lbl">Rappels 🔔</label>
       <div id="hb-times"></div>
       <button type="button" class="btn" id="hb-addtime">+ Ajouter une heure</button>
