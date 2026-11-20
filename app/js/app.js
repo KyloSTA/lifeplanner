@@ -303,6 +303,22 @@ drawSyncDot();
 
 $('#qa-fab')?.addEventListener('click', () => openQuickAdd());
 $('#brand-add')?.addEventListener('click', () => openQuickAdd());
+// ↑ Remonter en haut : un bouton apparaît quand on a défilé ; toucher l'onglet déjà ouvert du menu fait la même chose
+{
+  const toTop = () => view.scrollTo({ top: 0, behavior: 'smooth' });
+  const btn = $('#to-top');
+  let raf = 0;
+  view.addEventListener('scroll', () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; if (btn) btn.hidden = view.scrollTop < 500; });
+  }, { passive: true });
+  btn?.addEventListener('click', toTop);
+  $('#rail')?.addEventListener('click', (e) => {
+    const a = e.target.closest?.('a[data-route]');
+    if (a?.classList.contains('active') && a.getAttribute('href') === location.hash) { e.preventDefault(); toTop(); }
+  });
+  addEventListener('hashchange', () => { if (btn) btn.hidden = true; });
+}
 // Écrans vides : un bouton data-qa ouvre l'ajout rapide déjà prérempli (data-qa-type = type imposé)
 document.addEventListener('click', (e) => {
   const b = e.target.closest?.('[data-qa]');
@@ -1395,7 +1411,8 @@ async function renderHero() {
     refreshRail();
   };
   const drawCustom = () => {
-    $('#custom').innerHTML = AV.CATEGORIES.map((cat) => `
+    $('#custom').innerHTML = `<div class="opt-group"><h3>Style en un clic</h3><div class="av-presets">${AV.PRESETS.map((p) => `<button type="button" class="btn" data-preset="${p.id}">${esc(p.name)}</button>`).join('')}</div></div>`
+      + AV.CATEGORIES.map((cat) => `
       <div class="opt-group"><h3>${cat.name}</h3><div class="opts">${cat.items.map((it, i) => {
         const val = cat.type === 'color' ? i : it.id;
         const locked = it.lvl && it.lvl > s.level;
@@ -1408,6 +1425,15 @@ async function renderHero() {
         return `<button class="opt ${cat.type} ${on ? 'on' : ''}" data-k="${cat.key}" data-v="${val}" ${locked ? 'disabled' : ''}
           title="${locked ? `Débloqué au niveau ${it.lvl}` : esc(it.name || '')}">${inner}${locked ? `<span class="lock">🔒${it.lvl}</span>` : ''}</button>`;
       }).join('')}</div></div>`).join('');
+    // Préréglage : on applique tout ce qui est déjà débloqué à ton niveau
+    $$('#custom [data-preset]').forEach((b) => (b.onclick = () => {
+      const p = AV.PRESETS.find((x) => x.id === b.dataset.preset);
+      const skipped = [];
+      for (const [k, v] of Object.entries(p.cfg)) { if (AV.isLocked(k, v, s.level)) skipped.push(k); else cfg[k] = v; }
+      save();
+      drawCustom();
+      toast(`${p.name} appliqué${skipped.length ? ' (quelques éléments se débloquent plus tard)' : ''}`);
+    }));
     $$('#custom .opt').forEach((b) => (b.onclick = () => {
       const cat = AV.CATEGORIES.find((c) => c.key === b.dataset.k);
       cfg[cat.key] = cat.type === 'color' ? Number(b.dataset.v) : b.dataset.v;

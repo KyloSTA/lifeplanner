@@ -10,10 +10,10 @@ export const STATS = [
 ];
 
 export const SLOTS = [
-  { id: 'arme', icon: '🗡️', name: 'Arme' },
-  { id: 'tete', icon: '🪖', name: 'Tête' },
-  { id: 'armure', icon: '🛡️', name: 'Armure' },
-  { id: 'bijou', icon: '💍', name: 'Bijou' },
+  { id: 'arme', icon: '🔨', name: 'Outil' },
+  { id: 'tete', icon: '⛑️', name: 'Tête' },
+  { id: 'armure', icon: '🦺', name: 'Tenue' },
+  { id: 'bijou', icon: '⌚', name: 'Accessoire' },
   { id: 'compagnon', icon: '🐾', name: 'Compagnon' },
 ];
 
@@ -27,37 +27,37 @@ export const RARITY = {
 // bonus : points ajoutés aux statistiques quand l'objet est équipé
 export const ITEMS = [
   // Armes
-  { id: 'baton', slot: 'arme', icon: '🪵', name: 'Bâton du Débutant', rarity: 'commun', bonus: { force: 1 } },
-  { id: 'dague', slot: 'arme', icon: '🗡️', name: 'Dague du Premier Pas', rarity: 'commun', bonus: { disc: 1, force: 1 } },
-  { id: 'plume', slot: 'arme', icon: '🪶', name: 'Plume de Scribe', rarity: 'commun', bonus: { intel: 2 } },
-  { id: 'arc', slot: 'arme', icon: '🏹', name: 'Arc de l’Aube', rarity: 'rare', bonus: { disc: 3, force: 1 } },
+  { id: 'baton', slot: 'arme', icon: '📏', name: 'Règle Pliante de l’Apprenti', rarity: 'commun', bonus: { force: 1 } },
+  { id: 'dague', slot: 'arme', icon: '🔪', name: 'Couteau Utilitaire du Premier Pas', rarity: 'commun', bonus: { disc: 1, force: 1 } },
+  { id: 'plume', slot: 'arme', icon: '🖋️', name: 'Stylo du Signataire', rarity: 'commun', bonus: { intel: 2 } },
+  { id: 'arc', slot: 'arme', icon: '📐', name: 'Niveau à Bulle de l’Aube', rarity: 'rare', bonus: { disc: 3, force: 1 } },
   { id: 'marteau', slot: 'arme', icon: '🔨', name: 'Marteau du Bâtisseur', rarity: 'rare', bonus: { force: 3, intel: 1 } },
-  { id: 'baguette', slot: 'arme', icon: '🪄', name: 'Baguette des Notes Reliées', rarity: 'epique', bonus: { intel: 4, sage: 2 } },
-  { id: 'lame', slot: 'arme', icon: '⚔️', name: 'Lame de l’Habitude', rarity: 'epique', bonus: { force: 3, endu: 3 } },
-  { id: 'aurore', slot: 'arme', icon: '☀️', name: 'Épée Aurore, Briseuse de Brouillard', rarity: 'legendaire', bonus: { force: 5, disc: 4, endu: 3 } },
+  { id: 'baguette', slot: 'arme', icon: '📋', name: 'Tablette des Plans Reliés', rarity: 'epique', bonus: { intel: 4, sage: 2 } },
+  { id: 'lame', slot: 'arme', icon: '🔧', name: 'Clé à Molette de l’Habitude', rarity: 'epique', bonus: { force: 3, endu: 3 } },
+  { id: 'aurore', slot: 'arme', icon: '🔨', name: 'Marteau Aurore, Briseur de Brouillard', rarity: 'legendaire', bonus: { force: 5, disc: 4, endu: 3 } },
   // Tête
   { id: 'bandeau', slot: 'tete', icon: '🎗️', name: 'Bandeau de Concentration', rarity: 'commun', bonus: { disc: 1 } },
-  { id: 'chapeau', slot: 'tete', icon: '🎩', name: 'Chapeau du Planificateur', rarity: 'commun', bonus: { intel: 1, sage: 1 } },
+  { id: 'chapeau', slot: 'tete', icon: '🎩', name: 'Fedora du Négociateur', rarity: 'commun', bonus: { intel: 1, sage: 1 } },
   { id: 'casque', slot: 'tete', icon: '⛑️', name: 'Casque de Chantier', rarity: 'rare', bonus: { endu: 2, intel: 2 } },
-  { id: 'couronne', slot: 'tete', icon: '👑', name: 'Couronne d’Ordrelune', rarity: 'legendaire', bonus: { sage: 5, disc: 4, intel: 3 } },
-  { id: 'heaume', slot: 'tete', icon: '🪖', name: 'Heaume du Lève-tôt', rarity: 'epique', bonus: { disc: 3, endu: 3 } },
+  { id: 'couronne', slot: 'tete', icon: '👑', name: 'Casque d’Or du Maître d’Œuvre', rarity: 'legendaire', bonus: { sage: 5, disc: 4, intel: 3 } },
+  { id: 'heaume', slot: 'tete', icon: '🥽', name: 'Masque de Soudeur du Lève-tôt', rarity: 'epique', bonus: { disc: 3, endu: 3 } },
   // Armures
-  { id: 'tunique', slot: 'armure', icon: '👕', name: 'Tunique de Lin', rarity: 'commun', bonus: { endu: 1 } },
-  { id: 'cuir', slot: 'armure', icon: '🧥', name: 'Veste de Cuir Usé', rarity: 'commun', bonus: { endu: 1, force: 1 } },
-  { id: 'bouclier', slot: 'armure', icon: '🛡️', name: 'Bouclier de Routine', rarity: 'rare', bonus: { endu: 3, disc: 1 } },
-  { id: 'cotte', slot: 'armure', icon: '🦺', name: 'Cotte de Mailles du Matin', rarity: 'rare', bonus: { endu: 2, force: 2 } },
-  { id: 'cape', slot: 'armure', icon: '🧣', name: 'Cape du Silence Numérique', rarity: 'epique', bonus: { disc: 4, sage: 2 } },
-  { id: 'armure-lune', slot: 'armure', icon: '🌙', name: 'Armure de Lune Constante', rarity: 'legendaire', bonus: { endu: 6, force: 3, sage: 2 } },
+  { id: 'tunique', slot: 'armure', icon: '🧑‍🏭', name: 'Tablier d’Atelier', rarity: 'commun', bonus: { endu: 1 } },
+  { id: 'cuir', slot: 'armure', icon: '🧥', name: 'Veste de Travail en Canevas', rarity: 'commun', bonus: { endu: 1, force: 1 } },
+  { id: 'bouclier', slot: 'armure', icon: '🧰', name: 'Ceinture à Outils de la Routine', rarity: 'rare', bonus: { endu: 3, disc: 1 } },
+  { id: 'cotte', slot: 'armure', icon: '🦺', name: 'Dossard Haute Visibilité', rarity: 'rare', bonus: { endu: 2, force: 2 } },
+  { id: 'cape', slot: 'armure', icon: '🤵', name: 'Complet du Silence Numérique', rarity: 'epique', bonus: { disc: 4, sage: 2 } },
+  { id: 'armure-lune', slot: 'armure', icon: '🌟', name: 'Complet Doré du Grand Entrepreneur', rarity: 'legendaire', bonus: { endu: 6, force: 3, sage: 2 } },
   // Bijoux
-  { id: 'anneau', slot: 'bijou', icon: '💍', name: 'Anneau de Focus', rarity: 'commun', bonus: { disc: 1 } },
-  { id: 'pendentif', slot: 'bijou', icon: '📿', name: 'Pendentif de Gratitude', rarity: 'rare', bonus: { sage: 3 } },
-  { id: 'amulette', slot: 'bijou', icon: '🧿', name: 'Amulette Anti-Distraction', rarity: 'rare', bonus: { disc: 2, intel: 1 } },
-  { id: 'sablier', slot: 'bijou', icon: '⏳', name: 'Sablier du Pomodoro', rarity: 'epique', bonus: { disc: 3, intel: 3 } },
-  { id: 'etoile', slot: 'bijou', icon: '🌟', name: 'Étoile du Nord', rarity: 'legendaire', bonus: { sage: 4, intel: 4, disc: 2 } },
+  { id: 'anneau', slot: 'bijou', icon: '⌚', name: 'Montre de Focus', rarity: 'commun', bonus: { disc: 1 } },
+  { id: 'pendentif', slot: 'bijou', icon: '🪪', name: 'Badge d’Accès de la Gratitude', rarity: 'rare', bonus: { sage: 3 } },
+  { id: 'amulette', slot: 'bijou', icon: '🧿', name: 'Épinglette Anti-Distraction', rarity: 'rare', bonus: { disc: 2, intel: 1 } },
+  { id: 'sablier', slot: 'bijou', icon: '⏱️', name: 'Chronomètre du Pomodoro', rarity: 'epique', bonus: { disc: 3, intel: 3 } },
+  { id: 'etoile', slot: 'bijou', icon: '💍', name: 'Chevalière de l’Étoile du Nord', rarity: 'legendaire', bonus: { sage: 4, intel: 4, disc: 2 } },
   // Compagnons
-  { id: 'chat', slot: 'compagnon', icon: '🐈', name: 'Chat de Bibliothèque', rarity: 'commun', bonus: { sage: 1 } },
-  { id: 'chien', slot: 'compagnon', icon: '🐕', name: 'Chien Joggeur', rarity: 'rare', bonus: { force: 2, endu: 1 } },
-  { id: 'hibou', slot: 'compagnon', icon: '🦉', name: 'Hibou Savant', rarity: 'epique', bonus: { intel: 3, sage: 3 } },
+  { id: 'chat', slot: 'compagnon', icon: '🐈', name: 'Chat de Bureau', rarity: 'commun', bonus: { sage: 1 } },
+  { id: 'chien', slot: 'compagnon', icon: '🐕', name: 'Labrador de Chantier', rarity: 'rare', bonus: { force: 2, endu: 1 } },
+  { id: 'hibou', slot: 'compagnon', icon: '🦉', name: 'Hibou Comptable', rarity: 'epique', bonus: { intel: 3, sage: 3 } },
   { id: 'phenix', slot: 'compagnon', icon: '🐦‍🔥', name: 'Phénix du Recommencement', rarity: 'legendaire', bonus: { endu: 5, sage: 3, force: 2 } },
 ];
 export const ITEM = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
