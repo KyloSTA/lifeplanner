@@ -2879,3 +2879,10 @@ body.ink-mode #qa-fab, body:has(#modal-root > *) #qa-fab { display: none; }
 }
 /* Le bouton ＋ flottant ne cache jamais le bas de la page */
 main { padding-bottom: 96px !important; }
+
+/* Ajout rapide : photos collées */
+.qa-pics { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.qa-pic { position: relative; margin: 0; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); }
+.qa-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.qa-pic .x { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; font-size: 14px; line-height: 1; cursor: pointer; }
+.qa-pic-btn { min-width: 44px; justify-content: center; padding: 0 12px; font-size: 18px; }
