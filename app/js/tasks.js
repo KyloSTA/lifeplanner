@@ -791,16 +791,18 @@ export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
     const subs = me.subtasks || [];
     const desc = [(me.notes || '').trim(), subs.length ? 'Étapes :\n' + subs.map((s) => `${s.done ? '☑' : '☐'} ${s.title}`).join('\n') : ''].filter(Boolean).join('\n\n');
     const day = me.date || U.iso(new Date());
+    // Plage horaire : celle de la mission placée dans le planificateur (heure + durée), sinon l'alarme, sinon 9 h ; 1 h par défaut
     const hm = me.alarmAt ? new Date(me.alarmAt) : null;
-    const start = hm ? `${String(hm.getHours()).padStart(2, '0')}:${String(hm.getMinutes()).padStart(2, '0')}` : '09:00';
-    const endH = (Number(start.slice(0, 2)) + 1) % 24;
+    const start = me.time || (hm ? `${String(hm.getHours()).padStart(2, '0')}:${String(hm.getMinutes()).padStart(2, '0')}` : '09:00');
+    const endMin = Math.min(toMin(start) + (me.time ? me.dur || 60 : 60), 23 * 60 + 59);
+    const end = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
     box.innerHTML = `
       <div class="tm-head"><h2 class="tm-pick-title">📅 Transformer en événement</h2><button class="tm-close" aria-label="Retour">×</button></div>
       <form class="form tm-ev" id="tm-ev">
         <label>Titre<input name="t" value="${esc(me.title)}" required></label>
         <div class="tm-ev-row"><label>Date<input name="d" type="date" value="${day}" required></label>
           <label class="tm-ev-all"><input type="checkbox" name="all"> Toute la journée</label></div>
-        <div class="tm-ev-row tm-ev-times"><label>Début<input name="s" type="time" value="${start}"></label><label>Fin<input name="e" type="time" value="${String(endH).padStart(2, '0')}${start.slice(2)}"></label></div>
+        <div class="tm-ev-row tm-ev-times"><label>Début<input name="s" type="time" value="${start}"></label><label>Fin<input name="e" type="time" value="${end}"></label></div>
         <label>Description<textarea name="desc" rows="3">${esc(desc)}</textarea></label>
         <label class="tm-ev-keep"><input type="checkbox" name="rm" checked> Retirer la mission ensuite (elle va dans Supprimées)</label>
         <p class="warn-text tm-ev-err" hidden></p>
