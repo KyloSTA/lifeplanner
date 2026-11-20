@@ -182,6 +182,9 @@ export async function makeStep(id, targetId) {
   return tgt;
 }
 
+/** Petites marques après le titre d'une étape : sa date et ✎ si elle a des notes. */
+const stepMeta = (s) => (s.date || s.notes ? ` <small class="sub-meta">${s.date ? '📅 ' + U.fmtShort(U.parseISO(s.date)) : ''}${s.notes ? ' ✎' : ''}</small>` : '');
+
 /* ---------- Mission placée à l'horaire (vue Jour) : t.time « HH:MM » et t.dur (minutes) ---------- */
 export const DURS = [15, 30, 45, 60, 90, 120, 180, 240];
 const hm = (min) => { const h = Math.floor(min / 60), m = min % 60; return `${h} h${m ? ' ' + String(m).padStart(2, '0') : ''}`; };
@@ -264,7 +267,7 @@ export function taskHTML(t, ref, opts = {}) {
       <button class="x t-del" aria-label="Supprimer">×</button>
       <button type="button" class="t-drag" aria-label="Déplacer « ${esc(t.title)} » (glisser, ou flèches ↑ ↓)" title="Glisser pour déplacer"><svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></button>
     </div>
-    ${subs.length ? `<ul class="t-subs">${subs.map((s) => `<li class="${s.done ? 'done' : ''}"><label><input type="checkbox" data-sub="${s.id}" ${s.done ? 'checked' : ''}><span>${esc(s.title)}</span></label></li>`).join('')}</ul>` : ''}
+    ${subs.length ? `<ul class="t-subs">${subs.map((s) => `<li class="${s.done ? 'done' : ''}"><label class="sub-cb"><input type="checkbox" data-sub="${s.id}" ${s.done ? 'checked' : ''} aria-label="Étape faite : ${esc(s.title)}"></label><button type="button" class="sub-open" data-open-sub="${s.id}" title="Ouvrir l’étape">${esc(s.title)}${stepMeta(s)}</button></li>`).join('')}</ul>` : ''}
   </li>`;
 }
 
@@ -378,6 +381,8 @@ export function bindTaskList(root, redraw) {
       open ? subsOpen.add(id) : subsOpen.delete(id);
       saveSubsOpen();
     });
+    // Toucher le titre d'une étape l'ouvre (comme une mission) ; la case la coche sur place
+    li.querySelectorAll('[data-open-sub]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openTaskEditor(id, redraw, { step: b.dataset.openSub }); }));
     li.querySelectorAll('[data-sub]').forEach((cb) => (cb.onchange = async (e) => {
       e.stopPropagation();
       await setSubDone(id, cb.dataset.sub, cb.checked);
@@ -446,7 +451,7 @@ export function bindTaskList(root, redraw) {
  * Ouvre la mission dans une fenêtre (pop-up). Chaque changement est enregistré tout de suite ;
  * onChange() est appelé après chaque changement pour rafraîchir la liste derrière.
  */
-export async function openTaskEditor(id, onChange = () => {}) {
+export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
   await loadGoals();
   let host = document.getElementById('modal-root');
   if (!host) { host = document.createElement('div'); host.id = 'modal-root'; document.body.appendChild(host); }
@@ -459,7 +464,8 @@ export async function openTaskEditor(id, onChange = () => {}) {
   const changed = () => { try { onChange(); } catch { /* la liste a pu disparaître */ } };
   const saveTitle = U.debounce(async (v) => { await editTask(id, (t) => { t.title = v; }); changed(); }, 400);
   const saveNotes = U.debounce(async (v) => { await editTask(id, (t) => { t.notes = v; }); changed(); }, 500);
-  const flush = async () => { await saveTitle.flush(); await saveNotes.flush(); };
+  let stepFlush = async () => {}; // étape ouverte : ses changements en attente
+  const flush = async () => { await saveTitle.flush(); await saveNotes.flush(); await stepFlush(); };
 
   const close = async () => {
     if (closed) return;
@@ -512,7 +518,8 @@ export async function openTaskEditor(id, onChange = () => {}) {
         <h3>Étapes ${subs.length ? `<span class="muted">${sd}/${subs.length}</span>` : ''}</h3>
         ${subs.length ? `<div class="sub-bar"><i style="width:${Math.round((sd / subs.length) * 100)}%"></i></div>` : ''}
         <ul class="subs">${subs.map((s) => `<li class="sub ${s.done ? 'done' : ''}" data-sid="${s.id}">
-          <label><input type="checkbox" ${s.done ? 'checked' : ''}><span>${esc(s.title)}</span></label>
+          <label class="sub-cb"><input type="checkbox" ${s.done ? 'checked' : ''} aria-label="Étape faite : ${esc(s.title)}"></label>
+          <button type="button" class="sub-open" title="Ouvrir l’étape (notes, date…)">${esc(s.title)}${stepMeta(s)}</button>
           <button class="x" aria-label="Supprimer l’étape">×</button></li>`).join('')}</ul>
         <form class="add-sub"><input name="s" placeholder="+ Ajouter une étape…" autocomplete="off"></form>
       </section>
@@ -622,6 +629,7 @@ export async function openTaskEditor(id, onChange = () => {}) {
 
     box.querySelectorAll('.sub').forEach((sl) => {
       sl.querySelector('input').onchange = async (e) => { await flush(); await setSubDone(id, sl.dataset.sid, e.target.checked); changed(); draw(); };
+      sl.querySelector('.sub-open').onclick = async () => { await flush(); editStep(sl.dataset.sid); };
       sl.querySelector('.x').onclick = async () => {
         await flush();
         await editTask(id, (x) => { x.subtasks = x.subtasks.filter((s) => s.id !== sl.dataset.sid); });
@@ -684,6 +692,89 @@ export async function openTaskEditor(id, onChange = () => {}) {
     box.querySelector('.tm-ok').onclick = close;
     box.querySelector('.tm-close').onclick = close;
     if (focus) box.querySelector(focus)?.focus();
+  };
+
+  // ↳ Une étape ouverte comme une mission : titre, fait, date, notes ; ‹ › pour passer d'une étape à l'autre
+  const editStep = async (sid) => {
+    const me = await db.get('tasks', id);
+    const subs = me?.subtasks || [];
+    const i = subs.findIndex((s) => s.id === sid);
+    if (!me || i < 0) return draw();
+    const s = subs[i];
+    // Les enregistrements passent un à la fois (sinon deux écritures de la mission s'écrasent : date + notes)
+    let chain = Promise.resolve();
+    const patch = (fn) => (chain = chain.then(async () => { await editTask(id, (x) => { const y = (x.subtasks || []).find((z) => z.id === sid); if (y) fn(y); }); changed(); }).catch(console.error));
+    const saveT = U.debounce((v) => patch((y) => { y.title = v; }), 400);
+    const saveN = U.debounce((v) => patch((y) => { y.notes = v; }), 500);
+    stepFlush = async () => { await saveT.flush(); await saveN.flush(); await chain; };
+    box.innerHTML = `
+      <div class="tm-head">
+        <input type="checkbox" class="tm-cb st-cb" ${s.done ? 'checked' : ''} aria-label="Étape faite" title="Étape faite">
+        <textarea class="tm-title st-title" rows="1" aria-label="Titre de l’étape">${esc(s.title)}</textarea>
+        <button class="tm-close st-x" aria-label="Retour à la mission" title="Retour à la mission">×</button>
+      </div>
+      <p class="st-parent">↳ Étape ${i + 1}/${subs.length} de <button type="button" class="link-btn st-back">« ${esc(me.title)} »</button></p>
+      <div class="tm-meta">
+        <label><span>📅 Date</span><input type="date" class="st-date" value="${s.date || ''}" title="Date prévue pour cette étape (facultatif)"></label>
+      </div>
+      <section class="tm-sec">
+        <h3>Notes</h3>
+        <textarea class="notes st-notes" placeholder="Détails, liens, quoi apporter…">${esc(s.notes || '')}</textarea>
+      </section>
+      <div class="st-nav">
+        <button type="button" class="btn st-prev" ${i ? '' : 'disabled'}>‹ Étape précédente</button>
+        <button type="button" class="btn st-next" ${i < subs.length - 1 ? '' : 'disabled'}>Étape suivante ›</button>
+      </div>
+      <div class="modal-actions tm-actions">
+        <button class="btn danger st-del">🗑 Supprimer l’étape</button>
+        <button class="btn st-promote" title="Sortir cette étape de la mission et en faire une mission à part">⬆ En faire une mission</button>
+        <button class="btn primary st-ok">‹ Retour à la mission</button>
+      </div>`;
+    const title = box.querySelector('.st-title');
+    const grow = () => { title.style.height = 'auto'; title.style.height = title.scrollHeight + 'px'; };
+    grow();
+    title.oninput = () => { grow(); const v = title.value.replace(/\n/g, ' ').trim(); if (v) saveT(v); };
+    title.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); box.querySelector('.st-notes').focus(); } };
+    const notes = box.querySelector('.st-notes');
+    notes.oninput = () => saveN(notes.value);
+    notes.onblur = () => saveN.flush();
+    box.querySelector('.st-cb').onchange = async (e) => { await stepFlush(); await setSubDone(id, sid, e.target.checked); changed(); };
+    box.querySelector('.st-date').onchange = (e) => patch((y) => { y.date = e.target.value || null; });
+    const back = async () => { await stepFlush(); stepFlush = async () => {}; draw(); };
+    box.querySelector('.st-x').onclick = back;
+    box.querySelector('.st-back').onclick = back;
+    box.querySelector('.st-ok').onclick = back;
+    box.querySelector('.st-prev').onclick = async () => { await stepFlush(); editStep(subs[i - 1].id); };
+    box.querySelector('.st-next').onclick = async () => { await stepFlush(); editStep(subs[i + 1].id); };
+    const del = box.querySelector('.st-del');
+    del.onclick = async () => {
+      if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = 'Confirmer la suppression'; return; }
+      stepFlush = async () => {};
+      await editTask(id, (x) => { x.subtasks = (x.subtasks || []).filter((z) => z.id !== sid); });
+      await syncGoalProgress(me.goalId);
+      changed();
+      draw();
+    };
+    // ⬆ L'étape devient une mission à part (même date, mêmes notes, même objectif et projet) ; « Annuler » la remet
+    box.querySelector('.st-promote').onclick = async () => {
+      await stepFlush(); stepFlush = async () => {};
+      const cur = (await db.get('tasks', id))?.subtasks?.find((z) => z.id === sid) || s;
+      const nt = await addTask(cur.title, cur.date || me.date || null, me.goalId || null, me.projectId || null);
+      if (cur.notes || cur.done) await editTask(nt.id, (x) => { x.notes = cur.notes || ''; });
+      if (cur.done) await setTaskDone(nt.id, true);
+      await editTask(id, (x) => { x.subtasks = (x.subtasks || []).filter((z) => z.id !== sid); });
+      await syncGoalProgress(me.goalId);
+      changed();
+      showUndo(`⬆ « ${cur.title} » est maintenant une mission`, async () => {
+        await deleteTask(nt.id);
+        await editTask(id, (x) => { x.subtasks = [...(x.subtasks || [])]; x.subtasks.splice(i, 0, cur); });
+        await syncGoalProgress(me.goalId);
+        changed();
+      }, 6000);
+      draw();
+    };
+    title.focus();
+    title.setSelectionRange(title.value.length, title.value.length);
   };
 
   // 📅 En événement : crée un événement Google Agenda (titre, date, heure, notes et étapes en description)
@@ -804,5 +895,5 @@ export async function openTaskEditor(id, onChange = () => {}) {
   // Glisser-déposer une image sur la fenêtre
   box.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
   box.addEventListener('drop', (e) => { const files = images.imageFiles(e.dataTransfer); if (files.length) { e.preventDefault(); addImages(files); } });
-  await draw();
+  if (opts.step) await editStep(opts.step); else await draw();
 }

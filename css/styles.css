@@ -2910,3 +2910,20 @@ main { padding-bottom: 96px !important; }
 .pg-done-fold > summary .exp { display: inline-block; transition: transform .15s; }
 .pg-done-fold[open] > summary .exp { transform: rotate(90deg); }
 .pg-done-fold > summary:hover { color: var(--text); }
+
+/* Planificateur (semaine) : missions de chaque jour dans une cellule repliable */
+.day-fold { display: flex; align-items: center; gap: 6px; width: 100%; margin: 4px 0; padding: 8px 10px; min-height: 40px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600; text-align: left; cursor: pointer; }
+.day-fold:hover { border-color: var(--accent); }
+.day-fold .df-caret { display: inline-block; width: 12px; color: var(--muted); font-size: 16px; line-height: 1; transition: transform .15s; }
+.day-fold[aria-expanded="true"] .df-caret { transform: rotate(90deg); }
+.day-fold .muted { font-weight: 400; }
+
+/* Étapes : la case coche, le titre ouvre l'étape */
+.t-subs li, .subs .sub { display: flex; align-items: center; gap: 8px; }
+.sub-cb { display: inline-flex; align-items: center; flex: none; cursor: pointer; }
+.sub-open { flex: 1; min-width: 0; border: 0; background: none; padding: 4px 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 6px; }
+.sub-open:hover { color: var(--accent); }
+.done > .sub-open, .sub.done .sub-open { text-decoration: line-through; color: var(--muted); }
+.sub-meta { color: var(--muted); font-size: 11.5px; margin-left: 4px; }
+.st-parent { margin: -6px 0 0; color: var(--muted); font-size: 13px; }
+.st-nav { display: flex; justify-content: space-between; gap: 8px; }
