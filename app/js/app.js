@@ -1698,6 +1698,7 @@ async function renderYear(arg) {
     </div>`;
 }
 
+const weekFolds = () => { try { return JSON.parse(localStorage.getItem('lp.weekFolds')) || {}; } catch { return {}; } };
 async function renderWeek(arg) {
   const start = U.startOfWeek(arg ? U.parseISO(arg) : new Date());
   const days = [...Array(7)].map((_, i) => U.addDays(start, i));
@@ -1738,7 +1739,22 @@ async function renderWeek(arg) {
     const k = dayEl.dataset.day;
     const items = (await db.all('tasks')).filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     const box = dayEl.querySelector('.day-tasks');
-    box.innerHTML = tasksBlock(items);
+    // Missions du jour dans une cellule repliable : aujourd'hui ouvert par défaut, les autres jours repliés
+    // (ton choix pour chaque jour est gardé sur cet appareil)
+    const folds = weekFolds();
+    const open = folds[k] ?? (k === today);
+    const nd = items.filter((t) => t.done).length;
+    box.innerHTML = items.length ? `<button type="button" class="day-fold" aria-expanded="${open}"><span class="df-caret" aria-hidden="true">›</span> ✅ ${items.length} mission${items.length > 1 ? 's' : ''}<span class="muted">${nd ? ` · ${nd} faite${nd > 1 ? 's' : ''}` : ''}</span></button>
+      <div class="day-fold-body" ${open ? '' : 'hidden'}>${tasksBlock(items)}</div>` : '';
+    box.querySelector('.day-fold')?.addEventListener('click', (e) => {
+      const b = e.currentTarget, on = b.getAttribute('aria-expanded') !== 'true';
+      b.setAttribute('aria-expanded', String(on));
+      b.nextElementSibling.hidden = !on;
+      const f = weekFolds();
+      f[k] = on;
+      for (const d of Object.keys(f)) if (d < iso(U.addDays(new Date(), -21))) delete f[d]; // on oublie les vieux jours
+      try { localStorage.setItem('lp.weekFolds', JSON.stringify(f)); } catch { /* ignore */ }
+    });
     bindDoneFold(box);
     bindTaskList(box, () => drawTasks(dayEl));
   };
