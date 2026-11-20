@@ -140,7 +140,7 @@ function show(list, { onDone, needPermission, dirName }) {
 
 /** Cherche de nouvelles captures et les propose. ask : peut demander la permission du dossier (après un clic). */
 export async function check({ ask = false, force = false } = {}) {
-  if (busy || (!force && Date.now() - lastRun < 4000)) return;
+  if (busy || (!force && Date.now() - lastRun < 1500)) return;
   if (document.querySelector('#shot-root .shot-card')) return; // une proposition est déjà affichée
   busy = true; lastRun = Date.now();
   try {
@@ -163,8 +163,11 @@ export async function check({ ask = false, force = false } = {}) {
 export function start({ toast = () => {}, onAdded = () => {} } = {}) {
   toastFn = toast; afterAdd = onAdded;
   const go = () => { if (document.visibilityState === 'visible') check(); };
-  setTimeout(go, 1500);
+  setTimeout(go, 500);
   addEventListener('focus', go);
+  addEventListener('pointerdown', go, { passive: true }); // premier clic après la capture : proposé tout de suite
+  // Capture prise pendant que l'app est ouverte (outil Capture, stylet) : vérifie aux 3 s, sans jamais rien demander
+  setInterval(() => { if (document.visibilityState === 'visible' && document.hasFocus()) check(); }, 3000);
   document.addEventListener('visibilitychange', go);
   // Le dossier attend la confirmation d'Edge : on le signale une fois par session
   dirStatus().then((s) => { if (s.on && s.perm !== 'granted') setTimeout(() => check({ force: true }), 2500); }).catch(() => {});

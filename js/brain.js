@@ -137,7 +137,7 @@ export function projectStats(projectId, goals, tasks) {
   const ms = [...viaGoals, ...direct];
   // Un objectif abandonné ne compte plus dans l'avancement du projet
   const parts = gs.filter((g) => !(g.done && g.outcome === 'dropped')).map((g) => g.progress || 0);
-  if (direct.length) parts.push((direct.filter((t) => t.done).length / direct.length) * 100);
+  if (direct.length) parts.push((direct.reduce((n, t) => n + (t.done ? 1 : t.subtasks?.length ? t.subtasks.filter((x) => x.done).length / t.subtasks.length : 0), 0) / direct.length) * 100);
   return {
     goals: gs,
     direct,

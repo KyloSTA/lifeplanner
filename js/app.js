@@ -2174,10 +2174,19 @@ async function renderNote(id) {
     await flush();
     const t = await addTask(n.title.trim() || brain.excerpt(n.body, 60) || 'Note', today);
     await assoc.toggle(n, 'tasks', t.id, true); // la mission garde un lien vers la note (fenêtre de la mission)
+    // Les photos de la note suivent dans les détails de la mission
+    const pics = images.refsIn(n.body);
+    if (pics.length) {
+      const mt = await db.get('tasks', t.id);
+      if (mt) { mt.images = [...new Set([...(mt.images || []), ...pics])]; await db.put('tasks', mt); }
+    }
     Object.assign(n, await brain.setArchived(n.id, true));
     brainState.arch = false;
     toast(`✅ Mission « ${t.title} » ajoutée pour aujourd’hui — la note est rangée dans les Archives`);
-    location.hash = '#/brain';
+    // On va à la page Missions et on ouvre la nouvelle mission
+    history.pushState(null, '', '#/missions');
+    await router();
+    openTaskEditor(t.id, () => { if (location.hash === '#/missions') routes.missions(); });
   };
   $('#n-arch').onclick = async () => {
     await flush();
