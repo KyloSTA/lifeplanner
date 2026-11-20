@@ -2712,3 +2712,24 @@ a.md-where.md-none:hover { text-decoration: underline; }
 .sx-end { margin: auto; text-align: center; display: grid; gap: 8px; justify-items: center; }
 .sx-end .btn { min-width: 180px; min-height: 48px; margin-top: 10px; }
 @media (max-width: 600px) { .sx-zbar { grid-template-columns: 96px minmax(0, 1fr) 46px; font-size: 13px; } .sx-grid { grid-template-columns: 1fr; } }
+
+/* 🔁 Abonnements (Finances) */
+.subs-wrap { padding: 0; overflow-x: auto; }
+.subs-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.subs-table th, .subs-table td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.subs-table thead th { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface-2); position: sticky; top: 0; }
+.subs-table th.sortable { cursor: pointer; user-select: none; }
+.subs-table th.sortable:hover, .subs-table th.on { color: var(--accent); }
+.subs-table .num { text-align: right; }
+.subs-table tbody tr:hover { background: var(--surface-2); }
+.subs-table tr.detected td { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+.subs-table tfoot td { border-bottom: 0; font-weight: 600; background: var(--surface-2); }
+.subs-name { white-space: normal; }
+.subs-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 11px; color: var(--accent); background: var(--accent-soft); }
+.subs-act-cell { width: 1%; }
+.subs-acts { display: flex; gap: 4px; justify-content: flex-end; }
+.subs-acts .btn { text-decoration: none; }
+@media (max-width: 640px) {
+  .subs-table th, .subs-table td { padding: 8px; }
+  .subs-table :is(th, td):is(:nth-child(3), :nth-child(5), :nth-child(7)) { display: none; }
+}
