@@ -435,9 +435,9 @@ async function renderToday() {
     </header>
     <div class="today">
       <section class="card today-top ${foldedSet().has('today-top') ? 'collapsed' : ''}">
-        <button type="button" class="fold-btn top-fold" id="top-fold" aria-expanded="${!foldedSet().has('today-top')}" title="${foldedSet().has('today-top') ? 'Afficher l’agenda et l’humeur' : 'Réduire : garder seulement le héros et les tuiles'}">${FOLD_ICON}</button>
         <div class="today-summary" id="c-hero"></div>
         <div class="top-agenda"><div id="c-agenda"><div class="skeleton"></div></div><div class="ag-journal" id="c-journal"></div></div>
+        <button type="button" class="top-fold" id="top-fold" aria-expanded="${!foldedSet().has('today-top')}">${FOLD_ICON}<span>${foldedSet().has('today-top') ? 'Agenda et humeur' : 'Réduire'}</span></button>
       </section>
       <section class="card capture-card" id="c-brain"></section>
       <div class="today-cols">
@@ -467,7 +467,7 @@ async function renderToday() {
     on ? set.add('today-top') : set.delete('today-top');
     try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
     e.currentTarget.setAttribute('aria-expanded', String(!on));
-    e.currentTarget.title = on ? 'Afficher l’agenda et l’humeur' : 'Réduire : garder seulement le héros et les tuiles';
+    e.currentTarget.querySelector('span').textContent = on ? 'Agenda et humeur' : 'Réduire';
   };
   $('#add-ev').onclick = () => eventModal(today, renderToday);
   $('#as-open').onclick = openAssistant;

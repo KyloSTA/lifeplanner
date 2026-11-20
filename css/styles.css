@@ -1978,11 +1978,14 @@ h2 { font-weight: 600; }
 .card.is-folded .fold-btn svg { transform: rotate(-90deg); }
 @media (pointer: coarse) { .fold-btn { width: 36px; height: 36px; } .card.is-folded { max-height: 70px; } }
 /* Carte du haut d'Aujourd'hui : réduite = héros et tuiles seulement */
-.today-top { position: relative; }
-.top-fold { position: absolute; top: 8px; right: 8px; z-index: 2; }
-.today-top .today-summary { padding-right: 34px; }
+/* Petit onglet centré au bas de la carte (comme une poignée de tiroir) */
+.top-fold { display: flex; align-items: center; gap: 4px; margin: 10px auto -10px; padding: 3px 12px 3px 9px; border: 0; border-radius: 99px;
+  background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; opacity: .75; transition: opacity .15s, background .15s; }
+.top-fold:hover, .top-fold:focus-visible { opacity: 1; background: var(--surface-2); color: var(--text); }
+.top-fold svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transform: rotate(180deg); transition: transform .15s; }
+.today-top.collapsed .top-fold svg { transform: none; }
 .today-top.collapsed .top-agenda, .today-top.collapsed .sum-focus-row { display: none; }
-.today-top.collapsed .top-fold svg { transform: rotate(-90deg); }
+@media (pointer: coarse) { .top-fold { padding: 6px 14px; font-size: 13px; } }
 .today-cols .card-head > h2 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today-cols .card-head > span, .today-cols .card-head > a { white-space: nowrap; flex: none; }
 /* Menu : onglets retirés ; cartes d'Aujourd'hui masquées */
