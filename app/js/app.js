@@ -5,7 +5,7 @@ import * as gcal from './gcal.js';
 import { InkEditor, INK_COLORS, HL_COLORS } from './ink.js';
 import * as game from './game.js';
 import * as AV from './avatar.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo } from './tasks.js';
+import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo, scheduleTask, timeLabel, setTaskDone } from './tasks.js';
 import * as brain from './brain.js';
 import * as quotes from './quotes.js';
 import * as assistant from './assistant.js';
@@ -1814,17 +1814,21 @@ async function renderDay(arg) {
     </div>`;
 
   await loadGoals();
-  let alarmTasks = [];
+  let alarmTasks = [], schedTasks = [];
+  let gridFrom = 7; // première heure affichée dans l'horaire
+  const minToHM = (min) => { const r = Math.round(min / 15) * 15; return `${U.pad(Math.floor(r / 60))}:${U.pad(r % 60)}`; };
+  const redrawDay = async () => { await drawTasks(); await drawEvents(); };
   const drawTasks = async () => {
     const all = await db.all('tasks');
     const items = all.filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     alarmTasks = all.filter((t) => !t.done && t.alarmAt && iso(new Date(t.alarmAt)) === k);
+    schedTasks = items.filter((t) => t.time); // missions placées à l'horaire (glissées sur la grille ou heure choisie)
     const box = $('#dv-tasks');
     if (!box) return;
     box.innerHTML = tasksBlock(items, today, 'Aucune mission prévue ce jour-là.');
     bindDoneFold(box);
     $('#dv-count').textContent = items.length ? `${items.filter((t) => t.done).length}/${items.length}` : '';
-    bindTaskList(box, () => { drawTasks(); drawEvents(); });
+    bindTaskList(box, redrawDay);
   };
 
   // Horaire : une ligne par heure ; les événements qui se chevauchent se partagent la largeur
@@ -1836,15 +1840,18 @@ async function renderDay(arg) {
     const list = events.filter((e) => e.start < de && e.end > ds);
     const allDay = list.filter((e) => e.allDay);
     const timed = list.filter((e) => !e.allDay).map((e) => ({ ...e, s: Math.max(e.start, ds), e2: Math.min(e.end, de) }));
+    // Missions placées à l'horaire : des blocs comme les événements (ils partagent la largeur en cas de chevauchement)
+    const blocks = schedTasks.map((t) => { const [h, mi] = t.time.split(':').map(Number); const s = ds + (h * 60 + mi) * 60_000; return { task: t, s, e2: Math.min(s + (t.dur || 60) * 60_000, de) }; });
     const marks = alarmTasks.map((t) => ({ t, s: t.alarmAt }));
     const hr = (ms) => (ms - ds) / 3_600_000;
-    const from = Math.min(7, ...timed.map((e) => Math.floor(hr(e.s))), ...marks.map((x) => Math.floor(hr(x.s))));
-    const to = Math.max(22, ...timed.map((e) => Math.ceil(hr(e.e2))), ...marks.map((x) => Math.ceil(hr(x.s)) + 1));
+    const from = Math.min(7, ...timed.map((e) => Math.floor(hr(e.s))), ...blocks.map((e) => Math.floor(hr(e.s))), ...marks.map((x) => Math.floor(hr(x.s))));
+    const to = Math.max(22, ...timed.map((e) => Math.ceil(hr(e.e2))), ...blocks.map((e) => Math.ceil(hr(e.e2))), ...marks.map((x) => Math.ceil(hr(x.s)) + 1));
+    gridFrom = from;
     // Colonnes pour les chevauchements
-    timed.sort((a, b) => a.s - b.s || b.e2 - a.e2);
+    const laid = [...timed, ...blocks].sort((a, b) => a.s - b.s || b.e2 - a.e2);
     let group = [], groupEnd = 0;
     const flush = () => { const n = Math.max(...group.map((e) => e.col)) + 1; group.forEach((e) => (e.cols = n)); group = []; };
-    for (const e of timed) {
+    for (const e of laid) {
       if (group.length && e.s >= groupEnd) flush();
       const used = new Set(group.filter((x) => x.e2 > e.s).map((x) => x.col));
       e.col = 0; while (used.has(e.col)) e.col++;
@@ -1862,6 +1869,11 @@ async function renderDay(arg) {
         return `<div class="ev dayv-ev ${e.end < now ? 'past' : ''} ${h < 40 ? 'short' : ''}" data-ev="${esc(e.id)}" style="--c:${esc(e.color)};top:${top(e.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${e.col} / ${e.cols});width:calc((100% - 60px) / ${e.cols} - 4px)">
           <span class="ev-title">${withTeamLogos(esc(e.title))}</span><span class="ev-time">${U.fmtTime(new Date(e.start))} – ${U.fmtTime(new Date(e.end))}</span></div>`;
       }).join('')
+      + blocks.map((b) => {
+        const h = Math.max(top(b.e2) - top(b.s), 22), t = b.task;
+        return `<div class="dayv-task ${t.done ? 'done' : ''} ${h < 40 ? 'short' : ''}" data-tid="${t.id}" style="top:${top(b.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${b.col} / ${b.cols});width:calc((100% - 60px) / ${b.cols} - 4px)" title="Glisser pour changer l’heure · clic pour ouvrir">
+          <input type="checkbox" class="dvt-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie : ${esc(t.title)}"><span class="ev-title">✅ ${esc(t.title)}</span><span class="ev-time">${esc(timeLabel(t))}</span></div>`;
+      }).join('')
       + marks.map(({ t, s }) => `<a class="dayv-alarm" href="#/missions" style="top:${top(s) - 11}px" title="Alarme de mission">⏰ ${U.fmtTime(new Date(s))} · ${esc(t.title)}</a>`).join('')
       + (isToday && hr(now) >= from && hr(now) <= to ? `<div class="dayv-now" style="top:${top(now)}px"></div>` : '');
     const ad = $('.dayv-allday');
@@ -1869,9 +1881,63 @@ async function renderDay(arg) {
     ad.innerHTML = allDay.map((e) => evItem(e, true)).join('');
     bindEvents($('.dayv-cal'), list, drawEvents);
     $$('.dayv-slot').forEach((b) => (b.onclick = () => eventModal(k, drawEvents, { start: `${U.pad(+b.dataset.h)}:00`, end: `${U.pad(Math.min(+b.dataset.h + 1, 23))}:00` })));
+    // Blocs de mission : case = accomplie ; glisser = changer l'heure (par quart d'heure) ; clic = ouvrir la mission
+    $$('.dayv-task').forEach((el) => {
+      const id = el.dataset.tid;
+      el.querySelector('.dvt-cb').onchange = async (e) => { await setTaskDone(id, e.target.checked); redrawDay(); };
+      el.onpointerdown = (e) => {
+        if (e.button > 0 || e.target.closest('.dvt-cb')) return;
+        const y0 = e.clientY, top0 = el.offsetTop, pid = e.pointerId;
+        let moved = false;
+        try { el.setPointerCapture(pid); } catch { /* ignore */ }
+        el.onpointermove = (ev) => {
+          if (ev.pointerId !== pid) return;
+          if (!moved && Math.abs(ev.clientY - y0) < 5) return;
+          moved = true;
+          el.classList.add('moving');
+          const snap = DAY_H / 4;
+          el.style.top = `${Math.max(0, Math.round((top0 + ev.clientY - y0) / snap) * snap)}px`;
+          el.querySelector('.ev-time').textContent = `${minToHM(gridFrom * 60 + (el.offsetTop / DAY_H) * 60).replace(':', ' h ')}`;
+        };
+        el.onpointerup = el.onpointercancel = async (ev) => {
+          el.onpointermove = el.onpointerup = el.onpointercancel = null;
+          if (!moved) { openTaskEditor(id, redrawDay); return; }
+          await scheduleTask(id, k, minToHM(gridFrom * 60 + (el.offsetTop / DAY_H) * 60));
+          redrawDay();
+        };
+      };
+    });
     // Aujourd'hui : on fait défiler jusqu'à l'heure actuelle (une heure avant)
     if (isToday && !drawEvents.scrolled) { drawEvents.scrolled = true; $('.dayv-now')?.scrollIntoView({ block: 'center' }); }
   };
+
+  // Glisser une mission (poignée ⋮⋮ de la liste) sur l'horaire : elle prend l'heure visée (par quart d'heure)
+  const grid = $('#dv-grid');
+  grid.dataset.dropDay = k;
+  const timeAt = (y) => {
+    const min = gridFrom * 60 + ((y - grid.getBoundingClientRect().top) / DAY_H) * 60;
+    return Math.max(0, Math.min(23 * 60 + 45, Math.round(min / 15) * 15));
+  };
+  let ghost = null;
+  grid.addEventListener('lp-drag-over', (e) => {
+    const min = timeAt(e.detail.y);
+    if (!ghost) { ghost = document.createElement('div'); ghost.className = 'dayv-drop'; grid.append(ghost); }
+    ghost.style.top = `${((min / 60) - gridFrom) * DAY_H}px`;
+    ghost.style.height = `${DAY_H - 2}px`;
+    ghost.innerHTML = `<b>${esc(e.detail.title)}</b><span>${minToHM(min).replace(':', ' h ')}</span>`;
+  });
+  grid.addEventListener('lp-drag-leave', () => { ghost?.remove(); ghost = null; });
+  grid.addEventListener('lp-drop', async (e) => {
+    ghost?.remove(); ghost = null;
+    const time = minToHM(timeAt(e.detail.y));
+    const before = await db.get('tasks', e.detail.id);
+    await scheduleTask(e.detail.id, k, time);
+    redrawDay();
+    showUndo(`🕒 « ${before?.title || 'Mission'} » placée à ${time.replace(':', ' h ')}`, async () => {
+      await scheduleTask(e.detail.id, before?.date || k, before?.time || null, before?.dur);
+      redrawDay();
+    }, 5000);
+  });
 
   $('#dv-add').onclick = () => eventModal(k, drawEvents);
   $('#dv-addt').onsubmit = async (e) => {

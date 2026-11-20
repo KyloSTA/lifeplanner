@@ -182,6 +182,25 @@ export async function makeStep(id, targetId) {
   return tgt;
 }
 
+/* ---------- Mission placée à l'horaire (vue Jour) : t.time « HH:MM » et t.dur (minutes) ---------- */
+export const DURS = [15, 30, 45, 60, 90, 120, 180, 240];
+const hm = (min) => { const h = Math.floor(min / 60), m = min % 60; return `${h} h${m ? ' ' + String(m).padStart(2, '0') : ''}`; };
+const toMin = (s) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+/** « 9 h – 10 h 30 » */
+export function timeLabel(t) {
+  if (!t.time) return '';
+  const s = toMin(t.time), e = Math.min(s + (t.dur || 60), 24 * 60);
+  return `${hm(s)} – ${hm(e)}`;
+}
+/** Place la mission à une heure (time = null : la retire de l'horaire). */
+export async function scheduleTask(id, day, time, dur) {
+  return editTask(id, (t) => {
+    if (day) t.date = day;
+    t.time = time || null;
+    if (time) t.dur = dur || t.dur || 60;
+  });
+}
+
 async function editTask(id, fn) {
   const t = await db.get('tasks', id);
   if (!t) return;
@@ -221,9 +240,11 @@ export function taskHTML(t, ref, opts = {}) {
   const focusChip = timer.current()?.taskId === t.id ? '<span class="chip focus-chip" title="Minuteur en cours">⏱ focus</span>' : '';
   const alarmChip = t.alarmAt && !t.done
     ? `<span class="chip alarm-chip ${t.alarmState === 'ringing' ? 'ringing' : ''}" title="Alarme">⏰ ${esc(alarms.label(t.alarmAt))}</span>` : '';
+  const timeChip = t.time ? `<span class="chip time-chip" title="Placée à l’horaire">🕒 ${esc(timeLabel(t))}</span>` : '';
   const chips = [
     couple.whoChip(t), // app couple : pour qui
     focusChip,
+    timeChip,
     alarmChip,
     // Pastilles cliquables : le projet ouvre sa page ; l'objectif ouvre son projet (sinon la page Objectifs)
     goal && !opts.hideGoal ? `<a class="chip goal-chip chip-link" href="${goal.projectId ? `#/note/${goal.projectId}` : '#/goals'}" title="Objectif : ${esc(goal.title)}${goal.projectId ? ' (ouvrir son projet)' : ''}">🎯 ${esc(goal.title)}</a>` : '',
@@ -285,6 +306,8 @@ function startDrag(e, li, redraw) {
   // à la poignée, ce qui arrêtait le glisser après une seule place.
   const startY = e.clientY;
   let moved = false;
+  let zone = null; // zone de dépôt survolée (ex. l'horaire de la vue Jour : data-drop-day)
+  const title = li.querySelector('.t-title')?.textContent || 'Mission';
   li.classList.add('dragging');
   ul.classList.add('drag-on');
   const onMove = (ev) => {
@@ -292,6 +315,14 @@ function startDrag(e, li, redraw) {
     ev.preventDefault();
     if (!moved && Math.abs(ev.clientY - startY) < 4) return;
     moved = true;
+    // Au-dessus d'une zone de dépôt (horaire) : on ne réordonne pas la liste, la zone montre l'heure visée
+    const z = document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => el.dataset?.dropDay);
+    if (z !== zone) { zone?.dispatchEvent(new CustomEvent('lp-drag-leave')); zone = z || null; li.classList.toggle('drag-out', !!zone); }
+    if (zone) {
+      zone.dispatchEvent(new CustomEvent('lp-drag-over', { detail: { y: ev.clientY, title } }));
+      if (ev.clientY < 60) scrollBy(0, -12); else if (ev.clientY > innerHeight - 60) scrollBy(0, 12);
+      return;
+    }
     // On place la mission avant la première voisine dont le milieu est sous le doigt
     const others = [...ul.children].filter((x) => x !== li && x.classList.contains('task'));
     const before = others.find((x) => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
@@ -304,9 +335,13 @@ function startDrag(e, li, redraw) {
     removeEventListener('pointermove', onMove);
     removeEventListener('pointerup', onUp);
     removeEventListener('pointercancel', onUp);
-    li.classList.remove('dragging');
+    li.classList.remove('dragging', 'drag-out');
     ul.classList.remove('drag-on');
     if (!moved) return;
+    if (zone) { // déposée sur l'horaire : la zone donne l'heure à la mission
+      zone.dispatchEvent(new CustomEvent('lp-drop', { detail: { id: li.dataset.id, y: ev?.clientY ?? startY } }));
+      return;
+    }
     await saveOrder(ul);
     redraw();
   };
@@ -467,6 +502,8 @@ export async function openTaskEditor(id, onChange = () => {}) {
       </div>
       <div class="tm-meta">
         <label><span>📅 Date</span><input type="date" class="tm-date" value="${t.date || ''}"></label>
+        <label><span>🕒 Heure</span><input type="time" class="tm-time" step="900" value="${t.time || ''}" title="Place la mission dans l’horaire de la journée (vue Jour)"></label>
+        ${t.time ? `<label><span>⏳ Durée</span><select class="tm-dur">${DURS.map((m) => `<option value="${m}" ${m === (t.dur || 60) ? 'selected' : ''}>${m < 60 ? m + ' min' : hm(m).replace(' h', ' h').trim()}</option>`).join('')}</select></label>` : ''}
         ${t.goalId ? goalSel : ''}
         ${t.projectId ? projSel : ''}
         ${couple.ON ? `<label><span>👤 Pour</span><select class="tm-who">${couple.whoOptions(t.who || '')}</select></label>` : ''}
@@ -542,6 +579,12 @@ export async function openTaskEditor(id, onChange = () => {}) {
 
     box.querySelector('.tm-cb').onchange = async (e) => { await flush(); await setTaskDone(id, e.target.checked); changed(); draw(); };
     box.querySelector('.tm-date').onchange = async (e) => { await editTask(id, (x) => { x.date = e.target.value || null; }); changed(); };
+    box.querySelector('.tm-time').onchange = async (e) => {
+      const v = e.target.value;
+      await editTask(id, (x) => { x.time = v || null; if (v) { x.dur ||= 60; x.date ||= U.iso(new Date()); } });
+      changed(); draw();
+    };
+    box.querySelector('.tm-dur')?.addEventListener('change', async (e) => { await editTask(id, (x) => { x.dur = Number(e.target.value) || 60; }); changed(); });
     box.querySelector('.tm-goal').onchange = async (e) => { await setTaskGoal(id, e.target.value || null); changed(); };
     box.querySelector('.tm-proj').onchange = async (e) => { await setTaskProject(id, e.target.value || null); changed(); };
     box.querySelector('.tm-who')?.addEventListener('change', async (e) => { await editTask(id, (x) => { x.who = e.target.value || null; }); changed(); });
