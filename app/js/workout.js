@@ -769,7 +769,7 @@ async function tplEditor(ctx, id, onDone, st = null) {
     const drawEx = () => {
       m.querySelector('#tp-exs').innerHTML = exs.map((e, i) => `<div class="tp-row" data-i="${i}">
         <input data-f="name" value="${esc(e.name)}" placeholder="Ex. Squat" aria-label="Exercice ${i + 1}">
-        <input data-f="sets" type="number" min="1" max="20" value="${e.sets}" aria-label="Séries">
+        <input data-f="sets" type="number" inputmode="numeric" min="1" max="20" value="${e.sets}" aria-label="Séries">
         <input data-f="reps" value="${esc(e.reps)}" aria-label="Répétitions" placeholder="10">
         <input data-f="weight" value="${esc(e.weight)}" inputmode="decimal" aria-label="Charge" placeholder="—">
         <span class="tp-tools"><button type="button" class="btn sm" data-up ${i ? '' : 'disabled'} aria-label="Monter">↑</button><button type="button" class="btn sm" data-rm aria-label="Retirer">×</button></span>

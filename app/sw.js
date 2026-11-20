@@ -4,12 +4,12 @@
 // sa propre base, ses propres fichiers (page, manifeste, icônes) et le code commun via « base » (« ../ »).
 const CFG = self.LP_SW || {};
 const PREFIX = CFG.cache || 'lifeplanner';
-const CACHE = 'lifeplanner-v160'.replace('lifeplanner', PREFIX);
+const CACHE = 'lifeplanner-v161'.replace('lifeplanner', PREFIX);
 const BASE = CFG.base || '';
 const OWN = CFG.own || ['./', 'index.html', 'widget.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/logo.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 const SHARED = [
   'css/styles.css',
-  'js/config.js', 'js/couple.js', 'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js', 'js/habits.js', 'js/rbq.js', 'js/workout.js', 'js/images.js', 'js/missions.js', 'js/docs.js', 'js/assoc.js', 'js/news.js', 'js/reminders.js', 'js/rpg.js', 'js/rpg-data.js', 'js/habs.js', 'js/finance.js', 'js/usage.js', 'js/activities.js', 'js/linkmeta.js', 'js/teams.js', 'js/stretch.js', 'js/shots.js', 'js/quickadd.js', 'js/digest.js',
+  'js/config.js', 'js/couple.js', 'js/app.js', 'js/db.js', 'js/util.js', 'js/gcal.js', 'js/ink.js', 'js/widget.js', 'js/game.js', 'js/avatar.js', 'js/tasks.js', 'js/brain.js', 'js/quotes.js', 'js/assistant.js', 'js/alarms.js', 'js/launcher.js', 'js/timer.js', 'js/sync.js', 'js/clips.js', 'js/habits.js', 'js/rbq.js', 'js/workout.js', 'js/images.js', 'js/missions.js', 'js/docs.js', 'js/assoc.js', 'js/news.js', 'js/reminders.js', 'js/rpg.js', 'js/rpg-data.js', 'js/habs.js', 'js/finance.js', 'js/usage.js', 'js/activities.js', 'js/linkmeta.js', 'js/teams.js', 'js/stretch.js', 'js/shots.js', 'js/quickadd.js', 'js/digest.js', 'js/swipe.js',
 ];
 const ASSETS = [...OWN, ...SHARED.map((a) => BASE + a)];
 

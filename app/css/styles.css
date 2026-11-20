@@ -2831,3 +2831,51 @@ body.ink-mode #qa-fab, body:has(#modal-root > *) #qa-fab { display: none; }
 .fi-empty .empty-acts { justify-content: flex-start; }
 .link-btn { border: 0; background: none; padding: 0; margin-left: 4px; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 .link-btn:hover { text-decoration: underline; }
+
+/* Gestes de balayage (au doigt) */
+@media (pointer: coarse) {
+  .tasks > .task, .note-grid > .note-card { touch-action: pan-y; }
+  .tasks, .note-grid { overflow-x: clip; }
+}
+.swiping { position: relative; z-index: 2; user-select: none; }
+.swiping::after { content: attr(data-swipe-label); position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap; font-weight: 700; font-size: 14px; color: var(--muted); pointer-events: none; transition: color .1s; }
+.swipe-r::after { right: calc(100% + 14px); }
+.swipe-l::after { left: calc(100% + 14px); }
+.swipe-go.swipe-r { box-shadow: -6px 0 0 var(--ok) inset; }
+.swipe-go.swipe-l { box-shadow: 6px 0 0 var(--accent) inset; }
+.swipe-go.swipe-r::after { color: var(--ok); }
+.swipe-go.swipe-l::after { color: var(--accent); }
+
+/* 📱 Barre du bas personnalisable (ordre choisi, cellulaire seulement) */
+@media (max-width: 600px) {
+  .rail > a[data-route] { order: var(--ph-order, 0); }
+  .rail > .rail-bottom, .rail > #rail-more { order: 90; }
+}
+.more-custom { width: 100%; margin-top: 12px; justify-content: center; }
+.pt-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.pt-item { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.pt-item svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pt-item span { flex: 1; min-width: 0; }
+.pt-item b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; }
+.pt-item.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.pt-item.on b { background: var(--accent); color: #fff; }
+.pt-item:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Aujourd'hui allégée sur cellulaire */
+.today-more { display: none; }
+@media (max-width: 600px) {
+  .today .card.m-extra { display: none; }
+  .today-more:not([hidden]) { display: flex; width: 100%; justify-content: center; margin-top: 12px; min-height: 44px; }
+}
+
+/* Doigt : zones de toucher d'au moins 44 px (✓, ×, petits boutons), sans changer l'apparence */
+@media (pointer: coarse) {
+  .t-cb, .sh-check input, .sub input[type="checkbox"], [data-sub] { min-width: 24px; min-height: 24px; }
+  .t-del, .sh-item .x, .sub .x, .tm-img .x, .up-acts .btn, .subs-acts .btn, .btn.sm { min-width: 44px; min-height: 44px; }
+  .t-del, .sh-item .x, .sub .x { display: inline-grid; place-items: center; }
+  .chip-btn, .qa-types .chip, .fi-tabs button { min-height: 44px; }
+  .t-subs-toggle { min-height: 36px; padding-inline: 10px; }
+  .sh-check, label:has(> .t-cb) { padding: 10px; margin: -10px; }
+}
+/* Le bouton ＋ flottant ne cache jamais le bas de la page */
+main { padding-bottom: 96px !important; }

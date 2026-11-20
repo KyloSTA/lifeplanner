@@ -34,6 +34,7 @@ import * as rpg from './rpg.js';
 import * as couple from './couple.js';
 import * as quick from './quickadd.js';
 import * as digest from './digest.js';
+import { swipeable } from './swipe.js';
 
 const { esc, iso, cap } = U;
 const $ = (s, r = document) => r.querySelector(s);
@@ -583,7 +584,35 @@ function foldableCards(root) {
       });
       head.append(b);
     }
+    trimPhone();
   };
+  // Cellulaire : Missions, Objectifs et les 2 premières cartes de côté ; les autres derrière « Afficher plus »
+  const PHONE_SIDE = 2;
+  const phoneMQ = matchMedia('(max-width: 600px)');
+  const trimPhone = () => {
+    const cols = root; // root = .today-cols
+    if (!cols) return;
+    let more = cols.parentElement?.querySelector(':scope > #today-more');
+    if (!more) {
+      more = document.createElement('button');
+      more.type = 'button'; more.id = 'today-more'; more.className = 'btn today-more';
+      more.addEventListener('click', () => {
+        const open = localStorage.getItem('lp.todayMore') !== '1';
+        try { localStorage.setItem('lp.todayMore', open ? '1' : ''); } catch { /* ignore */ }
+        trimPhone();
+        if (!open) cols.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
+      cols.after(more);
+    }
+    const side = [...root.querySelectorAll('.col-side > .card')].filter((c) => !c.hidden && !c.classList.contains('is-removed') && !c.classList.contains('t-hint') && c.innerHTML.trim());
+    const open = (() => { try { return localStorage.getItem('lp.todayMore') === '1'; } catch { return false; } })();
+    const extra = phoneMQ.matches ? side.slice(PHONE_SIDE) : [];
+    root.querySelectorAll('.m-extra').forEach((c) => { if (!extra.includes(c)) c.classList.remove('m-extra'); });
+    extra.forEach((c) => c.classList.toggle('m-extra', !open));
+    more.hidden = !extra.length;
+    more.textContent = open ? 'Afficher moins ▴' : `Afficher ${extra.length} autre${extra.length > 1 ? 's' : ''} carte${extra.length > 1 ? 's' : ''} ▾`;
+  };
+  phoneMQ.addEventListener?.('change', trimPhone);
   decorate();
   db.get('settings', 'todayHidden').then((v) => { removed = v || []; decorate(); }).catch(() => {});
   // Les cartes se remplissent (et se redessinent) après coup : on ajoute le bouton à chaque nouvel en-tête
@@ -1798,6 +1827,27 @@ async function renderBrain() {
           <li><b>Redécouvre</b> tes anciennes notes pour qu’elles restent en mémoire.</li></ol>
           <p class="muted">Chaque action donne des points de Savoir : ton avatar gagne des étincelles, un compagnon hibou, une aura… jusqu’au stade Archisage.</p></div>`);
     markSel();
+    // Au doigt : balayer → pour archiver (ou ressortir des archives), ← pour épingler / désépingler
+    $$('#ng .note-card').forEach((card) => {
+      const nid = idOf(card);
+      const name = card.querySelector('.nc-head b')?.textContent || 'Note';
+      swipeable(card, {
+        right: { label: brainState.arch ? '↩ Ressortir' : '🗄 Archiver', run: async () => {
+          const to = !brainState.arch;
+          await brain.setArchived(nid, to);
+          await renderBrainKeep([]);
+          showUndo(`${to ? '🗄 Archivée' : '↩ Ressortie'} : « ${name} »`, async () => { await brain.setArchived(nid, !to); router(); }, 5000);
+        } },
+        left: { label: card.classList.contains('pinned') ? '📌 Détacher' : '📌 Épingler', run: async () => {
+          const n = await db.get('notes', nid);
+          if (!n) return;
+          n.pinned = !n.pinned;
+          await brain.saveNote(n, { touch: false });
+          await renderBrainKeep([]);
+          toast(n.pinned ? `📌 « ${name} » épinglée` : `« ${name} » détachée`);
+        } },
+      });
+    });
   };
 
   /* ---------- Sélection multiple : classer plusieurs éléments d'un coup ---------- */
@@ -4274,15 +4324,48 @@ async function applyNavOrder() {
   const rail = $('#rail');
   const end = rail.querySelector('#rail-more'); // « Plus » puis Réglages restent en bas
   const hidden = (await db.get('settings', 'navHidden')) || []; // pages retirées du menu (toujours accessibles dans Réglages → Menu)
+  // Barre du bas choisie à la main (cellulaire seulement, n'a aucun effet sur le menu du PC)
+  const phone = ((await db.get('settings', 'phoneTabs')) || []).filter((k) => rail.querySelector(`a[data-route="${k}"]`)).slice(0, PHONE_TABS);
   let i = 0;
   (await navOrder()).forEach((k) => {
     const a = rail.querySelector(`a[data-route="${k}"]`);
     if (!a) return;
     rail.insertBefore(a, end);
-    a.classList.toggle('nav-hidden', hidden.includes(k));
+    a.classList.toggle('nav-hidden', hidden.includes(k) && !phone.includes(k));
+    a.style.removeProperty('--ph-order');
+    if (phone.length) {
+      a.classList.toggle('nav-extra', !phone.includes(k));
+      if (phone.includes(k)) a.style.setProperty('--ph-order', phone.indexOf(k));
+      return;
+    }
     if (hidden.includes(k)) return;
     a.classList.toggle('nav-extra', i >= PHONE_TABS);
     i++;
+  });
+}
+/** « Plus » → Personnaliser : choisir les 4 onglets de la barre du bas du cellulaire, dans l'ordre touché. */
+async function editPhoneTabs() {
+  const order = await navOrder();
+  const all = order.map((k) => $(`#rail a[data-route="${k}"]`)).filter(Boolean)
+    .map((a) => ({ k: a.dataset.route, l: a.querySelector('span')?.textContent || a.dataset.route, ico: a.querySelector('svg')?.outerHTML || '' }));
+  let pick = ((await db.get('settings', 'phoneTabs')) || []).filter((k) => all.some((x) => x.k === k));
+  if (!pick.length) pick = $$('#rail > a[data-route]:not(.nav-extra):not(.nav-hidden)').map((a) => a.dataset.route).filter((k) => all.some((x) => x.k === k)).slice(0, PHONE_TABS);
+  modal(`<h2>Barre du bas</h2><p class="muted" style="margin-top:0">Touche jusqu’à ${PHONE_TABS} pages, dans l’ordre voulu. Les autres restent dans « Plus ».</p>
+    <div class="pt-list"></div>
+    <div class="modal-actions"><button class="btn" id="pt-reset">Par défaut</button><button class="btn primary" id="pt-ok">Enregistrer</button></div>`, (m, close) => {
+    const draw = () => {
+      m.querySelector('.pt-list').innerHTML = all.map((x) => { const n = pick.indexOf(x.k); return `<button type="button" class="pt-item ${n >= 0 ? 'on' : ''}" data-k="${x.k}" ${n < 0 && pick.length >= PHONE_TABS ? 'disabled' : ''}>${x.ico}<span>${esc(x.l)}</span><b>${n >= 0 ? n + 1 : ''}</b></button>`; }).join('');
+      m.querySelectorAll('[data-k]').forEach((b) => (b.onclick = () => { const k = b.dataset.k; pick = pick.includes(k) ? pick.filter((x) => x !== k) : [...pick, k]; draw(); }));
+    };
+    draw();
+    m.querySelector('#pt-reset').onclick = async () => { await db.del('settings', 'phoneTabs'); await applyNavOrder(); close(); toast('Barre du bas par défaut'); };
+    m.querySelector('#pt-ok').onclick = async () => {
+      if (!pick.length) { toast('Choisis au moins une page', 'err'); return; }
+      await db.put('settings', pick, 'phoneTabs');
+      await applyNavOrder();
+      close();
+      toast('📱 Barre du bas enregistrée');
+    };
   });
 }
 
@@ -4429,7 +4512,8 @@ $('#rail-more').onclick = () => {
     const label = route === 'hero' ? 'Ton héros' : a.querySelector('span')?.textContent || '';
     const icon = route === 'hero' ? (a.querySelector('svg.avatar')?.outerHTML || '') : a.querySelector('svg')?.outerHTML || '';
     return `<a href="${a.getAttribute('href')}" data-close class="${a.classList.contains('active') ? 'active' : ''}">${icon}<span>${esc(label)}</span></a>`;
-  }).join('')}</nav>`, (m, close) => {
+  }).join('')}</nav><button type="button" class="btn more-custom" data-pt>✏️ Personnaliser la barre du bas</button>`, (m, close) => {
+    m.querySelector('[data-pt]').addEventListener('click', () => { close(); editPhoneTabs(); });
     $$('a', m).forEach((a) => a.addEventListener('click', close));
     m.querySelector('[data-gs]').addEventListener('click', (e) => { e.preventDefault(); close(); openSearch(); });
     m.querySelector('[data-sync]').addEventListener('click', () => { close(); syncDotClick(); });
