@@ -430,14 +430,21 @@ async function renderToday() {
         <button class="btn" id="focus-toggle" aria-pressed="false" title="Mode Focus : seulement l’essentiel (3 missions, agenda, habitudes)">🎯 Focus</button>
         <button class="btn" id="as-open" title="Demander à l’assistant (ajouter, déplacer, cocher…)">✨ Assistant</button>
         <button class="btn" id="add-ev">+ Événement</button>
-        <a class="btn primary" href="#/page/day-${today}">✎ Écrire à la main</a>
+        <a class="journal-btn" href="#/page/day-${today}" title="Écrire à la main dans le journal du jour" aria-label="Écrire à la main dans le journal du jour">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <defs><linearGradient id="jb-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6c56e"/><stop offset="1" stop-color="#a8842f"/></linearGradient></defs>
+            <path d="M6 12c5-2 11-2 17 1v26c-6-3-12-3-17-1z" fill="#7a1e2c" stroke="url(#jb-g)" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M42 12c-5-2-11-2-17 1v26c6-3 12-3 17-1z" fill="#9b2c3a" stroke="url(#jb-g)" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M10 18c3-1 6-1 9 .5M10 23c3-1 6-1 9 .5M10 28c3-1 6-1 9 .5" stroke="#f2ede6" stroke-opacity=".55" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <path d="M33 31l9-15 3 2-9 15-4 1.5z" fill="url(#jb-g)" stroke="#1a1414" stroke-width=".8" stroke-linejoin="round"/>
+          </svg><span>Journal</span></a>
       </div>
     </header>
     <div class="today">
       <section class="card today-top ${foldedSet().has('today-top') ? 'collapsed' : ''}">
+        <button type="button" class="top-fold" id="top-fold" aria-expanded="${!foldedSet().has('today-top')}" title="${foldedSet().has('today-top') ? 'Afficher l’agenda et l’humeur' : 'Réduire'}" aria-label="${foldedSet().has('today-top') ? 'Afficher l’agenda et l’humeur' : 'Réduire'}">${FOLD_ICON}</button>
         <div class="today-summary" id="c-hero"></div>
         <div class="top-agenda"><div id="c-agenda"><div class="skeleton"></div></div><div class="ag-journal" id="c-journal"></div></div>
-        <button type="button" class="top-fold" id="top-fold" aria-expanded="${!foldedSet().has('today-top')}">${FOLD_ICON}<span>${foldedSet().has('today-top') ? 'Agenda et humeur' : 'Réduire'}</span></button>
       </section>
       <section class="card capture-card" id="c-brain"></section>
       <div class="today-cols">
@@ -467,7 +474,9 @@ async function renderToday() {
     on ? set.add('today-top') : set.delete('today-top');
     try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
     e.currentTarget.setAttribute('aria-expanded', String(!on));
-    e.currentTarget.querySelector('span').textContent = on ? 'Agenda et humeur' : 'Réduire';
+    const lbl = on ? 'Afficher l’agenda et l’humeur' : 'Réduire';
+    e.currentTarget.title = lbl;
+    e.currentTarget.setAttribute('aria-label', lbl);
   };
   $('#add-ev').onclick = () => eventModal(today, renderToday);
   $('#as-open').onclick = openAssistant;
@@ -1513,7 +1522,6 @@ async function renderBrain() {
     <div class="brain-top">
       <section class="card capture-card brain-cap"><div class="card-head"><h2>💡 Capture rapide</h2><span class="muted cap-stats">${inbox ? `📥 ${inbox} à classer` : ''}</span></div>${captureForm('cap')}</section>
       <div class="brain-aside">
-        <a class="card hero-card evo-card" id="c-evo" href="#/hero"></a>
         <section class="card" id="c-redisc"></section>
       </div>
     </div>
