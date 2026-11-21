@@ -2319,9 +2319,13 @@ async function renderPage(id) {
       toast(err.message === 'unsupported' ? 'Ton navigateur ne permet pas de lire le presse-papiers : utilise Ctrl + V' : 'Accès au presse-papiers refusé : autorise-le quand Edge le demande, ou utilise Ctrl + V', 'err');
     }
   };
+  // Menu du clic droit : souris (clic droit), stylet (bouton latéral touché sans effacer) ou doigt (appui long)
   ed.page.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if ((e.pointerType || ed.lastPointer) !== 'mouse') return;
+    if ((e.pointerType || ed.lastPointer) === 'mouse') openCtx(e);
+  });
+  ed.page.addEventListener('ink-menu', (e) => openCtx(e.detail));
+  function openCtx(e) {
     closeCtx();
     const at = ed.pos(e);
     const hit = ed.imageAt(...at);
@@ -2349,7 +2353,7 @@ async function renderPage(id) {
     menu.querySelector('button')?.focus();
     addEventListener('pointerdown', ctxOutside, true);
     addEventListener('keydown', ctxKey);
-  });
+  }
 
   const syncUndo = () => {
     $('#undo').disabled = !ed.undoStack.length;
