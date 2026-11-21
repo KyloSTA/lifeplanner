@@ -35,6 +35,7 @@ import * as couple from './couple.js';
 import * as quick from './quickadd.js';
 import * as digest from './digest.js';
 import { swipeable } from './swipe.js';
+import * as videodock from './videodock.js';
 import { bindCapture, brainState, captureForm, evoCard, renderBrain, renderNote } from './page-brain.js';
 
 const { esc, iso, cap } = U;
@@ -303,6 +304,8 @@ drawSyncDot();
 
 $('#qa-fab')?.addEventListener('click', () => openQuickAdd());
 $('#brand-add')?.addEventListener('click', () => openQuickAdd());
+$('#brand-video')?.addEventListener('click', () => videodock.toggle());
+videodock.start(); // remet le dock vidéo tel qu'il était
 // ↑ Remonter en haut : un bouton apparaît quand on a défilé ; toucher l'onglet déjà ouvert du menu fait la même chose
 {
   const toTop = () => view.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3597,7 +3600,7 @@ $('#rail-more').onclick = () => {
     const on = b.classList.contains('active');
     return `<a href="${href}" data-close class="${on ? 'active' : ''}">${b.querySelector('svg').outerHTML}<span>${esc(b.getAttribute('aria-label'))}</span></a>`;
   }).join('');
-  const search = `<a href="#" data-gs>${$('#brand-search svg').outerHTML}<span>Rechercher</span></a>`;
+  const search = `<a href="#" data-gs>${$('#brand-search svg').outerHTML}<span>Rechercher</span></a><a href="#" data-vd>${$("#brand-video svg").outerHTML}<span>${videodock.isOpen() ? "Fermer l’espace vidéo" : "Espace vidéo"}</span></a>`;
   const ss = syncState();
   modal(`<h2>Plus</h2><button type="button" class="more-sync" data-s="${ss.c}" data-sync><i></i><span>${esc(ss.t)}</span></button><nav class="more-sheet">${search}${launch}${links.map((a) => {
     const route = a.dataset.route;
@@ -3607,7 +3610,8 @@ $('#rail-more').onclick = () => {
   }).join('')}</nav><button type="button" class="btn more-custom" data-pt>✏️ Personnaliser la barre du bas</button>`, (m, close) => {
     m.querySelector('[data-pt]').addEventListener('click', () => { close(); editPhoneTabs(); });
     $$('a', m).forEach((a) => a.addEventListener('click', close));
-    m.querySelector('[data-gs]').addEventListener('click', (e) => { e.preventDefault(); close(); openSearch(); });
+    m.querySelector('[data-gs]').addEventListener('click', (e) => { e.preventDefault(); close(); openSearch(); }); 
+    m.querySelector('[data-vd]').addEventListener('click', (e) => { e.preventDefault(); close(); videodock.toggle(); });
     m.querySelector('[data-sync]').addEventListener('click', () => { close(); syncDotClick(); });
   });
 };

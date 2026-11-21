@@ -3044,3 +3044,43 @@ body.ink-fullscreen #qa-fab, body.ink-fullscreen #to-top { display: none; }
 .ink-shell.bar-hidden > .ink-bar, .ink-shell.bar-hidden > .ink-docs { display: none !important; }
 .ink-shell.bar-hidden .ink-bar-show { display: flex; align-items: center; gap: 4px; position: absolute; top: 12px; right: 30px; z-index: 30; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,.25); cursor: pointer; opacity: .85; }
 .ink-shell.bar-hidden .ink-bar-show:hover { opacity: 1; border-color: var(--accent); color: var(--accent); }
+
+/* 📺 Dock vidéo : colonne à droite (PC), bande au-dessus de la barre du bas (cellulaire) */
+#vdock[hidden] { display: none; }
+#vdock { flex: none; width: var(--vdock-w, 440px); display: flex; flex-direction: column; gap: 10px; padding: 14px; border-left: 1px solid var(--border); background: var(--surface); overflow-y: auto; }
+.vd-head { display: flex; align-items: center; gap: 4px; }
+.vd-title { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-sizes { display: inline-flex; gap: 2px; }
+.vd-btn { min-width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0 6px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.vd-btn:hover, .vd-btn.on { color: var(--accent); border-color: var(--border); background: var(--surface-2); }
+.vd-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.vd-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.vd-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; }
+.vd-link { color: var(--accent); text-decoration: none; font-weight: 600; }
+.vd-empty { aspect-ratio: 16 / 9; display: grid; place-content: center; gap: 6px; text-align: center; padding: 16px; border: 2px dashed var(--border); border-radius: 12px; color: var(--muted); font-size: 13px; }
+.vd-empty b { color: var(--text); font-size: 15px; }
+.vd-empty p { margin: 0; }
+body.vdock-min #vdock .vd-body { display: none; }
+body.vdock-min #vdock { width: auto; min-width: 220px; }
+.vd-min { display: none; }
+/* La carte du Cerveau : ▶ cliquable */
+.nc-yt .nc-play { pointer-events: auto; border: 0; cursor: pointer; }
+.nc-yt .nc-play:hover { background: #e00; transform: translate(-50%, -50%) scale(1.08); }
+.yt-acts { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 900px) {
+  #vdock { position: fixed; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 58; width: auto; max-height: 48vh; padding: 8px 10px; border-left: 0; border-top: 1px solid var(--border); box-shadow: 0 -8px 24px rgba(0,0,0,.35); }
+  .vd-sizes { display: none; }
+  .vd-min { display: inline-grid; }
+  .vd-frame { max-height: 36vh; }
+  body.vdock-min #vdock { min-width: 0; }
+  body.vdock-on:not(.vdock-min) main { padding-bottom: calc(56vw + 120px) !important; }
+  body.vdock-on #qa-fab, body.vdock-on #to-top { bottom: calc(64px + 56vw + 80px + env(safe-area-inset-bottom)); }
+  body.vdock-on.vdock-min #qa-fab, body.vdock-on.vdock-min #to-top { bottom: calc(64px + 60px + env(safe-area-inset-bottom)); }
+}
+@media (min-width: 601px) and (max-width: 900px) { #vdock { bottom: 0; } }
+@media (min-width: 901px) {
+  body.vdock-on #qa-fab { right: calc(var(--vdock-w, 440px) + 24px); }
+  body.vdock-on #to-top { right: calc(var(--vdock-w, 440px) + 32px); }
+  body.vdock-on.vdock-min #qa-fab { right: 260px; }
+  body.vdock-on.vdock-min #to-top { right: 268px; }
+}
