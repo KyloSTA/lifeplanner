@@ -2965,3 +2965,8 @@ body.ink-mode #to-top, body:has(#modal-root > *) #to-top { display: none; }
   #c-redisc .rc-row .redisc { display: flex; flex-direction: column; justify-content: center; }
   #c-redisc > .empty-sm { flex: 1; display: grid; place-items: center; text-align: center; }
 }
+.dayv-task { padding-right: 34px; }
+.dayv-task .dvt-x { position: absolute; top: 3px; right: 4px; width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.dayv-task .dvt-x:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+.dayv-task.short .dvt-x { top: 0; height: 22px; }
+@media (pointer: coarse) { .dayv-task .dvt-x { width: 34px; height: 34px; top: 0; right: 0; } }
