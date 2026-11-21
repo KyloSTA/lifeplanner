@@ -225,6 +225,7 @@ export class InkEditor {
   /* ---------- Zoom : pincer à deux doigts (ou Ctrl + molette / pavé tactile) ---------- */
   // Pendant le geste : simple agrandissement CSS (fluide) ; au relâchement : la page est redessinée nette.
   startPinch() {
+    clearTimeout(this.lpTimer);
     this.pan = null;
     cancelAnimationFrame(this.momentum);
     const [a, b] = [...this.touches.values()];
@@ -282,12 +283,22 @@ export class InkEditor {
   /* ---------- Défilement au doigt (avec élan) ---------- */
   startPan(e) {
     cancelAnimationFrame(this.momentum);
-    this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY, top: this.sc.scrollTop, left: this.sc.scrollLeft, samples: [[performance.now(), e.clientX, e.clientY]] };
+    this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY, top: this.sc.scrollTop, left: this.sc.scrollLeft, samples: [[performance.now(), e.clientX, e.clientY]], moved: 0 };
     this.capture(e);
+    // Appui long du doigt (sans bouger) : « clic droit » → menu Coller / Ajouter une image
+    clearTimeout(this.lpTimer);
+    const p = this.pan;
+    this.lpTimer = setTimeout(() => {
+      if (this.pan !== p || p.moved > 8 || this.pinch) return;
+      this.pan = null;
+      this.page.dispatchEvent(new CustomEvent('ink-menu', { detail: { clientX: p.x, clientY: p.y } }));
+      try { navigator.vibrate?.(15); } catch { /* ignore */ }
+    }, 550);
   }
 
   movePan(e) {
     const p = this.pan;
+    p.moved = Math.max(p.moved, Math.hypot(e.clientX - p.x, e.clientY - p.y));
     this.sc.scrollTop = p.top - (e.clientY - p.y);
     this.sc.scrollLeft = p.left - (e.clientX - p.x);
     const now = performance.now();
@@ -296,6 +307,7 @@ export class InkEditor {
   }
 
   endPan() {
+    clearTimeout(this.lpTimer);
     const p = this.pan;
     this.pan = null;
     if (!p) return;
@@ -522,7 +534,8 @@ export class InkEditor {
     this.capture(e);
     const [x, y] = this.pos(e);
     if (this.isEraser(e)) {
-      this.erasing = { id: e.pointerId, removed: [] };
+      this.erasing = { id: e.pointerId, removed: [], x: e.clientX, y: e.clientY, t: performance.now(), barrel: e.pointerType === 'pen' && (e.button === 2 || !!(e.buttons & 2)) };
+      this.lastEraseTap = false;
       this.eraseAt(x, y);
       return;
     }
@@ -577,6 +590,9 @@ export class InkEditor {
     if (this.drag && e.pointerId === this.drag.id) { this.boxUp(e); return; }
     if (this.erasing && e.pointerId === this.erasing.id) {
       const removed = this.erasing.removed;
+      // Bouton du stylet touché brièvement, sans bouger ni rien effacer : c'est un « clic droit » (menu Coller…)
+      this.lastEraseTap = this.erasing.barrel && !removed.length && Math.hypot(e.clientX - this.erasing.x, e.clientY - this.erasing.y) < 8 && performance.now() - this.erasing.t < 700;
+      if (this.lastEraseTap) this.page.dispatchEvent(new CustomEvent('ink-menu', { detail: { clientX: e.clientX, clientY: e.clientY } }));
       this.erasing = null;
       if (removed.length) this.push({ type: 'erase', items: removed });
       return;
