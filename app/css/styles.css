@@ -3029,3 +3029,10 @@ body.ink-mode #to-top, body:has(#modal-root > *) #to-top { display: none; }
 }
 .fi-c-time { white-space: nowrap; }
 .fi-tx-table .fi-c-time { width: 76px; }
+
+/* Page manuscrite en plein écran */
+.ink-shell:fullscreen { background: var(--bg, #0b0b0f); width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+.ink-shell:fullscreen .ink-scroll, .ink-shell.ink-full .ink-scroll { flex: 1; min-height: 0; }
+.ink-shell.ink-full { position: fixed; inset: 0; z-index: 80; background: var(--bg, #0b0b0f); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
+body.ink-fullscreen #qa-fab, body.ink-fullscreen #to-top { display: none; }
+#ink-fs svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

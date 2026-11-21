@@ -2176,7 +2176,7 @@ async function renderPage(id) {
           <button id="undo" title="Annuler (Ctrl+Z)">${ICONS.undo}</button>
           <button id="redo" title="Rétablir (Ctrl+Y)">${ICONS.redo}</button>
         </div>
-        <div class="seg"><button id="finger" title="Doigt : défiler (désactivé = le doigt dessine)" class="on">${ICONS.hand}</button></div>
+        <div class="seg"><button id="finger" title="Doigt : défiler (désactivé = le doigt dessine)" class="on">${ICONS.hand}</button><button id="ink-fs" type="button" title="Plein écran (Échap pour sortir)" aria-label="Plein écran" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
         <span class="spacer"></span>
         <button class="btn ink-more-btn" id="ink-more" type="button" aria-label="Plus d’outils" aria-expanded="false" title="Plus d’outils">⋯</button>
         <select id="bg" class="ink-extra" aria-label="Fond de page">${BGS.map(([v, l]) => `<option value="${v}" ${meta.bg === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -2385,6 +2385,43 @@ async function renderPage(id) {
   $('#more').onclick = () => { if (!ed.extend()) toast('Taille maximale de page atteinte'); else $('#ink-scroll').scrollBy({ top: 400, behavior: 'smooth' }); };
   $('#png').onclick = () => ed.exportPNG(meta.title);
   // Cellulaire : les outils moins utilisés sont derrière « ⋯ »
+  // ⛶ Plein écran : la feuille et ses outils occupent tout l'écran (vrai plein écran si possible, sinon la page couvre l'app)
+  {
+    const shell = $('.ink-shell'), fsBtn = $('#ink-fs');
+    const ICON_IN = '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+    const ICON_OUT = '<svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
+    const isOn = () => document.fullscreenElement === shell || shell.classList.contains('ink-full');
+    const sync = () => {
+      if (!shell.isConnected) return;
+      const on = isOn();
+      fsBtn.innerHTML = on ? ICON_OUT : ICON_IN;
+      fsBtn.classList.toggle('on', on);
+      fsBtn.setAttribute('aria-pressed', String(on));
+      fsBtn.title = on ? 'Quitter le plein écran (Échap)' : 'Plein écran (Échap pour sortir)';
+      document.body.classList.toggle('ink-fullscreen', on);
+    };
+    const exit = async () => {
+      shell.classList.remove('ink-full');
+      if (document.fullscreenElement === shell) await document.exitFullscreen().catch(() => {});
+      sync();
+    };
+    fsBtn.onclick = async () => {
+      if (isOn()) return exit();
+      try {
+        if (!shell.requestFullscreen) throw new Error('indisponible');
+        // Certains navigateurs (ou une app intégrée) ne répondent jamais : après 1 s, on passe au plan B
+        await Promise.race([shell.requestFullscreen({ navigationUI: 'hide' }), new Promise((_, no) => setTimeout(() => no(new Error('délai')), 1000))]);
+      } catch { if (document.fullscreenElement !== shell) shell.classList.add('ink-full'); } // plan B : la page couvre toute l'app
+      sync();
+    };
+    const onFs = () => { if (!shell.isConnected) { document.removeEventListener('fullscreenchange', onFs); return; } sync(); };
+    document.addEventListener('fullscreenchange', onFs);
+    const onKey = (e) => { if (!shell.isConnected) { removeEventListener('keydown', onKey); return; } if (e.key === 'Escape' && shell.classList.contains('ink-full')) exit(); };
+    addEventListener('keydown', onKey);
+    // En quittant la page : on sort du plein écran
+    const onLeave = () => { removeEventListener('hashchange', onLeave); if (document.fullscreenElement === shell) document.exitFullscreen().catch(() => {}); document.body.classList.remove('ink-fullscreen'); };
+    addEventListener('hashchange', onLeave);
+  }
   $('#ink-more').onclick = (e) => { const bar = $('.ink-bar'); bar.classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', bar.classList.contains('open')); };
   $('#clear').onclick = async () => { if (await confirmBox('Effacer tout le contenu de la page ? (Ctrl+Z pour annuler ensuite)', 'Effacer')) ed.clear(); };
   $('#title').oninput = (e) => { meta.title = e.target.value || 'Sans titre'; $('#saved').textContent = '…'; save(); };
