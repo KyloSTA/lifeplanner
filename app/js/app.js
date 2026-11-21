@@ -1914,7 +1914,7 @@ async function renderDay(arg) {
       + blocks.map((b) => {
         const h = Math.max(top(b.e2) - top(b.s), 22), t = b.task;
         return `<div class="dayv-task ${t.done ? 'done' : ''} ${h < 40 ? 'short' : ''}" data-tid="${t.id}" style="top:${top(b.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${b.col} / ${b.cols});width:calc((100% - 60px) / ${b.cols} - 4px)" title="Glisser pour changer l’heure · clic pour ouvrir">
-          <input type="checkbox" class="dvt-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie : ${esc(t.title)}"><span class="ev-title">✅ ${esc(t.title)}</span><span class="ev-time">${esc(timeLabel(t))}</span></div>`;
+          <input type="checkbox" class="dvt-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie : ${esc(t.title)}"><span class="ev-title">✅ ${esc(t.title)}</span><span class="ev-time">${esc(timeLabel(t))}</span><button type="button" class="dvt-x" aria-label="Retirer « ${esc(t.title)} » de l’horaire" title="Retirer de l’horaire (la mission reste dans la liste)">×</button></div>`;
       }).join('')
       + marks.map(({ t, s }) => `<a class="dayv-alarm" href="#/missions" style="top:${top(s) - 11}px" title="Alarme de mission">⏰ ${U.fmtTime(new Date(s))} · ${esc(t.title)}</a>`).join('')
       + (isToday && hr(now) >= from && hr(now) <= to ? `<div class="dayv-now" style="top:${top(now)}px"></div>` : '');
@@ -1927,8 +1927,16 @@ async function renderDay(arg) {
     $$('.dayv-task').forEach((el) => {
       const id = el.dataset.tid;
       el.querySelector('.dvt-cb').onchange = async (e) => { await setTaskDone(id, e.target.checked); redrawDay(); };
+      // × : retire la mission de l'horaire (elle reste dans la liste du jour, sans heure) ; « Annuler » la remet
+      el.querySelector('.dvt-x').onclick = async (e) => {
+        e.stopPropagation();
+        const before = await db.get('tasks', id);
+        await scheduleTask(id, null, null);
+        redrawDay();
+        showUndo(`🕒 « ${before?.title || 'Mission'} » retirée de l’horaire`, async () => { await scheduleTask(id, before?.date, before?.time, before?.dur); redrawDay(); }, 5000);
+      };
       el.onpointerdown = (e) => {
-        if (e.button > 0 || e.target.closest('.dvt-cb')) return;
+        if (e.button > 0 || e.target.closest(".dvt-cb, .dvt-x")) return;
         const y0 = e.clientY, top0 = el.offsetTop, pid = e.pointerId;
         let moved = false;
         try { el.setPointerCapture(pid); } catch { /* ignore */ }
