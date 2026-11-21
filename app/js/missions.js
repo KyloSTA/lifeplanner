@@ -66,7 +66,7 @@ export async function renderPage(ctx) {
       <input name="t" placeholder="Nouvelle mission…" autocomplete="off" required>
       <input name="d" type="date" value="${today}" aria-label="Date prévue" title="Date prévue (vide = sans date)">
       ${couple.ON ? `<select name="w" aria-label="Pour qui">${couple.whoOptions('')}</select>` : ''}
-      <select name="g" aria-label="Objectif"><option value="">Sans objectif</option>${goals.map((g) => `<option value="${g.id}">🎯 ${esc(g.title)}</option>`).join('')}</select>
+      <select name="g" aria-label="Objectif"><option value="">Sans objectif</option>${goals.filter((g) => !g.done).map((g) => `<option value="${g.id}">🎯 ${esc(g.title)}</option>`).join('')}</select>
       <button class="btn primary">Ajouter</button>
     </form>
     <div class="ms-tools">
