@@ -3184,3 +3184,21 @@ body.vdock-min #vdock { width: auto; min-width: 220px; }
 .ink-scroll { background: #fffdf8; padding: 0; gap: 0; }
 .ink-page { box-shadow: none; border-radius: 0; }
 @media (max-width: 600px) { .ink-scroll { padding: 0; } }
+
+/* 🗂 Dossier de location (sous-page du Projet Propriété) */
+.pp-mini { display: inline-block; margin-top: 6px; font-size: 12.5px; color: var(--muted); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+.pp-mini:hover { color: var(--accent); border-color: var(--accent); }
+.pp-back { font-size: 12.5px; font-weight: 600; color: var(--accent); text-decoration: none; text-transform: uppercase; letter-spacing: .04em; }
+.pp-strat ol { margin: 0 0 6px 18px; padding: 0; display: grid; gap: 6px; }
+.pd-proofs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pd-proofs li { padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.pd-proofs li.done b { text-decoration: line-through; color: var(--muted); }
+.pd-top { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.pd-proofs p { margin: 4px 0 6px 28px; }
+.pd-files { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: 28px; }
+.pd-letter { width: 100%; margin-top: 12px; font: inherit; font-size: 14px; line-height: 1.5; padding: 12px; border-radius: 12px; }
+.pd-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.pd-ratio { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: var(--surface-2); }
+.pd-ratio.ok { border-left: 3px solid var(--ok); } .pd-ratio.warn { border-left: 3px solid var(--warn); } .pd-ratio.bad { border-left: 3px solid var(--danger); }
+.pd-caution h3 { margin: 0 0 6px; }
+.pd-caution ul { margin: 0 0 0 18px; padding: 0; display: grid; gap: 4px; }

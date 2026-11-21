@@ -6,6 +6,7 @@ import * as U from './util.js';
 import * as docs from './docs.js';
 import { addTask } from './tasks.js';
 import { OPTIONS, DEFAULTS, compute } from './property-calc.js';
+import { drawDossier } from './property-dossier.js';
 
 const { esc } = U;
 const KEY = 'propriete';
@@ -66,9 +67,18 @@ export async function renderPage(ctx, arg) {
   const A = () => ({ ...DEFAULTS, ...sc().a });
   const save = async () => { await store(d); };
 
+  // 🗂 Sous-page « Dossier de location » (#/propriete/dossier)
+  if (arg === 'dossier') {
+    view.innerHTML = `<header class="page-head"><div><a class="pp-back" href="#/propriete">← Projet Propriété</a><h1>🗂 Dossier de location</h1>
+      <p class="muted pp-sub">Louer à deux quand un des deux a un crédit plus faible : préparer un dossier qui rassure le propriétaire.</p></div></header>
+      <div id="pp-body"></div>`;
+    await drawDossier(view.querySelector('#pp-body'), ctx, d, A(), save);
+    return;
+  }
+
   view.innerHTML = `
     <header class="page-head">
-      <div><p class="eyebrow">Projet</p><h1>🏡 Projet Propriété</h1><p class="muted pp-sub">${d.bien.adresse ? `Acheter la maison du ${esc(d.bien.adresse)}, ou la louer et garder le condo en location ?` : 'Acheter la maison visée (et vendre le condo), ou la louer et garder le condo en location ?'}</p></div>
+      <div><p class="eyebrow">Projet</p><h1>🏡 Projet Propriété</h1><p class="muted pp-sub">${d.bien.adresse ? `Acheter la maison du ${esc(d.bien.adresse)}, ou la louer et garder le condo en location ?` : 'Acheter la maison visée (et vendre le condo), ou la louer et garder le condo en location ?'}</p><a class="pp-mini" href="#/propriete/dossier" title="Préparer le dossier pour louer à deux (preuves, lettre, caution)">🗂 Dossier de location</a></div>
       <div class="head-actions pp-scen">
         <label class="pp-scen-pick">Scénario <select id="pp-scen" aria-label="Scénario">${Object.entries(d.scenarios).map(([k, s]) => `<option value="${k}" ${k === d.cur ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
         <button class="btn" id="pp-scen-new" title="Nouveau scénario (copie, prudent ou optimiste)">＋</button>
