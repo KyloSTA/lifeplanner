@@ -95,6 +95,7 @@ export async function removeUnused(ids) {
     ...(await db.all('notes')).flatMap((n) => refsIn(n.body)),
     ...(await db.all('ink')).flatMap((p) => p.docs || []),
     ...(await db.all('study')).flatMap((m) => m.docIds || []),
+    ...(((await db.get('settings', 'propriete')) || {}).docs || []), // documents du Projet Propriété
   ]);
   for (const id of ids) if (!used.has(id)) { await db.del('files', id); await db.del('blobs', id); }
 }
