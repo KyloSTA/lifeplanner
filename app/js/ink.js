@@ -101,6 +101,7 @@ export class InkEditor {
 
     this.resize();
     this.loadImages();
+    setTimeout(() => this.ensureRoom(), 0); // page déjà écrite jusqu'en bas : on ajoute de l'espace à l'ouverture
   }
 
   /* ---------- Images ---------- */
@@ -331,8 +332,8 @@ export class InkEditor {
 
   /* ---------- Taille & rendu ---------- */
   resize(force = false) {
-    const avail = this.sc.clientWidth - 24;
-    const w = Math.round(Math.max(300, Math.min(avail, 1200)) * (this.zoom || 1)); // zoom : pincer à deux doigts
+    const avail = this.sc.clientWidth; // la feuille occupe toute la largeur (pas de marge grise autour)
+    const w = Math.round(Math.max(300, avail) * (this.zoom || 1)); // zoom : pincer à deux doigts
     const h = Math.round((this.H * w) / PAGE_W);
     if (!force && w === this.cssW && h === this.cssH) return;
     this.cssW = w;
@@ -605,6 +606,7 @@ export class InkEditor {
       this.drawStroke(this.bctx, s);
       this.blit();
       this.push({ type: 'add', stroke: s });
+      this.ensureRoom(); // écrit près du bas : la feuille s'allonge
     }
   }
 
@@ -703,6 +705,16 @@ export class InkEditor {
     this.resize(true);
     this.onChange();
     return true;
+  }
+
+  /** Toujours de la place pour écrire : si l'écriture approche du bas de la feuille, la feuille s'allonge. */
+  ensureRoom() {
+    const ROOM = 320; // espace libre gardé sous la dernière ligne écrite (unités de page)
+    let low = 0;
+    for (const s of this.strokes) for (const p of s.points) if (p[1] > low) low = p[1];
+    for (const m of this.imgs || []) low = Math.max(low, m.y + m.h);
+    if (low > this.H - ROOM && this.H < MAX_H) return this.extend();
+    return false;
   }
 
   thumbnail() {
