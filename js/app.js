@@ -2184,7 +2184,9 @@ async function renderPage(id) {
         <button class="btn ink-extra" id="png">Exporter</button>
         <button class="btn danger ink-extra" id="clear">Effacer</button>
         <span class="saved muted" id="saved"></span>
+        <button class="btn icon ink-hide-bar" id="ink-bar-hide" type="button" title="Replier les outils (voir toute la page)" aria-label="Replier les outils">︽</button>
       </div>
+      <button class="ink-bar-show" id="ink-bar-show" type="button" title="Afficher les outils" aria-label="Afficher les outils">︾ Outils</button>
       <div class="ink-docs" id="ink-rel" hidden></div>
       <div class="ink-docs" id="ink-docs" hidden></div>
       <div class="ink-scroll" id="ink-scroll"></div>
@@ -2389,6 +2391,17 @@ async function renderPage(id) {
   $('#more').onclick = () => { if (!ed.extend()) toast('Taille maximale de page atteinte'); else $('#ink-scroll').scrollBy({ top: 400, behavior: 'smooth' }); };
   $('#png').onclick = () => ed.exportPNG(meta.title);
   // Cellulaire : les outils moins utilisés sont derrière « ⋯ »
+  // ︽ Replier les outils : la feuille prend toute la hauteur ; « ︾ Outils » les ramène (choix gardé sur cet appareil)
+  {
+    const shell = $('.ink-shell');
+    const setBar = (hidden) => {
+      shell.classList.toggle('bar-hidden', hidden);
+      try { localStorage.setItem('lp.inkBarHidden', hidden ? '1' : ''); } catch { /* ignore */ }
+    };
+    setBar((() => { try { return !!localStorage.getItem('lp.inkBarHidden'); } catch { return false; } })());
+    $('#ink-bar-hide').onclick = () => setBar(true);
+    $('#ink-bar-show').onclick = () => setBar(false);
+  }
   // ⛶ Plein écran : la feuille et ses outils occupent tout l'écran (vrai plein écran si possible, sinon la page couvre l'app)
   {
     const shell = $('.ink-shell'), fsBtn = $('#ink-fs');
