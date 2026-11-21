@@ -353,7 +353,8 @@ export async function renderPage(ctx, arg) {
   month ||= curMonth();
   const hasData = all.length > 0;
   const months = [...new Set(all.map((t) => ym(t.date)))].sort();
-  const shop = tab === 'achats' || tab === 'avenir' || tab === 'abos'; // la liste d'achats et les paiements à venir ne dépendent pas des relevés
+  const shop = tab === 'achats' || tab === 'avenir' || tab === 'abos';
+  const weekly = (tab === 'apercu' && overView === 'semaine') || (tab === 'budget' && budgetView === 'semaine'); // la semaine a sa propre navigation // la liste d'achats et les paiements à venir ne dépendent pas des relevés
   // Sur cellulaire : icône + nom court sous l'icône (les 6 onglets tiennent sans défiler)
   const tabsHTML = `<div class="seg fi-tabs" role="tablist">${[['apercu', '📊', 'Aperçu', 'Aperçu'], ['budget', '🎯', 'Budget', 'Budget'], ['transactions', '🧾', 'Transactions', 'Dépenses'], ['avenir', '📅', 'À venir', 'À venir'], ['abos', '🔁', 'Abonnements', 'Abos'], ['achats', '🛒', 'Achats', 'À acheter']].map(([k, e, l, s]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" aria-label="${l}"><span class="fi-tab-ico">${e}</span> <span class="fi-tab-l">${l}</span><span class="fi-tab-s">${s}</span></button>`).join('')}</div>`;
 
@@ -368,7 +369,7 @@ export async function renderPage(ctx, arg) {
     <div id="fi-autobar"></div>
     <div class="fi-bar">
       ${tabsHTML}
-      ${hasData && !shop ? `<div class="fi-month">
+      ${hasData && !shop && !weekly ? `<div class="fi-month">
         <button class="btn icon" id="fi-prev" ${month <= months[0] ? 'disabled' : ''} aria-label="Mois précédent">‹</button>
         <b>${esc(monthName(month))}</b>
         <button class="btn icon" id="fi-next" ${month >= curMonth() ? 'disabled' : ''} aria-label="Mois suivant">›</button>
@@ -414,8 +415,8 @@ export async function renderPage(ctx, arg) {
   if (tab === 'abos') return drawSubs(ctx, body, all);
   if (shop) return drawShopping(ctx, body);
   if (!hasData) return;
-  $('#fi-prev').onclick = () => { month = monthsBack(month, 1); renderPage(ctx); };
-  $('#fi-next').onclick = () => { month = monthsBack(month, -1); renderPage(ctx); };
+  $('#fi-prev')?.addEventListener('click', () => { month = monthsBack(month, 1); renderPage(ctx); });
+  $('#fi-next')?.addEventListener('click', () => { month = monthsBack(month, -1); renderPage(ctx); });
   if (tab === 'budget') drawBudget(ctx, body, all, budget);
   else if (tab === 'transactions') drawTransactions(ctx, body, all);
   else drawOverview(ctx, body, all, budget);
@@ -1007,6 +1008,7 @@ function importReport(ctx, rep) {
 
 /* ---------- Aperçu du mois ---------- */
 function drawOverview(ctx, el, all, budget) {
+  if (overView === 'semaine') return drawOverviewWeek(ctx, el, all, budget);
   const s = summarize(all, month);
   const avg = averages(all, month);
   const isNow = month === curMonth();
@@ -1025,7 +1027,7 @@ function drawOverview(ctx, el, all, budget) {
   const over = cats.filter((c) => c.budget && c.spent > c.budget);
   const top = topMerchants(s.list, all);
 
-  el.innerHTML = `
+  el.innerHTML = `${overSwitch()}
     <div class="kpis fi-kpis">
       <div class="kpi ok"><b>${$$$(s.income, true)}</b><span>revenus</span></div>
       <div class="kpi"><b>${$$$(s.spent, true)}</b><span>dépenses${avg.spent ? ` · moy. ${$$$(avg.spent, true)}` : ''}</span></div>
@@ -1062,8 +1064,110 @@ function drawOverview(ctx, el, all, budget) {
         </section>` : ''}
       </div>
     </div>`;
+  bindOverSwitch(ctx, el);
   el.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { tab = b.dataset.go; renderPage(ctx); }));
   el.querySelectorAll('[data-cat]').forEach((b) => (b.onclick = () => { txFilter = { q: '', cat: b.dataset.cat }; tab = 'transactions'; renderPage(ctx); }));
+}
+
+/* ---------- Aperçu : vue Mois / Semaine ---------- */
+let overView = (() => { try { return localStorage.getItem('lp.overView') === 'semaine' ? 'semaine' : 'mois'; } catch { return 'mois'; } })();
+const overSwitch = () => `<div class="seg fi-bview" role="tablist" aria-label="Période de l’aperçu">
+  <button role="tab" data-ov="mois" class="${overView === 'mois' ? 'on' : ''}" aria-selected="${overView === 'mois'}">📆 Mois</button>
+  <button role="tab" data-ov="semaine" class="${overView === 'semaine' ? 'on' : ''}" aria-selected="${overView === 'semaine'}">🗓 Semaine</button></div>`;
+const bindOverSwitch = (ctx, el) => el.querySelectorAll('[data-ov]').forEach((b) => (b.onclick = () => {
+  overView = b.dataset.ov;
+  try { localStorage.setItem('lp.overView', overView); } catch { /* ignore */ }
+  renderPage(ctx);
+}));
+
+/** Totaux d'une période [from, to[ : dépenses, revenus, par jour et par catégorie. */
+function periodStats(all, from, to) {
+  const list = all.filter((t) => t.date >= from && t.date < to);
+  let spent = 0, income = 0;
+  const byCat = {}, perDay = {};
+  for (const t of list) {
+    if (t.kind === 'revenu') income += t.amount;
+    const s = spendOf(t);
+    if (!s) continue;
+    spent += s;
+    const c = spendCat(t, all);
+    byCat[c] = (byCat[c] || 0) + s;
+    perDay[t.date] = (perDay[t.date] || 0) + s;
+  }
+  return { list, spent, income, byCat, perDay };
+}
+
+function drawOverviewWeek(ctx, el, all, budget) {
+  bwStart ||= U.startOfWeek(new Date());
+  const ws = U.iso(bwStart), we = U.iso(U.addDays(bwStart, 7));
+  const today = U.iso(new Date());
+  const thisWeek = ws === U.iso(U.startOfWeek(new Date()));
+  const cur = periodStats(all, ws, we), prev = periodStats(all, U.iso(U.addDays(bwStart, -7)), ws);
+  const W = 12 / 52;
+  const wb = Object.fromEntries(Object.entries(budget.cats || {}).map(([k, v]) => [k, (Number(v) || 0) * W]));
+  const totalBudget = Object.values(wb).reduce((a, b) => a + b, 0);
+  const left = totalBudget - cur.spent;
+  const net = cur.income - cur.spent;
+  const diff = prev.spent ? Math.round(((cur.spent - prev.spent) / prev.spent) * 100) : null;
+  const days = [...Array(7)].map((_, i) => U.iso(U.addDays(bwStart, i)));
+  const perDay = days.map((d) => cur.perDay[d] || 0);
+  const maxDay = Math.max(1, ...perDay, totalBudget / 7);
+  const dayNames = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+  const cats = [...new Set([...Object.keys(cur.byCat), ...Object.keys(prev.byCat), ...Object.keys(wb).filter((k) => wb[k] > 0)])]
+    .map((id) => ({ ...catOf(id), id, s: cur.byCat[id] || 0, p: prev.byCat[id] || 0, b: wb[id] || 0 }))
+    .filter((c) => c.s > 0.5 || c.p > 0.5).sort((a, b) => b.s - a.s);
+  const top = topMerchants(cur.list, all);
+  const recent = [...cur.list].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).slice(0, 10);
+  const last = all.map((t) => t.date).sort().pop();
+  const delta = (s, p) => { if (!p) return s ? '<span class="muted">nouveau</span>' : '—'; const d = Math.round(((s - p) / p) * 100); return `<span class="${d > 10 ? 'fi-up' : d < -10 ? 'fi-down' : 'muted'}">${d > 0 ? '+' : ''}${d} %</span>`; };
+
+  el.innerHTML = `${overSwitch()}
+    <section class="card fi-week">
+      <div class="card-head"><h2>🗓 Semaine du ${U.fmtShort(bwStart)} au ${U.fmtShort(U.addDays(bwStart, 6))}</h2>
+        <span class="fi-month"><button class="btn icon" id="ow-prev" aria-label="Semaine précédente">‹</button>
+        ${thisWeek ? '' : '<button class="btn" id="ow-now">Cette semaine</button>'}
+        <button class="btn icon" id="ow-next" ${thisWeek ? 'disabled' : ''} aria-label="Semaine suivante">›</button></span></div>
+      <div class="kpis fi-kpis">
+        <div class="kpi ok"><b>${$$$(cur.income, true)}</b><span>revenus</span></div>
+        <div class="kpi"><b>${$$$(cur.spent, true)}</b><span>dépenses${diff === null ? '' : ` · ${diff > 0 ? '+' : ''}${diff} % vs sem. préc.`}</span></div>
+        <div class="kpi ${net < 0 ? 'bad' : 'ok'}"><b>${net < 0 ? '−' : '+'}${$$$(Math.abs(net), true)}</b><span>${net < 0 ? 'dépensé de plus que gagné' : 'gardé cette semaine'}</span></div>
+        ${totalBudget ? `<div class="kpi ${left < 0 ? 'bad' : 'ok'}"><b>${left < 0 ? '−' : ''}${$$$(Math.abs(left), true)}</b><span>${left < 0 ? 'au-dessus du budget' : `reste du budget (${$$$(totalBudget, true)})`}</span></div>` : ''}
+      </div>
+      ${totalBudget ? `<div class="fi-meter fi-week-meter"><i style="width:${Math.min(100, (cur.spent / totalBudget) * 100)}%" class="${cur.spent > totalBudget ? 'over' : ''}"></i></div>` : ''}
+      <div class="fi-days">${perDay.map((v, i) => `<div class="fi-day ${days[i] === today ? 'today' : ''} ${days[i] > today ? 'future' : ''}" title="${dayNames[i]} : ${$$$(v)}">
+        <span class="fi-day-v">${v ? $$$(v, true) : ''}</span><span class="fi-day-bar"><i class="${totalBudget && v > totalBudget / 7 ? 'over' : ''}" style="height:${(v / maxDay) * 100}%"></i></span><small>${dayNames[i]}</small></div>`).join('')}</div>
+    </section>
+    <div class="fi-grid">
+      <section class="card fi-tbl-card">
+        <div class="card-head fi-tbl-head"><h2>Par catégorie</h2><span class="muted">cette semaine · vs précédente</span></div>
+        ${cats.length ? `<table class="fi-table fi-cat-table"><thead><tr><th>Catégorie</th><th class="num">Semaine</th><th class="num">Sem. préc.</th><th class="num">Écart</th>${totalBudget ? '<th class="num">Budget</th>' : ''}</tr></thead><tbody>
+          ${cats.map((c) => `<tr class="fi-row" data-cat="${c.id}" title="Voir les transactions ${esc(c.name)}"><td><div class="fi-who-in"><span class="fi-tx-ico" style="--c:${c.color}">${c.emoji}</span><b>${esc(c.name)}</b></div></td>
+            <td class="num"><b class="${c.b && c.s > c.b ? 'fi-up' : ''}">${$$$(c.s, true)}</b></td><td class="num muted">${c.p ? $$$(c.p, true) : '—'}</td><td class="num">${delta(c.s, c.p)}</td>${totalBudget ? `<td class="num muted">${c.b ? $$$(c.b, true) : '—'}</td>` : ''}</tr>`).join('')}
+          </tbody><tfoot><tr><td>Total</td><td class="num"><b>${$$$(cur.spent, true)}</b></td><td class="num muted">${$$$(prev.spent, true)}</td><td class="num">${delta(cur.spent, prev.spent)}</td>${totalBudget ? `<td class="num muted">${$$$(totalBudget, true)}</td>` : ''}</tr></tfoot></table>`
+          : '<p class="empty-sm" style="padding:0 16px 16px">Aucune dépense cette semaine. <button type="button" class="link-btn" data-qa="" data-qa-type="expense">＋ Entrer une dépense</button></p>'}
+      </section>
+      <div class="fi-side">
+        <section class="card">
+          <div class="card-head"><h2>Où va ton argent</h2></div>
+          ${top.length ? `<ol class="fi-top">${top.map((x) => `<li><span>${catOf(x.cat).emoji} ${esc(x.name)} <small class="muted">× ${x.n}</small></span><b>${$$$(x.total, true)}</b></li>`).join('')}</ol>` : '<p class="empty-sm">Rien à afficher.</p>'}
+        </section>
+      </div>
+    </div>
+    ${recent.length ? `<section class="card fi-tbl-card">
+      <div class="card-head fi-tbl-head"><h2>Transactions de la semaine</h2><button class="btn sm-text" id="ow-all">Tout voir →</button></div>
+      <table class="fi-table fi-tx-table"><tbody>${recent.map((t) => `<tr class="fi-row ${t.kind}">
+        <td class="fi-c-time muted">${esc(U.parseISO(t.date).toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric' }))}</td>
+        <td class="fi-c-who"><div class="fi-who-in"><span class="fi-tx-ico" style="--c:${catOf(t.cat).color}">${catOf(t.cat).emoji}</span><span class="fi-who"><b>${esc(t.merchant)}</b><small class="muted">${esc(catOf(t.cat).name)}</small></span></div></td>
+        <td class="num fi-amt ${t.amount > 0 ? 'pos' : t.kind === 'transfert' ? 'muted' : ''}">${t.amount > 0 ? '+' : '−'}${$$$(Math.abs(t.amount))}</td></tr>`).join('')}</tbody></table>
+    </section>` : ''}
+    ${last && last < we && thisWeek ? `<p class="hint muted">Dépenses connues jusqu’au ${U.fmtShort(U.parseISO(last))} (dernier relevé importé).</p>` : ''}`;
+
+  bindOverSwitch(ctx, el);
+  el.querySelector('#ow-prev').onclick = () => { bwStart = U.addDays(bwStart, -7); drawOverviewWeek(ctx, el, all, budget); };
+  el.querySelector('#ow-next').onclick = () => { bwStart = U.addDays(bwStart, 7); drawOverviewWeek(ctx, el, all, budget); };
+  el.querySelector('#ow-now')?.addEventListener('click', () => { bwStart = U.startOfWeek(new Date()); drawOverviewWeek(ctx, el, all, budget); });
+  el.querySelector('#ow-all')?.addEventListener('click', () => { txFilter = { q: '', cat: '' }; month = ym(ws); tab = 'transactions'; renderPage(ctx); });
+  el.querySelectorAll('[data-cat]').forEach((r) => (r.onclick = () => { txFilter = { q: '', cat: r.dataset.cat }; month = ym(ws); tab = 'transactions'; renderPage(ctx); }));
 }
 
 function verdict({ isNow, left, pace, total, perDay, day, dim }) {
@@ -1183,7 +1287,7 @@ function drawBudgetWeek(ctx, el, all, budget) {
         <div class="fi-wk-bar"><i class="${r.b && r.s > r.b ? 'over' : p > 85 ? 'warn' : ''}" style="width:${Math.min(100, p)}%"></i></div></div>`; }).join('')}</div></section>` : ''}
     ${last && last < we && thisWeek ? `<p class="hint muted">Dépenses connues jusqu’au ${U.fmtShort(U.parseISO(last))} (dernier relevé importé) : importe le plus récent pour une semaine complète.</p>` : ''}`;
 
-  el.querySelectorAll('[data-bv]').forEach((b) => (b.onclick = () => { budgetView = b.dataset.bv; try { localStorage.setItem('lp.budgetView', budgetView); } catch { /* ignore */ } drawBudget(ctx, el, all, budget); }));
+  el.querySelectorAll('[data-bv]').forEach((b) => (b.onclick = () => { budgetView = b.dataset.bv; try { localStorage.setItem('lp.budgetView', budgetView); } catch { /* ignore */ } renderPage(ctx); }));
   el.querySelector('#bw-prev').onclick = () => { bwStart = U.addDays(bwStart, -7); drawBudgetWeek(ctx, el, all, budget); };
   el.querySelector('#bw-next').onclick = () => { bwStart = U.addDays(bwStart, 7); drawBudgetWeek(ctx, el, all, budget); };
   el.querySelector('#bw-now')?.addEventListener('click', () => { bwStart = U.startOfWeek(new Date()); drawBudgetWeek(ctx, el, all, budget); });
@@ -1221,7 +1325,7 @@ function drawBudget(ctx, el, all, budget) {
       <div class="modal-actions"><button class="btn primary" id="fi-save">Enregistrer le budget</button></div>
       <p class="hint muted">Conseils : commence par les catégories où tu dépenses le plus. Viser 10 à 20 % de moins que ta moyenne est réaliste ; plus serré, c’est souvent abandonné au bout de deux semaines. Mets l’épargne en premier : traite-la comme une dépense fixe.</p>
     </section>`;
-  el.querySelectorAll('[data-bv]').forEach((b) => (b.onclick = () => { budgetView = b.dataset.bv; try { localStorage.setItem('lp.budgetView', budgetView); } catch { /* ignore */ } drawBudget(ctx, el, all, budget); }));
+  el.querySelectorAll('[data-bv]').forEach((b) => (b.onclick = () => { budgetView = b.dataset.bv; try { localStorage.setItem('lp.budgetView', budgetView); } catch { /* ignore */ } renderPage(ctx); }));
   const inputs = [...el.querySelectorAll('[data-b]')];
   const sav = el.querySelector('#fi-sav');
   const totals = () => {
@@ -1266,16 +1370,27 @@ function drawTransactions(ctx, el, all) {
     const days = {};
     list.forEach((t) => (days[t.date] ||= []).push(t));
     const sum = list.reduce((a, t) => a + (spendOf(t) || 0), 0);
-    el.querySelector('#fi-tx').innerHTML = list.length ? `<p class="muted fi-tx-sum">${list.length} transaction${list.length > 1 ? 's' : ''}${sum ? ` · ${$$$(sum)} de dépenses` : ''}</p>` + Object.entries(days).map(([d, ts]) => `
-      <section class="card fi-day"><h3>${esc(U.parseISO(d).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }))}</h3>
-        ${ts.map((t) => `<div class="fi-tx ${t.kind}" data-id="${t.id}">
-          <span class="fi-tx-ico" style="--c:${catOf(t.cat).color}">${catOf(t.cat).emoji}</span>
-          <span class="fi-tx-main"><b>${esc(t.merchant)}</b><small class="muted">${esc([t.time.slice(0, 5), t.account, t.pending ? '⏳ en attente' : ''].filter(Boolean).join(' · '))}</small></span>
-          <select class="fi-tx-cat" aria-label="Catégorie">${opts(t.cat, t.kind)}</select>
-          <b class="fi-tx-amt ${t.amount > 0 ? 'pos' : ''}">${t.amount > 0 ? '+' : '−'}${$$$(Math.abs(t.amount))}</b>
-        </div>`).join('')}</section>`).join('') : '<div class="card empty-card"><p>Aucune transaction pour ce filtre.</p></div>';
+    const inc = list.filter((t) => t.kind === 'revenu').reduce((a, t) => a + t.amount, 0);
+    // Tableau : une ligne par transaction, groupées par jour (sous-total des dépenses du jour)
+    const amt = (t) => `${t.amount > 0 ? '+' : '−'}${$$$(Math.abs(t.amount))}`;
+    el.querySelector('#fi-tx').innerHTML = list.length ? `
+      <div class="fi-tx-sum"><span><b>${list.length}</b> transaction${list.length > 1 ? 's' : ''}</span>${sum ? `<span>Dépenses <b class="neg">${$$$(sum)}</b></span>` : ''}${inc ? `<span>Revenus <b class="pos">+${$$$(inc)}</b></span>` : ''}</div>
+      <div class="card fi-tbl-card"><table class="fi-table fi-tx-table">
+        <thead><tr><th class="fi-c-time">Heure</th><th>Marchand</th><th class="fi-c-cat">Catégorie</th><th class="num">Montant</th></tr></thead>
+        ${Object.entries(days).map(([d, ts]) => {
+          const ds = ts.reduce((a, t) => a + (spendOf(t) || 0), 0);
+          return `<tbody>
+          <tr class="fi-day-row"><th colspan="4"><span>${esc(U.cap(U.parseISO(d).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })))}</span>${ds ? `<span class="muted">${$$$(ds)}</span>` : ''}</th></tr>
+          ${ts.map((t) => `<tr class="fi-row ${t.kind} ${t.pending ? 'pending' : ''}" data-id="${t.id}">
+            <td class="fi-c-time muted">${esc(t.time.slice(0, 5))}</td>
+            <td class="fi-c-who"><div class="fi-who-in"><span class="fi-tx-ico" style="--c:${catOf(t.cat).color}">${catOf(t.cat).emoji}</span><span class="fi-who"><b>${esc(t.merchant)}</b><small class="muted">${esc([t.account, t.pending ? "⏳ en attente" : ""].filter(Boolean).join(" · "))}</small></span></div></td>
+            <td class="fi-c-cat"><select class="fi-tx-cat" aria-label="Catégorie de ${esc(t.merchant)}">${opts(t.cat, t.kind)}</select></td>
+            <td class="num fi-amt ${t.amount > 0 ? 'pos' : t.kind === 'transfert' ? 'muted' : ''}">${amt(t)}</td>
+          </tr>`).join('')}</tbody>`;
+        }).join('')}
+      </table></div>` : '<div class="card empty-card"><p>Aucune transaction pour ce filtre.</p></div>';
     el.querySelectorAll('.fi-tx-cat').forEach((s) => (s.onchange = async () => {
-      const t = all.find((x) => x.id === s.closest('.fi-tx').dataset.id);
+      const t = all.find((x) => x.id === s.closest('[data-id]').dataset.id);
       if (!t) return;
       t.cat = s.value; t.manual = true;
       await db.put('money', t);
