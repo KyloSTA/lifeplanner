@@ -2970,3 +2970,62 @@ body.ink-mode #to-top, body:has(#modal-root > *) #to-top { display: none; }
 .dayv-task .dvt-x:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
 .dayv-task.short .dvt-x { top: 0; height: 22px; }
 @media (pointer: coarse) { .dayv-task .dvt-x { width: 34px; height: 34px; top: 0; right: 0; } }
+
+/* Finances › Transactions : tableau */
+.fi-tx-sum { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 2px 10px; color: var(--muted); font-size: 14px; }
+.fi-tx-sum b { color: var(--text); font-variant-numeric: tabular-nums; }
+.fi-tx-sum b.neg { color: var(--text); } .fi-tx-sum b.pos { color: var(--ok); }
+.fi-tbl-card { padding: 0; overflow: hidden; }
+.fi-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.fi-table thead th { position: sticky; top: 0; z-index: 1; padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.fi-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fi-day-row th { padding: 14px 14px 6px; text-align: left; font-size: 13px; font-weight: 700; background: var(--surface); }
+.fi-day-row th > span:first-child { margin-right: auto; }
+.fi-day-row th { display: table-cell; }
+.fi-day-row th .muted { float: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fi-row td { padding: 8px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+.fi-row:hover td { background: var(--surface-2); }
+.fi-c-time { width: 64px; font-variant-numeric: tabular-nums; }
+.fi-tx-table { table-layout: fixed; }
+.fi-tx-table .fi-c-cat { width: 240px; } .fi-tx-table .fi-c-time { width: 70px; } .fi-tx-table th.num, .fi-tx-table .fi-amt { width: 120px; }
+.fi-who-in { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fi-who { display: grid; min-width: 0; }
+.fi-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.fi-who small { font-size: 12px; }
+.fi-c-cat { width: 230px; }
+.fi-c-cat select { width: 100%; min-height: 36px; padding: 4px 8px; font-size: 13.5px; }
+.fi-amt { font-weight: 700; width: 110px; }
+.fi-amt.pos { color: var(--ok); }
+.fi-row.transfert .fi-who b, .fi-row.transfert .fi-amt { color: var(--muted); font-weight: 600; }
+.fi-row.pending .fi-amt { opacity: .75; }
+.fi-table .fi-tx-ico { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; font-size: 17px; background: color-mix(in srgb, var(--c) 22%, var(--surface-2)); }
+@media (max-width: 700px) {
+  .fi-table thead { display: none; }
+  .fi-table, .fi-table tbody { display: block; }
+  .fi-day-row { display: block; }
+  .fi-day-row th { display: block; padding: 12px 12px 4px; }
+  .fi-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who amt" "cat cat"; gap: 4px 10px; padding: 8px 12px; border-top: 1px solid var(--border); }
+  .fi-row td { padding: 0; border: 0; }
+  .fi-row .fi-c-time { display: none; }
+  .fi-row .fi-c-who { grid-area: who; max-width: none; width: auto; }
+  .fi-row .fi-amt { grid-area: amt; width: auto; align-self: center; }
+  .fi-row .fi-c-cat { grid-area: cat; width: auto; padding-left: 44px; }
+  .fi-row .fi-c-cat select { min-height: 34px; font-size: 13px; }
+}
+.fi-tbl-head { padding: 14px 16px 6px; margin: 0; }
+.fi-cat-table tbody .fi-row { cursor: pointer; }
+.fi-cat-table tfoot td { padding: 10px 14px; border-top: 2px solid var(--border); font-weight: 700; background: var(--surface-2); }
+.fi-up { color: var(--danger); font-weight: 700; }
+.fi-down { color: var(--ok); font-weight: 700; }
+.fi-bview { margin-bottom: 12px; }
+@media (max-width: 700px) {
+  .fi-cat-table thead { display: table-header-group; }
+  .fi-cat-table, .fi-cat-table tbody { display: table; width: 100%; }
+  .fi-cat-table tbody { display: table-row-group; }
+  .fi-cat-table .fi-row { display: table-row; }
+  .fi-cat-table .fi-row td, .fi-cat-table thead th { padding: 8px 8px; }
+  .fi-cat-table th:nth-child(3), .fi-cat-table td:nth-child(3), .fi-cat-table th:nth-child(5), .fi-cat-table td:nth-child(5) { display: none; }
+  .fi-cat-table .fi-tx-ico { width: 28px; height: 28px; font-size: 14px; }
+}
+.fi-c-time { white-space: nowrap; }
+.fi-tx-table .fi-c-time { width: 76px; }
