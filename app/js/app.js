@@ -36,6 +36,7 @@ import * as quick from './quickadd.js';
 import * as digest from './digest.js';
 import { swipeable } from './swipe.js';
 import * as videodock from './videodock.js';
+import * as property from './property.js';
 import { bindCapture, brainState, captureForm, evoCard, renderBrain, renderNote } from './page-brain.js';
 
 const { esc, iso, cap } = U;
@@ -197,7 +198,7 @@ const SEARCH_PAGES = [
   ['Cerveau', '#/brain', '🧠'], ['Actualités', '#/news', '📰'], ['Carnet', '#/notebook', '✏️'], ['Agenda (semaine)', '#/week', '📅'],
   ['Mois', '#/month', '🗓'], ['Année', '#/year', '🗓'], ['Journal', '#/journal', '📔'], ['Finances', '#/finance/apercu', '💰'],
   ['Budget', '#/finance/budget', '🎯'], ['Transactions', '#/finance/transactions', '🧾'], ['Paiements à venir', '#/finance/avenir', '📅'],
-  ['Abonnements', '#/finance/abos', '🔁'], ['Liste d’achats', '#/finance/achats', '🛒'], ['Workout', '#/workout', '🏋️'],
+  ['Abonnements', '#/finance/abos', '🔁'], ['Projet Propriété', '#/propriete', '🏡'], ['Liste d’achats', '#/finance/achats', '🛒'], ['Workout', '#/workout', '🏋️'],
   ['Étirements', '#/stretch', '🧘'], ['Habitudes', '#/habits', '🔁'], ['Cours RBQ', '#/rbq', '📘'], ['Ton héros', '#/hero', '🦸'],
   ['Réglages', '#/settings', '⚙'], ['Historique des modifications', '#/changelog', '🕘'], ['Ton utilisation', '#/usage', '📊'],
 ];
@@ -370,6 +371,7 @@ const routes = {
   month: renderMonth, year: renderYear, day: renderDay,
   news: () => news.renderPage(pageCtx()),
   finance: (tab) => finance.renderPage(pageCtx(), tab),
+  propriete: (tab) => property.renderPage(pageCtx(), tab),
   usage: renderUsage,
   changelog: renderChangelog,
   activities: () => activities.renderPage(pageCtx(), { tabs: plannerTabs('activities'), addEvent: (day, pre) => eventModal(day, null, pre) }),
@@ -3408,7 +3410,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'week', 'missions', 'brain', 'finance', 'workout', 'rbq']; // Objectifs : onglet de Missions · Actualités et Carnet : onglets du Cerveau · Habitudes : onglet de Corps // Aventure : dans la page du héros (Progression) // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'week', 'missions', 'brain', 'finance', 'propriete', 'workout', 'rbq']; // Objectifs : onglet de Missions · Actualités et Carnet : onglets du Cerveau · Habitudes : onglet de Corps // Aventure : dans la page du héros (Progression) // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];

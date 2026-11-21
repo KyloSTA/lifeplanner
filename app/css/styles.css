@@ -3084,3 +3084,98 @@ body.vdock-min #vdock { width: auto; min-width: 220px; }
   body.vdock-on.vdock-min #qa-fab { right: 260px; }
   body.vdock-on.vdock-min #to-top { right: 268px; }
 }
+
+/* =========================================================
+   🏡 Projet Propriété
+   ========================================================= */
+.pp-sub { margin: 4px 0 0; font-size: 14px; }
+.pp-scen { align-items: center; }
+.pp-scen-pick { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.pp-scen-pick select { min-height: 38px; font-weight: 600; color: var(--text); }
+.pp-tabs { margin-bottom: 16px; flex-wrap: wrap; }
+.pp-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.pp-two > .card { margin: 0; }
+.pp-two h3 { margin: 4px 0 8px; font-size: 15px; }
+.pp-warn { border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 13.5px; }
+.pp-warn p { margin: 4px 0; }
+/* Horizon + verdict */
+.pp-horizon { margin-bottom: 16px; }
+.pp-hz-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pp-hz-row input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+.pp-hz-v { min-width: 60px; text-align: right; font-size: 18px; }
+.pp-verdict { margin: 12px 0 0; font-size: 15px; line-height: 1.5; }
+/* Cartes des 3 options */
+.pp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.pp-card { margin: 0; border-top: 4px solid var(--oc); display: grid; gap: 6px; align-content: start; }
+.pp-card.best { box-shadow: 0 0 0 2px var(--oc), 0 10px 30px color-mix(in srgb, var(--oc) 25%, transparent); }
+.pp-card-head { display: flex; align-items: center; gap: 8px; }
+.pp-card-head h3 { margin: 0; font-size: 15px; flex: 1; }
+.pp-ico { font-size: 22px; }
+.pp-badge { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oc) 18%, transparent); color: var(--oc); white-space: nowrap; }
+.pp-big { display: grid; margin-top: 6px; }
+.pp-big small { color: var(--muted); font-size: 12px; }
+.pp-big b { font-size: 24px; font-variant-numeric: tabular-nums; }
+.pp-share { margin: 0; font-size: 12.5px; }
+/* Graphique */
+.pp-chart { width: 100%; height: auto; display: block; }
+.pp-grid { stroke: var(--border); stroke-width: 1; }
+.pp-zero { stroke: var(--muted); stroke-dasharray: 4 4; }
+.pp-ax { fill: var(--muted); font-size: 11px; }
+.pp-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 13px; }
+.pp-legend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+/* Tableaux */
+.pp-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
+.pp-table td, .pp-table th { padding: 7px 10px; border-top: 1px solid var(--border); text-align: left; }
+.pp-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pp-table tr.pp-total td { border-top: 2px solid var(--border); font-weight: 600; background: var(--surface-2); }
+.pp-table thead th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--surface-2); border-top: 0; }
+.pp-scroll { overflow-x: auto; }
+.pp-years td.pp-top { font-weight: 700; color: var(--accent); }
+.pp-neg { color: var(--danger); } .pp-pos { color: var(--ok); }
+/* Champs */
+.pp-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 14px; }
+.pp-fields-inline { margin-bottom: 4px; }
+.pp-field { display: grid; gap: 4px; font-size: 13px; }
+.pp-lbl { color: var(--muted); font-weight: 600; }
+.pp-hint { font-style: normal; cursor: help; opacity: .8; }
+.pp-in { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
+.pp-in:focus-within { border-color: var(--accent); }
+.pp-in input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 8px 10px; font: inherit; font-size: 15px; color: var(--text); font-variant-numeric: tabular-nums; outline: none; box-shadow: none; }
+.pp-in b { padding: 0 10px; color: var(--muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.pp-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; grid-column: 1 / -1; cursor: pointer; }
+/* Étapes, listes, journal */
+.pp-steps, .pp-list, .pp-links, .pp-journal { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pp-steps li { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.pp-steps li label { flex: 1; display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+.pp-steps li.done span { text-decoration: line-through; color: var(--muted); }
+.pp-steps .x, .pp-list .x, .pp-links .x { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 0 6px; }
+.pp-add input, .pp-list-add input { width: 100%; margin-top: 10px; }
+.pp-list li, .pp-links li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.pp-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.pp-link-add { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 8px; margin-top: 10px; }
+.pp-docs { display: flex; flex-wrap: wrap; gap: 8px; }
+.pp-h3 { font-size: 13px; margin: 12px 0 4px; }
+.pp-h3.pos { color: var(--ok); } .pp-h3.neg { color: var(--danger); }
+.pp-dec { flex-wrap: wrap; }
+.pp-journal-add { display: grid; gap: 8px; margin-bottom: 10px; }
+.pp-journal-add .btn { justify-self: end; }
+.pp-journal li { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.pp-journal p { margin: 2px 0 0; white-space: pre-wrap; }
+/* Scénarios */
+.pp-presets { display: grid; gap: 8px; margin: 12px 0; }
+.pp-preset { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; }
+.pp-preset:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.pp-preset span { display: grid; gap: 2px; }
+.pp-preset small { color: var(--muted); }
+.pp-menu { display: grid; gap: 8px; margin: 12px 0; }
+@media (max-width: 700px) {
+  .pp-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .pp-tabs button { flex-direction: column; padding: 6px 2px; font-size: 10px; min-height: 48px; }
+  .pp-tab-l { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pp-two { grid-template-columns: 1fr; }
+  .pp-fields { grid-template-columns: 1fr 1fr; }
+  .pp-big b { font-size: 21px; }
+  .pp-link-add { grid-template-columns: 1fr; }
+  .page-head .pp-scen { width: 100%; }
+}
+.pp-cross { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 14px; }
