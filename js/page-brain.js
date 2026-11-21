@@ -37,6 +37,7 @@ import * as couple from './couple.js';
 import * as quick from './quickadd.js';
 import * as digest from './digest.js';
 import { swipeable } from './swipe.js';
+import * as videodock from './videodock.js';
 import { $, $$, view, toast, modal, confirmBox, router, routes, setCleanup, HZ_LABEL, QUICK_DATES, concludeGoal, evoBar, evoLine, fold, getAvatar, goalClass, goalMark, goalSort, goalVerdict, hzOptions, openGoals } from './app.js';
 
 const { esc, iso, cap } = U;
@@ -306,7 +307,7 @@ function noteCard(n, proj) {
       if (!v.length) return '';
       const at = v[0].start ? `${Math.floor(v[0].start / 60)}:${String(v[0].start % 60).padStart(2, '0')}` : '';
       return `<div class="nc-img nc-yt ${v[0].short ? 'is-short' : ''}"><img src="https://i.ytimg.com/vi/${v[0].id}/hqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">
-        <i class="nc-play" aria-hidden="true">▶</i>${at ? `<span title="Où tu étais rendu">⏱ ${at}</span>` : v.length > 1 ? `<span>+${v.length - 1}</span>` : ''}</div>`;
+        <button type="button" class="nc-play" data-dock-note="${n.id}" title="Regarder dans le dock vidéo (la page reste visible)" aria-label="Regarder dans le dock vidéo">▶</button>${at ? `<span title="Où tu étais rendu">⏱ ${at}</span>` : v.length > 1 ? `<span>+${v.length - 1}</span>` : ''}</div>`;
     })()}
     <p>${esc(brain.excerpt(cardText(n.body))) || (n.title ? '' : '<span class="muted">Vide</span>')}</p>
     <div class="nc-foot">${(n.tags || []).slice(0, 3).map((tg) => `<span class="tag">#${esc(tg)}</span>`).join('')}
@@ -686,6 +687,22 @@ function togglePgOpen(id, force) {
   return open;
 }
 
+// ▶ sur une carte (ou « 📺 Dans le dock » dans une note) : la vidéo joue dans le dock, la page reste visible
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest?.('[data-dock-note]');
+  if (!b) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const n = await db.get('notes', b.dataset.dockNote);
+  const v = youtubeVideos(n?.body)[Number(b.dataset.dockIdx) || 0];
+  if (!v) return;
+  const title = (n.source?.kind === 'news' && n.source.title) || n.title || 'Vidéo';
+  videodock.open({ id: v.id, start: v.start, title, noteId: n.id });
+  // Dans la note : on arrête le lecteur de la page (la vidéo continue dans le dock)
+  const inline = document.querySelector('#n-video iframe');
+  if (inline && b.closest('#n-video')) inline.src = 'about:blank';
+}, true);
+
 /** Vidéos YouTube d'un texte : [{ id, start (s), short }], sans doublon, dans l'ordre. */
 function youtubeVideos(text = '') {
   const out = new Map();
@@ -782,7 +799,8 @@ async function renderNote(id) {
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
       <div class="yt-bar">
         ${vids.length > 1 ? `<div class="yt-pick">${vids.map((x, i) => `<button class="chip-btn ${i === videoIdx ? 'on' : ''}" data-yt="${i}">▶ Vidéo ${i + 1}</button>`).join('')}</div>` : '<span></span>'}
-        <a class="btn sm-text" href="https://www.youtube.com/watch?v=${v.id}${v.start ? '&t=' + v.start + 's' : ''}" target="_blank" rel="noopener" title="Si la vidéo refuse de jouer ici, ouvre-la sur YouTube">Ouvrir sur YouTube ↗</a>
+        <span class="yt-acts"><button type="button" class="btn sm-text" data-dock-note="${n.id}" data-dock-idx="${videoIdx}" title="La vidéo continue dans le dock pendant que tu changes de page">📺 Dans le dock</button>
+          <a class="btn sm-text" href="https://www.youtube.com/watch?v=${v.id}${v.start ? '&t=' + v.start + 's' : ''}" target="_blank" rel="noopener" title="Si la vidéo refuse de jouer ici, ouvre-la sur YouTube">Ouvrir sur YouTube ↗</a></span>
       </div>`;
     $$('[data-yt]', el).forEach((b) => (b.onclick = () => { videoIdx = Number(b.dataset.yt); videoSig = ''; drawVideo(); }));
   };
