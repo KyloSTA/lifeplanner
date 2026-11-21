@@ -848,7 +848,7 @@ async function renderNote(id) {
     if (el.hidden) return;
     const [goals, tasks] = await Promise.all([loadGoals(), db.all('tasks')]);
     const st = brain.projectStats(n.id, goals, tasks);
-    const others = goals.filter((g) => g.projectId !== n.id);
+    const others = goals.filter((g) => g.projectId !== n.id && !g.done); // un objectif terminé n'est plus proposé
     const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
     el.innerHTML = `<div class="card-head"><h2>🎯 Objectifs et missions du projet</h2>
         <span class="muted">${st.goals.length || st.direct.length ? `${st.pct} %${st.missions ? ` · ${st.done}/${st.missions} missions` : ''}` : ''}</span></div>
@@ -909,7 +909,7 @@ async function renderNote(id) {
         <button class="btn primary">Ajouter</button>
       </form>
       ${others.length ? `<select class="proj-link" aria-label="Associer un objectif existant"><option value="">🔗 Associer un objectif existant…</option>
-        ${others.map((g) => `<option value="${g.id}">${esc(g.title)}${g.projectId ? ' (déjà dans un autre projet)' : ''}</option>`).join('')}</select>` : ''}`;
+        ${others.filter((g) => !g.done).map((g) => `<option value="${g.id}">${esc(g.title)}${g.projectId ? ' (déjà dans un autre projet)' : ''}</option>`).join('')}</select>` : ''}`;
 
     bindTaskList(el, drawProject);
     // Section « objectifs terminés » : ouverte ou fermée, le choix est gardé (comme les missions d'un objectif)
