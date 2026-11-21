@@ -3179,3 +3179,8 @@ body.vdock-min #vdock { width: auto; min-width: 220px; }
   .page-head .pp-scen { width: 100%; }
 }
 .pp-cross { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 14px; }
+
+/* Page manuscrite : seulement la feuille de papier (pas de fond gris, pas de cadre) */
+.ink-scroll { background: #fffdf8; padding: 0; gap: 0; }
+.ink-page { box-shadow: none; border-radius: 0; }
+@media (max-width: 600px) { .ink-scroll { padding: 0; } }
