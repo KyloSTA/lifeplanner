@@ -5,7 +5,7 @@ import * as gcal from './gcal.js';
 import { InkEditor, INK_COLORS, HL_COLORS } from './ink.js';
 import * as game from './game.js';
 import * as AV from './avatar.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo, scheduleTask, timeLabel, setTaskDone } from './tasks.js';
+import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo, scheduleTask, timeLabel, setTaskDone, setNextTaskImages } from './tasks.js';
 import * as brain from './brain.js';
 import * as quotes from './quotes.js';
 import * as assistant from './assistant.js';
@@ -322,6 +322,40 @@ videodock.start(); // remet le dock vidéo tel qu'il était
     if (a?.classList.contains('active') && a.getAttribute('href') === location.hash) { e.preventDefault(); toTop(); }
   });
   addEventListener('hashchange', () => { if (btn) btn.hidden = true; });
+}
+// 📷 Coller une image dans une case « + mission » (Missions, objectifs, projets, jour, semaine…) : la mission aura la photo
+{
+  const isMissionBox = (el) => el?.matches?.('form input[name="t"]') && /mission/i.test(el.placeholder || '');
+  const drawPics = (form, inp) => {
+    let chip = form.querySelector('.mi-pics');
+    if (!chip) { chip = document.createElement('span'); chip.className = 'mi-pics'; inp.after(chip); }
+    chip.innerHTML = `📷 ${form._pics.length > 1 ? form._pics.length + ' photos' : 'photo'}<button type="button" aria-label="Retirer les photos" title="Retirer">×</button>`;
+    chip.querySelector('button').onclick = () => { images.removeUnused(form._pics); form._pics = []; chip.remove(); inp.focus(); };
+  };
+  document.addEventListener('paste', async (e) => {
+    const inp = e.target;
+    if (!isMissionBox(inp)) return;
+    const files = images.imageFiles(e.clipboardData);
+    if (!files.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const form = inp.form;
+    form._pics ||= [];
+    try { for (const f of files) form._pics.push(await images.save(f)); } catch (err) { toast('Image illisible : ' + err.message, 'err'); return; }
+    if (!inp.value.trim()) inp.value = `Photo du ${U.fmtShort(new Date())}`; // titre modifiable avant d'ajouter
+    drawPics(form, inp);
+    inp.focus();
+    inp.select();
+    toast('📷 Photo prête : ajoute la mission (Entrée ou +) et elle aura la photo');
+  }, true);
+  // À l'envoi du formulaire : les photos accompagnent la mission créée
+  document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (!form._pics?.length) return;
+    setNextTaskImages(form._pics);
+    form._pics = [];
+    form.querySelector('.mi-pics')?.remove();
+  }, true);
 }
 // Écrans vides : un bouton data-qa ouvre l'ajout rapide déjà prérempli (data-qa-type = type imposé)
 document.addEventListener('click', (e) => {
