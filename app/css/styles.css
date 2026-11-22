@@ -3347,6 +3347,10 @@ body.an-open { overflow: hidden; }
   .tb-launch:hover, .tb-launch[aria-expanded="true"] { background: rgba(255,255,255,.14); }
   .tb-title { opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .app { margin-top: env(titlebar-area-height, 33px); height: calc(100% - env(titlebar-area-height, 33px)); }
+  /* Les fenêtres plein écran de l'app commencent sous la barre (sinon les boutons de Windows cachent leurs outils) */
+  .alarm-back, .modal-back, .img-zoom, .fi-drop, .sx-player, .ink-shell.ink-full, .an-root { top: env(titlebar-area-height, 33px); }
+  #habit-root { top: calc(env(titlebar-area-height, 33px) + 16px); }
+  .titlebar { z-index: 400; }
 }
 
 /* 📺 Carte vidéo flottante : déplacer (titre) et redimensionner (coin) */
