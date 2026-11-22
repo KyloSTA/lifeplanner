@@ -233,20 +233,14 @@ export async function renderPage(ctx) {
         ${chs.length ? `<section class="card rpg-chests"><div class="card-head"><h2>🎁 Coffres à ouvrir</h2><span class="muted">${chs.length}</span></div>
           ${chs.slice(0, 6).map((c) => `<div class="rpg-chest" style="--rc:${RARITY[c.rarity].color}"><span>${c.icon}</span><span class="rpg-item-txt"><b>${esc(c.name)}</b><small>${RARITY[c.rarity].name}</small></span><button class="btn primary" data-chest="${esc(c.key)}">Ouvrir</button></div>`).join('')}
           ${chs.length > 6 ? `<p class="hint muted">+ ${chs.length - 6} autres coffres</p>` : ''}</section>` : ''}
-        <section class="card rpg-inv"><div class="card-head"><h2>🎒 Équipement</h2><span class="muted">${s.inv.length} objet${s.inv.length > 1 ? 's' : ''}</span></div>
-          <div class="rpg-slots">${SLOTS.map((sl) => `<div class="rpg-slot ${eqItems[sl.id] ? 'full' : ''}" style="--rc:${eqItems[sl.id] ? RARITY[eqItems[sl.id].rarity].color : 'var(--border)'}" title="${sl.name}"><span>${eqItems[sl.id] ? AV.itemArt(eqItems[sl.id], 40) : sl.icon}</span><small>${eqItems[sl.id] ? esc(eqItems[sl.id].name) : sl.name}</small></div>`).join('')}</div>
-          <div class="rpg-items">${[...s.inv].sort((a, b) => Object.keys(RARITY).indexOf(ITEM[b.id].rarity) - Object.keys(RARITY).indexOf(ITEM[a.id].rarity)).map((x) => {
-            const it = ITEM[x.id], on = s.equip?.[it.slot] === x.uid;
-            return itemCard(it, `<span class="rpg-item-act">${on ? '<button class="btn sm-text on" data-unequip="' + it.slot + '">Équipé ✓</button>' : `<button class="btn sm-text" data-equip="${x.uid}">Équiper</button><button class="btn sm-text" data-sell="${x.uid}" title="Vendre">${Math.floor(RARITY[it.rarity].price / 3)} 🪙</button>`}</span>`);
-          }).join('')}</div>
-        </section>
         <section class="card rpg-shop"><div class="card-head"><h2>🛒 Marchand</h2><span class="muted">Nouveaux objets chaque jour</span></div>
           ${shopFor(U.iso(new Date())).map((it) => itemCard(it, `<button class="btn sm-text" data-buy="${it.id}" ${s.gold < RARITY[it.rarity].price ? 'disabled' : ''}>${RARITY[it.rarity].price} 🪙</button>`)).join('')}
         </section>
         <section class="card rpg-log"><div class="card-head"><h2>📜 Journal d’aventure</h2></div>
           ${(s.log || []).slice(0, 8).map((l) => `<p><small class="muted">${U.fmtShort(new Date(l.at))}</small> ${esc(l.text)}</p>`).join('') || '<p class="empty-sm">Ton aventure commence. Affronte ton premier ennemi !</p>'}</section>
       </div>
-    </div>`;
+    </div>
+    ${equipHTML(s, eqItems, avCfg)}`;
 
   const $ = (sel) => view.querySelector(sel), $$ = (sel) => [...view.querySelectorAll(sel)];
   $('#rpg-fight').onclick = async () => {
@@ -277,6 +271,7 @@ export async function renderPage(ctx) {
     });
   }));
   const mutate = async (fn) => { const st2 = await load(); fn(st2); await save(st2); redraw(); };
+  bindEquip(view, s, mutate, toast, redraw);
   $$('[data-equip]').forEach((b) => (b.onclick = () => mutate((x) => { const it = ITEM[x.inv.find((i) => i.uid === b.dataset.equip).id]; x.equip = { ...x.equip, [it.slot]: b.dataset.equip }; toast(`${it.icon} ${it.name} équipé`); })));
   $$('[data-unequip]').forEach((b) => (b.onclick = () => mutate((x) => { delete x.equip[b.dataset.unequip]; })));
   $$('[data-sell]').forEach((b) => (b.onclick = () => mutate((x) => {
@@ -290,6 +285,192 @@ export async function renderPage(ctx) {
     x.gold -= p; x.inv.push({ uid: U.uid(), id: it.id }); addLog(x, `🛒 Acheté : ${it.icon} ${it.name} (−${p} 🪙)`); toast(`${it.icon} ${it.name} acheté`);
   })));
 }
+
+/* =========================================================
+   🎒 Équipement : héros entouré de ses emplacements + inventaire filtrable
+   Glisser un objet sur le héros (souris, stylet) pour l'équiper ; le sortir du héros pour le retirer.
+   Au doigt : toucher l'objet, puis « Équiper » (ou toucher l'emplacement sur le héros).
+   ========================================================= */
+const EQ_KEY = 'lp.eqFilter';
+let eqf = (() => { try { return { slot: 'all', rar: 'all', q: '', hideOn: false, sort: 'rarete', ...(JSON.parse(localStorage.getItem(EQ_KEY)) || {}) }; } catch { return { slot: 'all', rar: 'all', q: '', hideOn: false, sort: 'rarete' }; } })();
+let eqSel = null; // objet sélectionné (id) pour la fiche
+let eqFlash = null; // emplacement qui vient de changer (petite animation)
+const saveEqf = () => { try { localStorage.setItem(EQ_KEY, JSON.stringify({ ...eqf, q: '' })); } catch { /* ignore */ } };
+const RANK = Object.keys(RARITY); // commun → légendaire
+const power = (it) => Object.values(it.bonus || {}).reduce((a, b) => a + b, 0);
+// Emplacements autour du héros : à gauche Tête, Tenue, Accessoire · à droite Outil, Compagnon
+const SLOT_SIDE = { tete: 'l', armure: 'l', bijou: 'l', arme: 'r', compagnon: 'r' };
+
+/** L'inventaire regroupé par objet : { it, uids, onUid } (onUid = l'exemplaire porté). */
+function grouped(s) {
+  const by = new Map();
+  for (const x of s.inv) {
+    const it = ITEM[x.id];
+    if (!it) continue;
+    const g = by.get(it.id) || { it, uids: [], onUid: null };
+    if (s.equip?.[it.slot] === x.uid) g.onUid = x.uid; else g.uids.push(x.uid);
+    by.set(it.id, g);
+  }
+  return [...by.values()];
+}
+
+function equipHTML(s, eqItems, avCfg) {
+  const groups = grouped(s);
+  const q = eqf.q.trim().toLowerCase();
+  const count = (slot) => groups.filter((g) => slot === 'all' || g.it.slot === slot).length;
+  let list = groups.filter((g) => (eqf.slot === 'all' || g.it.slot === eqf.slot) && (eqf.rar === 'all' || g.it.rarity === eqf.rar)
+    && (!eqf.hideOn || !g.onUid) && (!q || g.it.name.toLowerCase().includes(q)));
+  const sorts = {
+    rarete: (a, b) => RANK.indexOf(b.it.rarity) - RANK.indexOf(a.it.rarity) || power(b.it) - power(a.it),
+    puissance: (a, b) => power(b.it) - power(a.it) || RANK.indexOf(b.it.rarity) - RANK.indexOf(a.it.rarity),
+    nom: (a, b) => a.it.name.localeCompare(b.it.name, 'fr'),
+  };
+  list.sort(sorts[eqf.sort] || sorts.rarete);
+  const totalBonus = Object.values(eqItems).filter(Boolean).reduce((a, it) => a + power(it), 0);
+  const slotBox = (sl) => {
+    const it = eqItems[sl.id];
+    return `<button type="button" class="eq-slot ${it ? 'full' : 'empty'} ${eqFlash === sl.id ? 'flash' : ''}" data-slot="${sl.id}" style="--rc:${it ? RARITY[it.rarity].color : 'var(--border)'}"
+      title="${it ? esc(it.name) + ' — glisse-le hors du héros pour le retirer' : sl.name + ' : glisse un objet ici'}">
+      <span class="eq-slot-art">${it ? AV.itemArt(it, 46) : `<span class="eq-slot-ico">${sl.icon}</span>`}</span>
+      <span class="eq-slot-txt"><small>${sl.name}</small><b>${it ? esc(it.name) : 'Vide'}</b></span></button>`;
+  };
+  const sel = eqSel && groups.find((g) => g.it.id === eqSel);
+  const detail = sel ? (() => {
+    const it = sel.it, cur = eqItems[it.slot];
+    const diff = STATS.map((x) => [x, (it.bonus[x.id] || 0) - (cur && cur.id !== it.id ? cur.bonus[x.id] || 0 : 0)]).filter(([, v]) => v);
+    const sellable = sel.uids.length;
+    return `<div class="eq-detail" style="--rc:${RARITY[it.rarity].color}">
+      <div class="eq-detail-art">${AV.itemArt(it, 84)}</div>
+      <div class="eq-detail-body">
+        <p class="eq-rar">${RARITY[it.rarity].name} · ${SLOTS.find((x) => x.id === it.slot).name}${sel.uids.length + (sel.onUid ? 1 : 0) > 1 ? ` · ×${sel.uids.length + (sel.onUid ? 1 : 0)}` : ''}</p>
+        <h3>${esc(it.name)}</h3>
+        <p class="eq-bonus">${bonusText(it.bonus)}</p>
+        ${cur && cur.id !== it.id ? `<p class="eq-cmp">Comparé à <b>${esc(cur.name)}</b> : ${diff.map(([x, v]) => `<span class="${v > 0 ? 'up' : 'down'}">${v > 0 ? '+' : ''}${v} ${x.icon}</span>`).join(' ') || 'pareil'}</p>` : ''}
+        <div class="eq-acts">
+          ${sel.onUid ? `<button class="btn" data-unequip="${it.slot}">Retirer</button>` : `<button class="btn primary" data-equip="${sel.uids[0]}">Équiper</button>`}
+          ${sellable ? `<button class="btn" data-sell="${sel.uids[0]}" title="Vendre un exemplaire">Vendre · ${Math.floor(RARITY[it.rarity].price / 3)} 🪙</button>` : ''}
+          <button class="btn icon" data-eq-close aria-label="Fermer la fiche">×</button>
+        </div>
+      </div></div>`;
+  })() : '';
+
+  return `<section class="card rpg-eq" id="rpg-eq">
+    <div class="card-head"><h2>🎒 Équipement</h2><span class="muted">${s.inv.length} objet${s.inv.length > 1 ? 's' : ''} · bonus porté +${totalBonus}</span></div>
+    <div class="eq-layout">
+      <div class="eq-doll" id="eq-doll">
+        <div class="eq-side">${SLOTS.filter((sl) => SLOT_SIDE[sl.id] === 'l').map(slotBox).join('')}</div>
+        <div class="eq-body">${AV.heroSVG(avCfg, Object.values(eqItems).filter(Boolean), 300)}<p class="eq-drop-hint">Glisse un objet sur ton héros</p></div>
+        <div class="eq-side">${SLOTS.filter((sl) => SLOT_SIDE[sl.id] === 'r').map(slotBox).join('')}</div>
+      </div>
+      <div class="eq-inv">
+        <div class="eq-filters">
+          <input type="search" id="eq-q" placeholder="Chercher un objet…" value="${esc(eqf.q)}" autocomplete="off">
+          <select id="eq-sort" aria-label="Trier">${[['rarete', 'Trier : rareté'], ['puissance', 'Trier : puissance'], ['nom', 'Trier : nom']].map(([k, l]) => `<option value="${k}" ${eqf.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        </div>
+        <div class="eq-chips">${[['all', '✨', 'Tout'], ...SLOTS.map((sl) => [sl.id, sl.icon, sl.name])].map(([k, e, l]) => `<button type="button" class="chip-btn ${eqf.slot === k ? 'on' : ''}" data-eqslot="${k}">${e} ${l} <small>${count(k)}</small></button>`).join('')}</div>
+        <div class="eq-chips eq-rars">${[['all', 'Toutes raretés'], ...RANK.map((k) => [k, RARITY[k].name])].map(([k, l]) => `<button type="button" class="chip-btn ${eqf.rar === k ? 'on' : ''}" data-eqrar="${k}" ${k !== 'all' ? `style="--rc:${RARITY[k].color}"` : ''}>${k !== 'all' ? '<i></i>' : ''}${l}</button>`).join('')}
+          <label class="eq-hide"><input type="checkbox" id="eq-hide" ${eqf.hideOn ? 'checked' : ''}> Cacher les objets portés</label></div>
+        ${detail}
+        <div class="eq-grid" id="eq-grid">${list.map((g) => {
+          const n = g.uids.length + (g.onUid ? 1 : 0);
+          return `<button type="button" class="eq-tile ${g.onUid ? 'on' : ''} ${eqSel === g.it.id ? 'sel' : ''} r-${g.it.rarity}" data-id="${g.it.id}" style="--rc:${RARITY[g.it.rarity].color}" title="${esc(g.it.name)} · ${RARITY[g.it.rarity].name}">
+            ${AV.itemArt(g.it, 52)}${n > 1 ? `<span class="eq-n">×${n}</span>` : ''}${g.onUid ? '<span class="eq-on">✓</span>' : ''}
+            <b>${esc(g.it.name)}</b><small>+${power(g.it)} · ${esc(SLOTS.find((x) => x.id === g.it.slot).name)}</small></button>`;
+        }).join('') || '<p class="empty-sm">Aucun objet pour ces filtres.</p>'}</div>
+      </div>
+    </div>
+  </section>`;
+}
+
+function bindEquip(view, s, mutate, toast, redraw) {
+  const root = view.querySelector('#rpg-eq');
+  if (!root) return;
+  eqFlash = null;
+  const equip = (id, uid) => mutate((x) => {
+    const g = grouped(x).find((gg) => gg.it.id === id);
+    const it = ITEM[id];
+    const use = uid || g?.uids[0] || g?.onUid;
+    if (!use) return;
+    x.equip = { ...x.equip, [it.slot]: use };
+    eqFlash = it.slot;
+    toast(`${it.icon} ${it.name} équipé`);
+  });
+  const unequip = (slot) => mutate((x) => { const it = ITEM[(x.inv.find((i) => i.uid === x.equip?.[slot]) || {}).id]; delete x.equip[slot]; if (it) toast(`${it.icon} ${it.name} retiré`); });
+
+  // Filtres
+  const q = root.querySelector('#eq-q');
+  q.oninput = () => { // filtre sur place (sans tout redessiner à chaque lettre)
+    eqf.q = q.value;
+    const w = q.value.trim().toLowerCase();
+    root.querySelectorAll('.eq-tile').forEach((t) => { t.hidden = !!w && !t.title.toLowerCase().includes(w); });
+  };
+  root.querySelector('#eq-sort').onchange = (e) => { eqf.sort = e.target.value; saveEqf(); redraw(); };
+  root.querySelectorAll('[data-eqslot]').forEach((b) => (b.onclick = () => { eqf.slot = b.dataset.eqslot; saveEqf(); redraw(); }));
+  root.querySelectorAll('[data-eqrar]').forEach((b) => (b.onclick = () => { eqf.rar = b.dataset.eqrar; saveEqf(); redraw(); }));
+  root.querySelector('#eq-hide').onchange = (e) => { eqf.hideOn = e.target.checked; saveEqf(); redraw(); };
+  root.querySelector('[data-eq-close]')?.addEventListener('click', () => { eqSel = null; redraw(); });
+
+  // Toucher une tuile : fiche de l'objet · toucher un emplacement avec un objet choisi : l'équiper là
+  root.querySelectorAll('.eq-tile').forEach((t) => (t.onclick = () => { if (t._dragged) return; eqSel = eqSel === t.dataset.id ? null : t.dataset.id; redraw(); }));
+  root.querySelectorAll('.eq-slot').forEach((b) => (b.onclick = () => {
+    if (b._dragged) return;
+    const slot = b.dataset.slot;
+    if (eqSel && ITEM[eqSel]?.slot === slot) return equip(eqSel);
+    eqf.slot = slot; saveEqf(); // sinon : montrer les objets de cet emplacement
+    const on = s.inv.find((i) => i.uid === s.equip?.[slot]);
+    eqSel = on ? on.id : null;
+    redraw();
+  }));
+
+  // Glisser-déposer (souris et stylet) : tuile → héros = équiper ; emplacement porté → hors du héros = retirer
+  const doll = root.querySelector('#eq-doll');
+  let drag = null;
+  const start = (e, el, payload) => {
+    if (e.button > 0 || e.pointerType === 'touch') return;
+    drag = { el, payload, x: e.clientX, y: e.clientY, pid: e.pointerId, on: false };
+  };
+  root.querySelectorAll('.eq-tile').forEach((t) => t.addEventListener('pointerdown', (e) => start(e, t, { kind: 'item', id: t.dataset.id })));
+  root.querySelectorAll('.eq-slot.full').forEach((b) => b.addEventListener('pointerdown', (e) => start(e, b, { kind: 'slot', slot: b.dataset.slot })));
+  const move = (e) => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    if (!drag.on) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 7) return;
+      drag.on = true;
+      drag.el._dragged = true;
+      const art = drag.el.querySelector('svg')?.cloneNode(true);
+      drag.ghost = document.createElement('div');
+      drag.ghost.className = 'eq-ghost';
+      if (art) drag.ghost.append(art);
+      document.body.append(drag.ghost);
+      doll.classList.add('dropping');
+      const slot = drag.payload.kind === 'item' ? ITEM[drag.payload.id].slot : drag.payload.slot;
+      doll.querySelector(`.eq-slot[data-slot="${slot}"]`)?.classList.add('target');
+    }
+    e.preventDefault();
+    drag.ghost.style.transform = `translate(${e.clientX - 30}px, ${e.clientY - 30}px)`;
+    doll.classList.toggle('over', !!document.elementFromPoint(e.clientX, e.clientY)?.closest('#eq-doll'));
+  };
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const d = drag;
+    drag = null;
+    if (!d.on) return;
+    d.ghost?.remove();
+    doll.classList.remove('dropping', 'over');
+    doll.querySelectorAll('.target').forEach((x) => x.classList.remove('target'));
+    setTimeout(() => { d.el._dragged = false; }, 0);
+    const onDoll = !!document.elementFromPoint(e.clientX, e.clientY)?.closest('#eq-doll');
+    if (d.payload.kind === 'item' && onDoll) equip(d.payload.id);
+    if (d.payload.kind === 'slot' && !onDoll) unequip(d.payload.slot);
+  };
+  // Écouteurs sur la fenêtre : on retire ceux de l'affichage précédent avant d'ajouter les nouveaux
+  eqOff?.();
+  addEventListener('pointermove', move, { passive: false });
+  addEventListener('pointerup', end);
+  addEventListener('pointercancel', end);
+  eqOff = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', end); removeEventListener('pointercancel', end); };
+}
+let eqOff = null;
 
 /** Objets équipés (pour dessiner le héros en entier ailleurs). */
 export async function equippedItems() {
