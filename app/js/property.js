@@ -142,7 +142,7 @@ export async function renderPage(ctx, arg) {
       <section class="card pp-horizon">
         <div class="pp-hz-row"><label for="pp-hz"><b>Horizon</b> <span class="muted">— comparer sur</span></label>
           <input type="range" id="pp-hz" min="1" max="25" step="1" value="${r.N}" aria-label="Horizon en années"><b class="pp-hz-v">${r.N} an${r.N > 1 ? 's' : ''}</b></div>
-        <p class="pp-verdict">🏆 Sur <b>${r.N} an${r.N > 1 ? 's' : ''}</b>, <b>${best.icon} ${esc(best.name)}</b> te laisse <b>${money(last[best.id].patrimoine - last[second.id].patrimoine)}</b> de plus que ${second.icon} ${esc(second.short.toLowerCase())}.
+        <p class="pp-verdict">🏆 Sur <b>${r.N} an${r.N > 1 ? 's' : ''}</b>, <b>${best.icon} ${esc(best.name)}</b> te laisse ${sorted.slice(1).map((o) => `<b>${money(last[best.id].patrimoine - last[o.id].patrimoine)}</b> de plus que ${o.icon} ${esc(o.short.toLowerCase())}`).join(' et ')}.
           ${r.bascule && r.bascule > 1 ? `Elle passe en tête à partir de l’<b>année ${r.bascule}</b>.` : r.bascule === 1 ? 'Elle est en tête dès la première année.' : ''}</p>
         ${(() => {
           // Sur 25 ans : à partir de quand acheter devient-il plus payant que la meilleure location ?
