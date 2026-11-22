@@ -3439,3 +3439,18 @@ html:fullscreen #habit-root { top: 16px; }
 .pp-explain .card-head h2 { font-size: 16px; }
 .pp-explain .pp-table tr.pp-cur td { font-weight: 700; }
 .pp-journal p { white-space: pre-line; }
+
+/* Horaire : choisir les missions d'une heure */
+.dayv-slot span { cursor: pointer; }
+.dayv-slot:hover span { color: var(--accent); }
+.hm-list { display: grid; gap: 4px; max-height: 46vh; overflow-y: auto; margin-bottom: 10px; }
+.hm-grp { margin: 8px 0 2px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.hm-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); cursor: pointer; }
+.hm-row:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.hm-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-row small { flex: none; }
+.hm-dur { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hm-dur label { display: flex; align-items: center; gap: 8px; }
+.dayv-task.tiny { padding-top: 0; padding-bottom: 0; font-size: 11.5px; align-items: center; overflow: hidden; }
+.dayv-task.tiny .ev-time { display: none; }
+.dayv-task.tiny .dvt-cb { transform: scale(.8); }
