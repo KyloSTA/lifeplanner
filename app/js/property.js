@@ -193,8 +193,45 @@ export async function renderPage(ctx, arg) {
     return out;
   }
 
+  /** D'où vient l'écart entre acheter et la meilleure location : décomposition exacte du patrimoine à l'horizon. */
+  function gapText(r) {
+    const a = r.a, N = r.N, last = r.years[r.years.length - 1];
+    const ans = `${N} an${N > 1 ? 's' : ''}`;
+    const L = OPTIONS.filter((o) => o.id !== 'achat').sort((x, y) => last[y.id].patrimoine - last[x.id].patrimoine)[0];
+    const A = last.achat, B = last[L.id];
+    const num = (v) => Number(v) || 0;
+    const G = B.patrimoine - A.patrimoine; // > 0 : la location laisse plus
+    // Frais payés une seule fois pour acheter (perdus) : vente du condo + achat de la maison
+    const fraisAchat = r.vente.commissionTTC + r.vente.frais + r.vente.penalite + r.achat.closing + r.achat.premiumTax + r.achat.premium;
+    const fraisLoc = num(a.demenagement) + (L.id === 'chambres' ? num(a.meubles) : 0);
+    const apprA = A.valeur - num(a.prix), apprL = B.valeur - num(a.prixVente);
+    const capA = r.achat.loan - A.solde, capL = r.vente.solde - B.solde;
+    const venteA = A.valeur - A.solde - A.equite, venteL = B.valeur - B.solde - B.equite; // frais de vente (+ impôt sur le gain du condo)
+    const place = (B.placements - A.placements) - num(a.epargne) + r.achat.leftover + fraisLoc;
+    const parMois = (A.cumul - B.cumul) / (N * 12);
+    const items = [
+      ['💸', 'Frais payés au départ pour acheter', `taxe de bienvenue, notaire, inspection, déménagement, commission et frais pour vendre le condo${r.vente.penalite ? ', pénalité de l’hypothèque du condo' : ''}${r.achat.premium ? ', assurance SCHL' : ''} : de l’argent qui part et ne revient pas`, fraisAchat],
+      ['📦', 'Frais de départ de la location', `déménagement${L.id === 'chambres' ? ' et meubles pour les chambres' : ''}`, -fraisLoc],
+      ['📆', `Ce que « ${L.short.toLowerCase()} » coûte de moins chaque mois, placé`, `environ ${money(Math.abs(parMois))} par mois de ${parMois >= 0 ? 'moins' : 'plus'} (${money(Math.abs(A.cumul - B.cumul))} sur ${ans}), placé à ${pct(num(a.rendement))} par année`, place],
+      ['📈', 'La prise de valeur', `la maison prendrait environ ${money(apprA)} de valeur, le condo ${money(apprL)}`, apprL - apprA],
+      ['🏦', 'La dette remboursée', `avec les paiements, on rembourse environ ${money(capA)} sur la maison, contre ${money(capL)} sur le condo`, capL - capA],
+      ['🧾', 'Les frais pour tout vendre à la fin', `commission pour vendre la maison (${money(venteA)}) ou le condo${B.impotGain ? ' et impôt sur son gain' : ''} (${money(venteL)})`, venteA - venteL],
+    ].sort((x, y) => Math.abs(y[3]) - Math.abs(x[3]));
+    const who = (v) => (v >= 0 ? `+${money(v)} pour la location` : `+${money(-v)} pour l’achat`);
+    const top = items[0];
+    const out = [`Pourquoi un si grand écart ? (sur ${ans})`];
+    out.push(`Dans ${ans}, « ${L.name.toLowerCase()} » laisserait ${money(Math.abs(G))} de ${G >= 0 ? 'plus' : 'moins'} qu’acheter la maison. Voici d’où vient cette différence, de la plus grosse à la plus petite :`);
+    for (const [ico, label, why, v] of items) out.push(`${ico} ${label} : ${who(v)}. ${why.charAt(0).toUpperCase() + why.slice(1)}.`);
+    out.push(`🔎 En résumé : le plus gros morceau, c’est « ${top[1].toLowerCase()} ». ${G >= 0
+      ? `Acheter demande de gros frais dès le départ et coûte plus cher chaque mois ; la maison prend de la valeur et on rembourse sa dette, mais sur ${ans} ça ne suffit pas à rattraper ces frais.`
+      : `La maison prend de la valeur et on rembourse sa dette, et ça dépasse les frais d’achat et les coûts mensuels plus élevés.`}`);
+    const mb = r.month1.out.bail, mc = r.month1.out.chambres, d1 = mb - mc;
+    out.push(`🛏 Entre louer le condo au complet ou à la chambre (écart de ${money(Math.abs(last.chambres.patrimoine - last.bail.patrimoine))}, en faveur ${last.chambres.patrimoine >= last.bail.patrimoine ? 'des chambres' : 'du bail complet'}) : à la chambre, ça coûte environ ${money(Math.abs(d1))} de ${d1 >= 0 ? 'moins' : 'plus'} par mois au début (plus de loyers, mais aussi services, gestion et chambres parfois vides), moins les meubles achetés au départ (${money(num(a.meubles))}).`);
+    return out;
+  }
+
   function drawScenarios(r) {
-    const blocks = [['opts', optionsText()], ['scen', scenariosText()], ['plain', plainText(r)]];
+    const blocks = [['opts', optionsText()], ['scen', scenariosText()], ['plain', plainText(r)], ['gap', gapText(r)]];
     // Chaque scénario enregistré : le choix gagnant et son patrimoine
     const rows = Object.entries(d.scenarios).map(([id, s]) => {
       const rr = compute({ ...DEFAULTS, ...s.a, horizon: r.N });
@@ -207,6 +244,7 @@ export async function renderPage(ctx, arg) {
         ${lines.slice(1).map((t) => `<p>${esc(t)}</p>`).join('')}${extra}</section>`;
     body.innerHTML = `
       ${card(blocks[2])}
+      ${card(blocks[3])}
       ${card(blocks[0])}
       ${card(blocks[1], `<h3 class="pp-h3">Tes scénarios sur ${r.N} an${r.N > 1 ? 's' : ''}</h3>
         <table class="pp-table"><tbody>${rows.map((x) => `<tr class="${x.cur ? 'pp-cur' : ''}"><td>${esc(x.name)}${x.cur ? ' <small class="muted">(affiché)</small>' : ''}</td><td>${x.best.icon} ${esc(x.best.short)}</td><td class="num">${money(x.pat)}</td></tr>`).join('')}</tbody></table>
