@@ -67,6 +67,31 @@ export async function addTask(title, date, goalId = null, projectId = null) {
   return t;
 }
 
+/**
+ * Objectifs comme zones de dépôt : glisser une mission (poignée ⋮⋮) sur un élément [data-drop-goal="id"]
+ * la rattache à cet objectif (« Annuler » possible). onDone() redessine la page.
+ */
+export function bindGoalDrops(root, onDone) {
+  root.querySelectorAll('[data-drop-goal]').forEach((z) => {
+    if (z._goalDrop) return;
+    z._goalDrop = true;
+    z.addEventListener('lp-drag-over', () => z.classList.add('goal-drop-over'));
+    z.addEventListener('lp-drag-leave', () => z.classList.remove('goal-drop-over'));
+    z.addEventListener('lp-drop', async (e) => {
+      z.classList.remove('goal-drop-over');
+      const id = e.detail.id, goalId = z.dataset.dropGoal;
+      const t = await db.get('tasks', id);
+      if (!t) return;
+      const before = t.goalId || null;
+      if (before === goalId) { onDone(); return; }
+      await setTaskGoal(id, goalId);
+      await onDone();
+      const g = goalsCache.find((x) => x.id === goalId) || (await db.get('goals', goalId));
+      showUndo(`🎯 « ${t.title} » rattachée à « ${g?.title || 'l’objectif'} »`, async () => { await setTaskGoal(id, before); await onDone(); }, 5000);
+    });
+  });
+}
+
 /* ---------- Photo collée dans une case « + mission » : elle accompagne la prochaine mission créée ---------- */
 let nextImages = null, nextTimer = 0;
 export function setNextTaskImages(ids) {
@@ -336,7 +361,7 @@ function startDrag(e, li, redraw) {
     if (!moved && Math.abs(ev.clientY - startY) < 4) return;
     moved = true;
     // Au-dessus d'une zone de dépôt (horaire) : on ne réordonne pas la liste, la zone montre l'heure visée
-    const z = document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => el.dataset?.dropDay);
+    const z = document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => (el.dataset?.dropDay || el.dataset?.dropGoal) && !el.contains(li)); // horaire (vue Jour) ou un autre objectif
     if (z !== zone) { zone?.dispatchEvent(new CustomEvent('lp-drag-leave')); zone = z || null; li.classList.toggle('drag-out', !!zone); }
     if (zone) {
       zone.dispatchEvent(new CustomEvent('lp-drag-over', { detail: { y: ev.clientY, title } }));

@@ -3298,3 +3298,6 @@ body.vdock-min #vdock { width: auto; min-width: 220px; }
   .eq-grid { max-height: none; }
 }
 @media (max-width: 600px) { .eq-doll { grid-template-columns: 86px minmax(120px, 1fr) 86px; } .eq-body .hero-body { max-width: 160px; } }
+
+/* Glisser une mission sur un objectif */
+.goal-drop-over { outline: 2px dashed var(--accent); outline-offset: 3px; background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)) !important; transition: background .12s; }

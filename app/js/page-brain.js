@@ -7,7 +7,7 @@ import * as gcal from './gcal.js';
 import { InkEditor, INK_COLORS, HL_COLORS } from './ink.js';
 import * as game from './game.js';
 import * as AV from './avatar.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo } from './tasks.js';
+import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo, bindGoalDrops } from './tasks.js';
 import * as brain from './brain.js';
 import * as quotes from './quotes.js';
 import * as assistant from './assistant.js';
@@ -886,7 +886,7 @@ async function renderNote(id) {
       ${''}`;
     function goalBlock(g) {
         const ms = tasks.filter((t) => t.goalId === g.id).sort(sortM);
-        return `<div class="pgoal ${goalClass(g)}" data-gid="${g.id}">
+        return `<div class="pgoal ${goalClass(g)}" data-gid="${g.id}" ${g.done ? "" : `data-drop-goal="${g.id}"`}>
           <div class="pg-head"><a href="#/goals" data-opengoal="${g.id}" title="Ouvrir dans Objectifs">${goalMark(g)}${esc(g.title)}</a>
             <span class="pct">${g.progress}%</span>
             <button class="btn icon sm pg-gear" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Options de l’objectif" title="Options">⚙</button>
@@ -930,6 +930,7 @@ async function renderNote(id) {
         ${others.filter((g) => !g.done).map((g) => `<option value="${g.id}">${esc(g.title)}${g.projectId ? ' (déjà dans un autre projet)' : ''}</option>`).join('')}</select>` : ''}`;
 
     bindTaskList(el, drawProject);
+    bindGoalDrops(el, drawProject); // glisser une mission (⋮⋮) sur un objectif : elle s'y rattache
     // Section « objectifs terminés » : ouverte ou fermée, le choix est gardé (comme les missions d'un objectif)
     $$('[data-pgdone]', el).forEach((d) => (d.ontoggle = () => { if (pgOpen().has(d.dataset.pgdone) !== d.open) togglePgOpen(d.dataset.pgdone); }));
     $$('.pg-add', el).forEach((f) => (f.onsubmit = async (e) => {

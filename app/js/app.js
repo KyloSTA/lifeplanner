@@ -5,7 +5,7 @@ import * as gcal from './gcal.js';
 import { InkEditor, INK_COLORS, HL_COLORS } from './ink.js';
 import * as game from './game.js';
 import * as AV from './avatar.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo, scheduleTask, timeLabel, setTaskDone, setNextTaskImages } from './tasks.js';
+import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo, scheduleTask, timeLabel, setTaskDone, setNextTaskImages, bindGoalDrops } from './tasks.js';
 import * as brain from './brain.js';
 import * as quotes from './quotes.js';
 import * as assistant from './assistant.js';
@@ -2708,7 +2708,7 @@ async function renderGoals() {
       g.projectId && g.horizon && inProjectGroup ? `<span class="chip hz-chip">📅 ${esc(HZ_LABEL[g.horizon])}</span>` : '',
     ].join('');
     // Carte d'objectif : anneau de progression (déplie), titre, une ligne de résumé ; les actions sont dans le menu ⋯
-    return `<article class="gcard ${open ? 'open' : ''} ${goalClass(g)} ${focus ? 'is-focus' : ''}" data-id="${g.id}">
+    return `<article class="gcard ${open ? 'open' : ''} ${goalClass(g)} ${focus ? 'is-focus' : ''}" data-id="${g.id}" ${done ? "" : `data-drop-goal="${g.id}"`}>
       <div class="gc-row">
         <button type="button" class="gc-ring goal-toggle" style="--p:${p}%" aria-expanded="${open}" aria-label="${open ? 'Replier' : 'Déplier'} « ${esc(g.title)} » (${p} %)"><span>${dropped ? '⛔' : done ? '✓' : p + '%'}</span></button>
         <div class="gc-body">
@@ -2973,6 +2973,7 @@ async function renderGoals() {
       renderGoals();
     };
     bindTaskList(box, renderGoals);
+    bindGoalDrops(view, renderGoals); // glisser une mission (⋮⋮) sur un objectif : elle s'y rattache
     box.querySelector('.g-addm').onclick = (e) => {
       const f = box.querySelector('.add-mission');
       f.hidden = !f.hidden;
