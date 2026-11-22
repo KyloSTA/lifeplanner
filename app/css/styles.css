@@ -3364,9 +3364,9 @@ body.an-open { overflow: hidden; }
   .vd-grip:hover { opacity: 1; }
   body.vdock-min .vd-grip { display: none; }
   /* Une fois déplacée, la carte ne réserve plus d'espace en bas de la page */
-  body.vdock-free.vdock-on:not(.vdock-min) main { padding-bottom: 0 !important; }
-  body.vdock-free.vdock-on #fab-dock { bottom: 24px; }
-  body.vdock-free.vdock-on #to-top { bottom: 92px; }
+  body.vdock-free.vdock-on main { padding-bottom: 96px !important; margin: var(--vd-mt, 0) var(--vd-mr, 0) var(--vd-mb, 0) var(--vd-ml, 0); }
+  body.vdock-free.vdock-on #fab-dock { bottom: calc(var(--vd-mb, 0px) + 24px); right: calc(var(--vd-mr, 0px) + 24px); }
+  body.vdock-free.vdock-on #to-top { bottom: calc(var(--vd-mb, 0px) + 92px); right: calc(var(--vd-mr, 0px) + 32px); }
 }
 
 /* Lanceur du mini-menu : caché quand la barre de titre maison a déjà l'icône ; revient en plein écran (plus de barre) */
