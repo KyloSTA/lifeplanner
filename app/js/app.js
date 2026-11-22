@@ -1951,8 +1951,8 @@ async function renderDay(arg) {
           <span class="ev-title">${withTeamLogos(esc(e.title))}</span><span class="ev-time">${U.fmtTime(new Date(e.start))} – ${U.fmtTime(new Date(e.end))}</span></div>`;
       }).join('')
       + blocks.map((b) => {
-        const h = Math.max(top(b.e2) - top(b.s), 22), t = b.task;
-        return `<div class="dayv-task ${t.done ? 'done' : ''} ${h < 40 ? 'short' : ''}" data-tid="${t.id}" style="top:${top(b.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${b.col} / ${b.cols});width:calc((100% - 60px) / ${b.cols} - 4px)" title="Glisser pour changer l’heure · clic pour ouvrir">
+        const h = Math.max(top(b.e2) - top(b.s), 14), t = b.task; // missions courtes (ex. 3 dans une heure) : petits blocs qui ne se chevauchent pas
+        return `<div class="dayv-task ${t.done ? 'done' : ''} ${h < 40 ? 'short' : ''} ${h < 24 ? 'tiny' : ''}" data-tid="${t.id}" style="top:${top(b.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${b.col} / ${b.cols});width:calc((100% - 60px) / ${b.cols} - 4px)" title="Glisser pour changer l’heure · clic pour ouvrir">
           <input type="checkbox" class="dvt-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie : ${esc(t.title)}"><span class="ev-title">✅ ${esc(t.title)}</span><span class="ev-time">${esc(timeLabel(t))}</span><button type="button" class="dvt-x" aria-label="Retirer « ${esc(t.title)} » de l’horaire" title="Retirer de l’horaire (la mission reste dans la liste)">×</button></div>`;
       }).join('')
       + marks.map(({ t, s }) => `<a class="dayv-alarm" href="#/missions" style="top:${top(s) - 11}px" title="Alarme de mission">⏰ ${U.fmtTime(new Date(s))} · ${esc(t.title)}</a>`).join('')
@@ -1961,7 +1961,7 @@ async function renderDay(arg) {
     ad.hidden = !allDay.length;
     ad.innerHTML = allDay.map((e) => evItem(e, true)).join('');
     bindEvents($('.dayv-cal'), list, drawEvents);
-    $$('.dayv-slot').forEach((b) => (b.onclick = () => eventModal(k, drawEvents, { start: `${U.pad(+b.dataset.h)}:00`, end: `${U.pad(Math.min(+b.dataset.h + 1, 23))}:00` })));
+    $$('.dayv-slot').forEach((b) => (b.onclick = () => hourMenu(+b.dataset.h)));
     // Blocs de mission : case = accomplie ; glisser = changer l'heure (par quart d'heure) ; clic = ouvrir la mission
     $$('.dayv-task').forEach((el) => {
       const id = el.dataset.tid;
@@ -1998,6 +1998,46 @@ async function renderDay(arg) {
     });
     // Aujourd'hui : on fait défiler jusqu'à l'heure actuelle (une heure avant)
     if (isToday && !drawEvents.scrolled) { drawEvents.scrolled = true; $('.dayv-now')?.scrollIntoView({ block: 'center' }); }
+  };
+
+  // Clic sur une heure : y regrouper plusieurs missions (réparties dans l'heure, à la suite) ou ajouter un événement
+  const hourMenu = async (h) => {
+    const all = (await db.all('tasks')).filter((t) => !t.done);
+    const dayList = all.filter((t) => t.date === k).sort((a, b) => !!a.time - !!b.time || (a.order ?? 1e15) - (b.order ?? 1e15));
+    const others = all.filter((t) => t.date !== k && (!t.date || t.date < k)).sort((a, b) => (a.date || '9') < (b.date || '9') ? -1 : 1).slice(0, 40);
+    const row = (t) => `<label class="hm-row"><input type="checkbox" value="${t.id}"><span>${esc(t.title)}</span><small class="muted">${t.time ? `🕒 ${esc(timeLabel(t))}` : t.date && t.date !== k ? `📅 ${esc(U.fmtShort(U.parseISO(t.date)))}` : !t.date ? 'sans date' : ''}</small></label>`;
+    const H = `${h} h`;
+    modal(`<h2>🕒 ${H} – ${h + 1} h</h2>
+      <p class="muted" style="margin-top:0">Coche les missions à faire dans cette heure : elles sont placées à la suite et se partagent l’heure.</p>
+      <div class="hm-list">${dayList.length ? `<p class="hm-grp">Missions de ce jour</p>${dayList.map(row).join('')}` : ''}
+        ${others.length ? `<p class="hm-grp">Autres missions (sans date ou en retard)</p>${others.map(row).join('')}` : ''}
+        ${!dayList.length && !others.length ? '<p class="empty-sm">Aucune mission à faire.</p>' : ''}</div>
+      <div class="hm-dur"><label>Durée totale<select id="hm-total"><option value="30">30 min</option><option value="60" selected>1 h</option><option value="90">1 h 30</option><option value="120">2 h</option></select></label><span class="muted" id="hm-each"></span></div>
+      <div class="modal-actions"><button type="button" class="btn" id="hm-ev">📅＋ Événement à ${H}</button><button type="button" class="btn primary" id="hm-ok" disabled>Placer à ${H}</button></div>`, (m, close) => {
+      const picked = () => [...m.querySelectorAll('.hm-list input:checked')].map((x) => x.value);
+      const each = () => { const n = picked().length; return n ? Math.max(5, Math.floor(+m.querySelector('#hm-total').value / n / 5) * 5) : 0; };
+      const upd = () => {
+        const n = picked().length;
+        m.querySelector('#hm-ok').disabled = !n;
+        m.querySelector('#hm-ok').textContent = n > 1 ? `Placer ${n} missions à ${H}` : `Placer à ${H}`;
+        m.querySelector('#hm-each').textContent = n ? `${n} mission${n > 1 ? 's' : ''} · ${each()} min chacune` : '';
+      };
+      m.querySelectorAll('.hm-list input').forEach((x) => (x.onchange = upd));
+      m.querySelector('#hm-total').onchange = upd;
+      m.querySelector('#hm-ev').onclick = () => { close(); eventModal(k, drawEvents, { start: `${U.pad(h)}:00`, end: `${U.pad(Math.min(h + 1, 23))}:00` }); };
+      m.querySelector('#hm-ok').onclick = async () => {
+        const ids = picked(), dur = each();
+        const before = await Promise.all(ids.map((id) => db.get('tasks', id)));
+        for (const [i, id] of ids.entries()) { const mn = h * 60 + i * dur; await scheduleTask(id, k, `${U.pad(Math.floor(mn / 60))}:${U.pad(mn % 60)}`, dur); }
+        close();
+        redrawDay();
+        showUndo(`🕒 ${ids.length} mission${ids.length > 1 ? 's' : ''} placée${ids.length > 1 ? 's' : ''} à ${H}`, async () => {
+          for (const t of before) if (t) await db.put('tasks', t); // remet date, heure et durée d'avant
+          redrawDay();
+        }, 6000);
+      };
+      upd();
+    });
   };
 
   // Glisser une mission (poignée ⋮⋮ de la liste) sur l'horaire : elle prend l'heure visée (par quart d'heure)
