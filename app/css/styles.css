@@ -3229,7 +3229,7 @@ body.vdock-min #vdock { width: auto; min-width: 220px; }
 /* =========================================================
    🎒 Aventure : équipement (héros + emplacements, inventaire filtrable, glisser-déposer)
    ========================================================= */
-.rpg-eq { margin-top: 18px; }
+.rpg-equip { margin: 0 0 18px; }
 .eq-layout { display: grid; grid-template-columns: minmax(340px, 440px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .eq-doll { position: sticky; top: 8px; display: grid; grid-template-columns: 110px 1fr 110px; gap: 8px; align-items: center; padding: 12px; border-radius: 16px; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent) 12%, var(--surface-2)), var(--surface-2)); border: 2px dashed transparent; transition: border-color .15s, background .15s; }
 .eq-doll.dropping { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
