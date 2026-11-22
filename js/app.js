@@ -36,6 +36,7 @@ import * as quick from './quickadd.js';
 import * as digest from './digest.js';
 import { swipeable } from './swipe.js';
 import * as videodock from './videodock.js';
+import * as spotify from './spotify.js';
 import * as property from './property.js';
 import { bindCapture, brainState, captureForm, evoCard, renderBrain, renderNote } from './page-brain.js';
 
@@ -3114,6 +3115,8 @@ async function renderSettings() {
 
       <section class="card rem-card" id="rem-card"></section>
 
+      <section class="card" id="sp-card"></section>
+
       <section class="card logo-card" id="logo-card"></section>
 
       <section class="card shot-set" id="shot-card"></section>
@@ -3238,6 +3241,8 @@ async function renderSettings() {
     });
   };
   drawRem();
+  const spCard = $("#sp-card");
+  if (spCard) spotify.settingsCard(spCard, toast);
   addEventListener('lp-google', drawRem, { once: true });
 
   // Logo et nom de l'app : ce qui te représente
@@ -3818,6 +3823,8 @@ game.init().catch(console.error).finally(async () => {
   });
   // Rappels fiables : copie des alarmes et des habitudes dans Google Agenda (si activé dans Réglages)
   reminders.start();
+  addEventListener('lp-toast', (e) => toast(e.detail));
+  spotify.start().catch(console.error);
   // Rappels d'habitudes : après « Fait » depuis un rappel, on rafraîchit la vue concernée
   habits.start(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
