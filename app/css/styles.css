@@ -3498,3 +3498,9 @@ html:fullscreen #habit-root { top: 16px; }
 .tm-flag { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .tm-flag.on { background: color-mix(in srgb, var(--gold, #c9a24a) 22%, transparent); border-color: var(--gold, #c9a24a); color: var(--text); }
 .tm-flag.urgent.on { background: color-mix(in srgb, #dc2626 20%, transparent); border-color: #dc2626; }
+
+/* Mini-menu du haut : il reste Lanceur et Espace vidéo -> icônes plus grandes ; la synchro est en bas, à côté du plein écran */
+.rail .brand-tools .brand-ico { width: 40px; height: 40px; border-radius: 11px; }
+.rail .brand-tools .brand-ico svg { width: 22px; height: 22px; }
+.rail-fs.sync-dot i { width: 12px; height: 12px; }
+@media (max-width: 900px) { .rail .brand-tools .brand-ico { width: 36px; height: 36px; } .rail .brand-tools .brand-ico svg { width: 20px; height: 20px; } }
