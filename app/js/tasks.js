@@ -274,6 +274,9 @@ function goalOptions(current) {
  * opts.hideGoal : ne pas afficher la pastille d'objectif (déjà dans l'objectif).
  * opts.showDate : afficher la date prévue.
  */
+/** Rang d'importance pour trier : urgente et prioritaire (3), urgente (2), prioritaire (1), autre (0). */
+export const prioRank = (t) => (t.urgent ? 2 : 0) + (t.prio ? 1 : 0);
+
 export function taskHTML(t, ref, opts = {}) {
   const subs = t.subtasks || [];
   const sd = subs.filter((s) => s.done).length;
@@ -286,7 +289,9 @@ export function taskHTML(t, ref, opts = {}) {
   const alarmChip = t.alarmAt && !t.done
     ? `<span class="chip alarm-chip ${t.alarmState === 'ringing' ? 'ringing' : ''}" title="Alarme">⏰ ${esc(alarms.label(t.alarmAt))}</span>` : '';
   const timeChip = t.time ? `<span class="chip time-chip" title="Placée à l’horaire">🕒 ${esc(timeLabel(t))}</span>` : '';
+  const flagChips = `${t.urgent && !t.done ? '<span class="chip urgent-chip" title="Urgente">🔥 Urgente</span>' : ''}${t.prio && !t.done ? '<span class="chip prio-chip" title="Prioritaire">⭐ Prioritaire</span>' : ''}`;
   const chips = [
+    flagChips,
     couple.whoChip(t), // app couple : pour qui
     focusChip,
     timeChip,
@@ -300,7 +305,7 @@ export function taskHTML(t, ref, opts = {}) {
     t.notes ? '<span class="chip" title="Contient des notes">✎</span>' : '',
     t.images?.length ? `<button type="button" class="chip chip-link t-photos" title="Voir ${t.images.length > 1 ? `les ${t.images.length} photos` : 'la photo'}" aria-label="Voir les photos de la mission">📷${t.images.length > 1 ? ' ' + t.images.length : ''}</button>` : '',
   ].join('');
-  return `<li class="task ${t.done ? 'done' : ''} ${subs.length && subsOpen.has(t.id) ? 'subs-open' : ''}" data-id="${t.id}">
+  return `<li class="task ${t.done ? 'done' : ''} ${t.prio && !t.done ? 'is-prio' : ''} ${t.urgent && !t.done ? 'is-urgent' : ''} ${subs.length && subsOpen.has(t.id) ? 'subs-open' : ''}" data-id="${t.id}">
     <div class="task-row">
       <div class="t-main">
         <label><input type="checkbox" class="t-cb" ${t.done ? 'checked' : ''}><span class="t-title">${esc(t.title)}</span></label>
@@ -553,6 +558,10 @@ export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
         <textarea class="tm-title" rows="1" aria-label="Titre de la mission">${esc(t.title)}</textarea>
         <button class="tm-close" aria-label="Fermer" title="Fermer (Échap)">×</button>
       </div>
+      <div class="tm-flags" role="group" aria-label="Importance">
+        <button type="button" class="tm-flag ${t.prio ? 'on' : ''}" data-flag="prio" aria-pressed="${!!t.prio}" title="Importante pour tes objectifs">⭐ Prioritaire</button>
+        <button type="button" class="tm-flag urgent ${t.urgent ? 'on' : ''}" data-flag="urgent" aria-pressed="${!!t.urgent}" title="À faire vite (échéance proche)">🔥 Urgente</button>
+      </div>
       <div class="tm-meta">
         <label><span>📅 Date</span><input type="date" class="tm-date" value="${t.date || ''}"></label>
         <label><span>🕒 Heure</span><input type="time" class="tm-time" step="900" value="${t.time || ''}" title="Place la mission dans l’horaire de la journée (vue Jour)"></label>
@@ -632,6 +641,12 @@ export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
     title.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); box.querySelector('.add-sub input').focus(); } };
 
     box.querySelector('.tm-cb').onchange = async (e) => { await flush(); await setTaskDone(id, e.target.checked); changed(); draw(); };
+    box.querySelectorAll('.tm-flag').forEach((b) => (b.onclick = async () => {
+      const k = b.dataset.flag, on = !b.classList.contains('on');
+      await editTask(id, (x) => { x[k] = on; });
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+      changed();
+    }));
     box.querySelector('.tm-date').onchange = async (e) => { await editTask(id, (x) => { x.date = e.target.value || null; }); changed(); };
     box.querySelector('.tm-time').onchange = async (e) => {
       const v = e.target.value;
@@ -891,7 +906,7 @@ export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
     const me = await db.get('tasks', id);
     if (!me) return close();
     const all = (await db.all('tasks')).filter((x) => x.id !== id)
-      .sort((a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15));
+      .sort((a, b) => a.done - b.done || prioRank(b) - prioRank(a) || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15));
     const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     box.innerHTML = `
       <div class="tm-head"><h2 class="tm-pick-title">↳ « ${esc(me.title)} » devient une étape de…</h2><button class="tm-close" aria-label="Retour">×</button></div>

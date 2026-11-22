@@ -5,7 +5,7 @@ import * as gcal from './gcal.js';
 import { InkEditor, INK_COLORS, HL_COLORS } from './ink.js';
 import * as game from './game.js';
 import * as AV from './avatar.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo, scheduleTask, timeLabel, setTaskDone, setNextTaskImages, bindGoalDrops } from './tasks.js';
+import { taskHTML, prioRank, bindTaskList, addTask, loadGoals, missionsOf, setTaskGoal, setTaskProject, openTaskEditor, showUndo, scheduleTask, timeLabel, setTaskDone, setNextTaskImages, bindGoalDrops } from './tasks.js';
 import * as brain from './brain.js';
 import * as quotes from './quotes.js';
 import * as assistant from './assistant.js';
@@ -601,7 +601,7 @@ async function taskCard(el, date) {
     const all = await db.all('tasks');
     const items = all
       .filter((t) => t.date === date || (!t.done && t.date && t.date < date))
-      .sort((a, b) => a.done - b.done || a.date.localeCompare(b.date) || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
+      .sort((a, b) => a.done - b.done || prioRank(b) - prioRank(a) || a.date.localeCompare(b.date) || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     const done = items.filter((t) => t.done).length;
     const late = items.filter((t) => !t.done && t.date < date).sort((a, b) => a.date.localeCompare(b.date));
     el.innerHTML = `<div class="card-head"><h2>📋 Missions du jour</h2><span class="muted">${done}/${items.length} · <a href="#/missions">Gérer →</a></span></div>
@@ -1677,7 +1677,7 @@ async function renderMonth(arg) {
     if (!cell.isConnected || location.hash.split('/')[1] !== 'month') return;
     const ds = +U.parseISO(k), de = +U.addDays(ds, 1);
     const evs = events.filter((e) => e.start < de && e.end > ds).sort((a, b) => a.start - b.start);
-    const ts = tasks.filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15));
+    const ts = tasks.filter((t) => t.date === k).sort((a, b) => a.done - b.done || prioRank(b) - prioRank(a) || (a.order ?? 1e15) - (b.order ?? 1e15));
     const j = jBy[k], m = moodOf(j);
     const note = j && (j.intention || j.text || '').trim();
     const d = U.parseISO(k);
@@ -1803,7 +1803,7 @@ async function renderWeek(arg) {
   await loadGoals();
   const drawTasks = async (dayEl) => {
     const k = dayEl.dataset.day;
-    const items = (await db.all('tasks')).filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
+    const items = (await db.all('tasks')).filter((t) => t.date === k).sort((a, b) => a.done - b.done || prioRank(b) - prioRank(a) || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     const box = dayEl.querySelector('.day-tasks');
     // Missions du jour dans une cellule repliable : aujourd'hui ouvert par défaut, les autres jours repliés
     // (ton choix pour chaque jour est gardé sur cet appareil)
@@ -1902,7 +1902,7 @@ async function renderDay(arg) {
   const redrawDay = async () => { await drawTasks(); await drawEvents(); };
   const drawTasks = async () => {
     const all = await db.all('tasks');
-    const items = all.filter((t) => t.date === k).sort((a, b) => a.done - b.done || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
+    const items = all.filter((t) => t.date === k).sort((a, b) => a.done - b.done || prioRank(b) - prioRank(a) || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
     alarmTasks = all.filter((t) => !t.done && t.alarmAt && iso(new Date(t.alarmAt)) === k);
     schedTasks = items.filter((t) => t.time); // missions placées à l'horaire (glissées sur la grille ou heure choisie)
     const box = $('#dv-tasks');
@@ -2617,7 +2617,7 @@ document.addEventListener('click', (e) => {
 function projectMissions(pid, goals, tasks) {
   const gids = new Set(goals.filter((g) => g.projectId === pid).map((g) => g.id));
   return tasks.filter((t) => t.projectId === pid || (t.goalId && gids.has(t.goalId)))
-    .sort((a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
+    .sort((a, b) => a.done - b.done || prioRank(b) - prioRank(a) || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt);
 }
 
 async function setProjectPin(id, on) {
@@ -2718,7 +2718,7 @@ async function renderGoals() {
   const goals = await loadGoals();
   const tasks = await db.all('tasks');
   const today = iso(new Date());
-  const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
+  const sortM = (a, b) => a.done - b.done || prioRank(b) - prioRank(a) || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
   const free = tasks.filter((t) => !t.goalId && !t.done).sort(sortM);
   const everyNote = await brain.allNotes();
   const relNotes = everyNote.filter((x) => !x.archived && (x.rel?.goals || []).length); // notes associées à des objectifs
