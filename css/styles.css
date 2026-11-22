@@ -3504,3 +3504,11 @@ html:fullscreen #habit-root { top: 16px; }
 .rail .brand-tools .brand-ico svg { width: 22px; height: 22px; }
 .rail-fs.sync-dot i { width: 12px; height: 12px; }
 @media (max-width: 900px) { .rail .brand-tools .brand-ico { width: 36px; height: 36px; } .rail .brand-tools .brand-ico svg { width: 20px; height: 20px; } }
+
+/* Bas du menu : Réglages en icône seulement, comme la synchro et le plein écran */
+@media (min-width: 601px) {
+  .rail-foot { justify-content: center; gap: 8px; }
+  .rail-foot > a[data-route="settings"] { flex: none; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 10px; }
+  .rail-foot > a[data-route="settings"] span { display: none; }
+  .rail-foot > a[data-route="settings"] svg { margin: 0; }
+}
