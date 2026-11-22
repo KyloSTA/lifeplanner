@@ -483,7 +483,12 @@ export function bindTaskList(root, redraw) {
       e.preventDefault();
       e.stopPropagation();
       const t = await db.get('tasks', id);
-      if (!(await images.gallery(t?.images || []))) openTaskEditor(id, redraw); // photo pas encore synchronisée : on ouvre la mission
+      // ✏️ Annoter une photo : elle est remplacée par sa version annotée dans la mission
+      const onAnnotate = async (old, blob) => {
+        await images.replaceWith(old, blob, (newId) => editTask(id, (x) => { x.images = (x.images || []).map((m) => (m === old ? newId : m)); }));
+        redraw();
+      };
+      if (!(await images.gallery(t?.images || [], 0, { onAnnotate }))) openTaskEditor(id, redraw); // photo pas encore synchronisée : on ouvre la mission
     };
   });
 }
@@ -696,7 +701,15 @@ export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
 
     // Photos : bouton, Coller, Ctrl + V (géré une fois pour la fenêtre, plus bas) ; clic = agrandir
     images.hydrate(box);
-    box.querySelectorAll('.tm-img img').forEach((img) => (img.onclick = () => img.src && images.zoom(img.src)));
+    box.querySelectorAll('.tm-img img').forEach((img) => (img.onclick = () => img.src && images.zoom(img.src, {
+      // ✏️ Annoter : la photo de la mission est remplacée par sa version annotée
+      onAnnotate: async (blob) => {
+        const old = img.dataset.img;
+        await images.replaceWith(old, blob, (newId) => editTask(id, (x) => { x.images = (x.images || []).map((m) => (m === old ? newId : m)); }));
+        changed();
+        draw();
+      },
+    })));
     box.querySelectorAll('[data-rmimg]').forEach((b) => (b.onclick = async () => {
       await flush();
       await editTask(id, (x) => { x.images = (x.images || []).filter((m) => m !== b.dataset.rmimg); });

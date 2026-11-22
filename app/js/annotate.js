@@ -116,9 +116,9 @@ export async function annotate(blob) {
       e.preventDefault();
       const [x, y] = pos(e);
       const isEraser = tool === 'eraser' || (e.pointerType === 'pen' && (e.button === 5 || e.buttons & 32));
-      if (isEraser) { cur = { t: 'erase' }; erase(x, y); cv.setPointerCapture(e.pointerId); return; }
+      if (isEraser) { cur = { t: 'erase' }; erase(x, y); try { cv.setPointerCapture(e.pointerId); } catch { /* pointeur déjà relâché */ } return; }
       if (tool === 'text') return placeText(e, x, y);
-      cv.setPointerCapture(e.pointerId);
+      try { cv.setPointerCapture(e.pointerId); } catch { /* pointeur déjà relâché */ }
       const pr = e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5;
       cur = tool === 'pen' || tool === 'hl' ? { t: tool, color, w: tool === 'hl' ? width() * 3 : width(), pts: [[x, y, pr]] }
         : { t: tool, color, w: width(), x1: x, y1: y, x2: x, y2: y };

@@ -88,33 +88,69 @@ export async function removeUnused(ids) {
 }
 
 /** Photos d'une mission en plein écran : ‹ › (ou flèches du clavier) pour passer de l'une à l'autre, clic à côté ou Échap pour fermer. */
-export async function gallery(ids, start = 0) {
-  const srcs = (await Promise.all(ids.map(url))).filter(Boolean);
+export async function gallery(ids, start = 0, opts = {}) {
+  const pairs = (await Promise.all(ids.map(async (id) => [id, await url(id)]))).filter(([, s]) => s);
+  const srcs = pairs.map(([, s]) => s);
   if (!srcs.length) return false;
-  if (srcs.length === 1) { zoom(srcs[0]); return true; }
+  // opts.onAnnotate(id, blob) : « ✏️ Annoter » sur la photo affichée
+  if (srcs.length === 1) { zoom(srcs[0], opts.onAnnotate ? { onAnnotate: (b) => opts.onAnnotate(pairs[0][0], b) } : {}); return true; }
   let i = Math.min(start, srcs.length - 1);
   const d = document.createElement('div');
   d.className = 'img-zoom img-gallery';
   d.innerHTML = `<img alt=""><button type="button" class="ig-nav ig-prev" aria-label="Photo précédente">‹</button>
-    <button type="button" class="ig-nav ig-next" aria-label="Photo suivante">›</button><span class="ig-count"></span>`;
+    <button type="button" class="ig-nav ig-next" aria-label="Photo suivante">›</button><span class="ig-count"></span>
+    ${opts.onAnnotate ? '<button type="button" class="img-annot-btn">✏️ Annoter</button>' : ''}`;
   const show = () => { d.querySelector('img').src = srcs[i]; d.querySelector('.ig-count').textContent = `${i + 1} / ${srcs.length}`; };
   const go = (k) => { i = (i + k + srcs.length) % srcs.length; show(); };
   const close = () => { d.remove(); removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1); };
-  d.onclick = (e) => { if (e.target.closest('.ig-prev')) go(-1); else if (e.target.closest('.ig-next')) go(1); else if (e.target.tagName !== 'IMG') close(); };
+  d.onclick = (e) => {
+    if (e.target.closest('.img-annot-btn')) { e.stopPropagation(); const [id, s] = pairs[i]; close(); annotateSrc(s, (b) => opts.onAnnotate(id, b)); return; }
+    if (e.target.closest('.ig-prev')) go(-1); else if (e.target.closest('.ig-next')) go(1); else if (e.target.tagName !== 'IMG') close();
+  };
   addEventListener('keydown', onKey);
   show();
   document.body.appendChild(d);
   return true;
 }
 
-/** Agrandit une image en plein écran (clic pour fermer). */
-export function zoom(src) {
+/**
+ * Agrandit une image en plein écran (clic pour fermer).
+ * opts.onAnnotate(blob) : ajoute « ✏️ Annoter » ; reçoit l'image annotée (à enregistrer à la place de l'ancienne).
+ */
+export function zoom(src, opts = {}) {
   const d = document.createElement('div');
   d.className = 'img-zoom';
-  d.innerHTML = `<img src="${src}" alt="">`;
-  d.onclick = () => d.remove();
-  const onKey = (e) => { if (e.key === 'Escape') { d.remove(); removeEventListener('keydown', onKey); } };
+  d.innerHTML = `<img src="${src}" alt="">${opts.onAnnotate ? '<button type="button" class="img-annot-btn">✏️ Annoter</button>' : ''}`;
+  const close = () => { d.remove(); removeEventListener('keydown', onKey); };
+  d.onclick = (e) => { if (!e.target.closest('.img-annot-btn')) close(); };
+  d.querySelector('.img-annot-btn')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    close();
+    await annotateSrc(src, opts.onAnnotate);
+  });
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
   addEventListener('keydown', onKey);
   document.body.appendChild(d);
+}
+
+/** Ouvre l'éditeur d'annotation sur une image (data: ou blob:) et passe le résultat à done(blob). */
+async function annotateSrc(src, done) {
+  try {
+    const { annotate } = await import('./annotate.js');
+    const blob = await (await fetch(src)).blob();
+    const out = await annotate(blob);
+    if (out) await done(out);
+  } catch (err) { console.error(err); }
+}
+
+/**
+ * Remplace une image enregistrée par sa version annotée : nouvelle image dans « files », l'ancienne est
+ * supprimée si plus rien ne l'utilise. Renvoie le nouvel identifiant.
+ */
+export async function replaceWith(oldId, blob, swap) {
+  const newId = await save(blob);
+  await swap(newId);
+  await removeUnused([oldId]);
+  return newId;
 }

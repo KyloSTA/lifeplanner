@@ -3325,3 +3325,6 @@ body.an-open { overflow: hidden; }
 .an-stage canvas { touch-action: none; cursor: crosshair; box-shadow: 0 10px 40px rgba(0,0,0,.6); border-radius: 4px; }
 .an-text { position: absolute; z-index: 2; min-width: 140px; padding: 2px 4px; border: 2px dashed currentColor; border-radius: 6px; background: rgba(0,0,0,.35); font-family: "Segoe UI", system-ui, sans-serif; font-weight: 700; line-height: 1.2; resize: none; outline: none; overflow: hidden; }
 @media (max-width: 600px) { .an-bar { gap: 6px; padding: 6px 8px; } .an-group button { min-width: 34px; height: 34px; font-size: 15px; } .an-color { width: 34px; } .an-grow { display: none; } }
+/* « ✏️ Annoter » dans l'image agrandie */
+.img-annot-btn { position: fixed; top: calc(16px + env(safe-area-inset-top)); right: 16px; z-index: 2; height: 42px; padding: 0 16px; border: 0; border-radius: 12px; background: #b91c1c; color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.img-annot-btn:hover { background: #dc2626; }
