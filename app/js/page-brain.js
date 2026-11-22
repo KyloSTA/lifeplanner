@@ -84,6 +84,45 @@ function captureForm(id) {
   </form>`;
 }
 
+/** Lien capturé : va chercher le vrai titre et la vignette de la page (si elle est publique). true si la note a changé. */
+async function enrichLink(n) {
+  const url = n.source?.url;
+  if (!url) return false;
+  let meta = await linkmeta.pageMeta(url);
+  if (!meta.title && !meta.img) meta = await linkmeta.pageMetaRaw(url); // 2e essai : les balises de la page elle-même
+  const fresh = await db.get('notes', n.id);
+  if (!fresh) return false;
+  let changed = false;
+  if (!fresh.source?.logo) { fresh.source = { ...fresh.source, logo: linkmeta.siteLogo(url) }; changed = true; } // vignette de secours : logo du site
+  // Le titre de la page remplace seulement le titre tiré de l'adresse (jamais un titre écrit à la main)
+  if (meta.title && fresh.title === linkmeta.urlLabel(url).slice(0, 80)) { fresh.title = meta.title.length > 80 ? meta.title.slice(0, 78).trim() + '…' : meta.title; changed = true; }
+  // YouTube a déjà sa propre vignette (lecteur) : pas d'image en double
+  if (meta.img && !fresh.source?.img && !/youtu\.?be/i.test(url)) { fresh.source = { ...fresh.source, img: meta.img }; changed = true; }
+  fresh.source = { ...fresh.source, checked: Date.now() };
+  await brain.saveNote(fresh, { touch: false });
+  return changed;
+}
+
+/** Notes déjà capturées dont le titre n'est qu'une adresse : on les complète (quelques-unes à la fois). */
+let linkFixRunning = false;
+async function fixOldLinks(all, redraw) {
+  if (linkFixRunning) return;
+  const todo = all.filter((n) => !n.source && /^https?:\/\/\S+$/.test((n.title || '').trim()) && !linkmeta.facebookUrl(n.title)).slice(0, 6);
+  if (!todo.length) return;
+  linkFixRunning = true;
+  try {
+    for (const n of todo) {
+      const url = n.title.trim().replace(/[.,;:!?…]+$/, '');
+      n.title = linkmeta.urlLabel(url).slice(0, 80);
+      if (!(n.body || '').includes(url)) n.body = [url, n.body].filter(Boolean).join('\n');
+      n.source = { kind: 'link', url, label: linkmeta.siteName(url) };
+      await brain.saveNote(n, { touch: false });
+      await enrichLink(n).catch(() => {});
+    }
+    redraw();
+  } finally { linkFixRunning = false; }
+}
+
 function bindCapture(form, after) {
   let files = []; // en attente : images { blob, url } et documents { blob, doc: true }
   const box = form.querySelector('.cap-imgs');
@@ -159,11 +198,20 @@ function bindCapture(form, after) {
         }
         fbSource = { kind: 'facebook', url: fb, label: linkmeta.facebookLabel(fb), ...(meta.img ? { img: meta.img } : {}) };
       }
+      // Autre lien seul sur la 1re ligne : un titre compris à partir de l'adresse tout de suite, puis le vrai titre et la vignette de la page
+      const link = !fb && linkmeta.anyUrl(v);
+      const isLink = link && title.replace(link, '').trim() === '';
+      if (isLink) {
+        title = linkmeta.urlLabel(link).slice(0, 80);
+        body = [link, body].filter(Boolean).join('\n');
+      }
       body = [body, ...ids.map(images.refLine), ...dms.map(docs.refLine)].filter(Boolean).join('\n');
       const n = await brain.createNote({ title, body, type: 'idee', inbox: true });
       n.captured = true;
       if (fbSource) n.source = fbSource;
+      if (isLink) n.source = { kind: 'link', url: link, label: linkmeta.siteName(link) };
       await brain.saveNote(n, { touch: false });
+      if (isLink) enrichLink(n).then((ok) => ok && after?.(n)).catch(() => {});
       files.forEach((f) => URL.revokeObjectURL(f.url));
       files = [];
       form.t.value = '';
@@ -327,7 +375,7 @@ function amazonPrice(n) {
 
 function noteCard(n, proj) {
   const t = brain.typeOf(n.type);
-  const media = n.source?.kind === 'news' || n.source?.kind === 'facebook' || !!n.source?.img || youtubeVideos(n.body).length > 0; // titre complet sur 2 lignes
+  const media = n.source?.kind === 'news' || n.source?.kind === 'facebook' || n.source?.kind === 'link' || !!n.source?.img || youtubeVideos(n.body).length > 0; // titre complet sur 2 lignes
   return `<a class="note-card ${n.pinned ? 'pinned' : ''} ${media ? 'has-media' : ''}" href="#/note/${n.id}">
     <div class="nc-head"><span class="nc-type" title="${t.name}">${t.icon}</span><b>${esc((n.source?.kind === 'news' && n.source.title) || n.title || 'Sans titre')}</b>${n.pinned ? '<span title="Épinglée">📌</span>' : ''}</div>
     ${n.inbox ? '<span class="chip warn">📥 À classer</span>' : ''}
@@ -341,6 +389,8 @@ function noteCard(n, proj) {
       // Article d'actualité : son image
       if (n.source?.img) return `<div class="nc-img nc-news"><img src="${esc(n.source.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>`
         + (amazonPrice(n) ? `<div class="nc-price">${esc(amazonPrice(n))}</div>` : ''); // article Amazon : son prix sous l'image
+      // Lien sans image de page : le logo du site et son nom (ex. Centris)
+      if (n.source?.kind === 'link' && n.source.logo && !youtubeVideos(n.body).length) return `<div class="nc-img nc-site"><img src="${esc(n.source.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"><small>${esc(n.source.label || '')}</small></div>`;
       // Vidéo YouTube : sa miniature plutôt que le lien
       const v = youtubeVideos(n.body);
       if (!v.length) return '';
@@ -457,6 +507,7 @@ const brainView = () => { try { return ['list', 'grid', 'cards'].includes(localS
 async function renderBrain() {
   let everything = await brain.allNotes();
   if (await news.recoverImages(everything).catch(() => 0)) everything = await brain.allNotes(); // images des articles déjà gardés
+  fixOldLinks(everything, () => { if (location.hash.startsWith('#/brain')) renderBrain(); }).catch(() => {}); // liens capturés avant : titre et vignette
   const archivedCount = everything.filter((n) => n.archived).length;
   if (!archivedCount) brainState.arch = false;
   // Mode normal : notes actives seulement. Mode Archives : notes archivées seulement (filtres identiques).
@@ -799,7 +850,7 @@ async function renderNote(id) {
       <div class="note-left">
       <section class="card project-panel" id="n-proj" hidden></section>
       <section class="card note-video" id="n-video" hidden></section>
-      ${['news', 'reddit', 'amazon', 'facebook'].includes(n.source?.kind) && n.source.img ? (() => {
+      ${['news', 'reddit', 'amazon', 'facebook', 'link'].includes(n.source?.kind) && n.source.img ? (() => {
         let host = ''; try { host = new URL(n.source.url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
         const reddit = n.source.kind === 'reddit', amz = n.source.kind === 'amazon';
         return `<section class="card note-article"><a href="${esc(n.source.url)}" target="_blank" rel="noopener" class="na-img"><img src="${esc(n.source.img)}" alt="" referrerpolicy="no-referrer" onerror="this.closest('.note-article').remove()"></a>
