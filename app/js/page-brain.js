@@ -38,6 +38,7 @@ import * as quick from './quickadd.js';
 import * as digest from './digest.js';
 import { swipeable } from './swipe.js';
 import * as videodock from './videodock.js';
+import { annotate } from './annotate.js';
 import { $, $$, view, toast, modal, confirmBox, router, routes, setCleanup, HZ_LABEL, QUICK_DATES, concludeGoal, evoBar, evoLine, fold, getAvatar, goalClass, goalMark, goalSort, goalVerdict, hzOptions, openGoals } from './app.js';
 
 const { esc, iso, cap } = U;
@@ -90,8 +91,19 @@ function bindCapture(form, after) {
     box.hidden = !files.length;
     box.innerHTML = files.map((f, i) => f.doc
       ? `<span class="doc-chip"><span class="doc-open"><span class="doc-ico">${docs.icon({ name: f.blob.name })}</span><span class="doc-name">${esc(f.blob.name)}</span><small>${docs.fmtSize(f.blob.size)}</small></span><button type="button" class="doc-rm" data-rm="${i}" aria-label="Retirer le document">×</button></span>`
-      : `<span class="cap-img"><img src="${f.url}" alt="Image ${i + 1}"><button type="button" data-rm="${i}" aria-label="Retirer l’image">×</button></span>`).join('');
+      : `<span class="cap-img"><img src="${f.url}" alt="Image ${i + 1}" data-annot="${i}" title="Cliquer pour annoter (dessiner, écrire)"><i class="cap-annot" aria-hidden="true">✏️</i><button type="button" data-rm="${i}" aria-label="Retirer l’image">×</button></span>`).join('');
     $$('[data-rm]', box).forEach((b) => (b.onclick = () => { const f = files[b.dataset.rm]; if (f.url) URL.revokeObjectURL(f.url); files.splice(Number(b.dataset.rm), 1); drawImgs(); }));
+    // ✏️ Cliquer l'image : l'ouvrir pour l'annoter (stylo, surligneur, flèche, cadre, texte)
+    $$('[data-annot]', box).forEach((im) => (im.onclick = async () => {
+      const f = files[Number(im.dataset.annot)];
+      const out = await annotate(f.blob).catch((err) => { toast(err.message, 'err'); return null; });
+      if (!out) return;
+      URL.revokeObjectURL(f.url);
+      f.blob = out;
+      f.url = URL.createObjectURL(out);
+      drawImgs();
+      toast('✏️ Annotations ajoutées à l’image');
+    }));
   };
   const add = (list) => {
     for (const blob of list) files.push({ blob, url: URL.createObjectURL(blob) });
