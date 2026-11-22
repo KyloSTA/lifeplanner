@@ -199,6 +199,7 @@ export async function renderPage(ctx) {
       <div><p class="eyebrow">Ordrelune · ${cur.arena ? 'Arène' : `Chapitre ${cur.ch.id} sur ${CHAPTERS.length}`}</p><h1>⚔️ Aventure</h1></div>
       <div class="rpg-res"><span class="rpg-pill" title="Énergie : +1 par tranche de 10 XP gagnés dans la vraie vie">⚡ <b>${energy}</b></span><span class="rpg-pill" title="Or">🪙 <b>${s.gold}</b></span></div>
     </header>
+    ${equipHTML(s, eqItems, avCfg)}
     <div class="rpg-layout">
       <div class="rpg-col">
         <section class="card rpg-hero">
@@ -239,8 +240,7 @@ export async function renderPage(ctx) {
         <section class="card rpg-log"><div class="card-head"><h2>📜 Journal d’aventure</h2></div>
           ${(s.log || []).slice(0, 8).map((l) => `<p><small class="muted">${U.fmtShort(new Date(l.at))}</small> ${esc(l.text)}</p>`).join('') || '<p class="empty-sm">Ton aventure commence. Affronte ton premier ennemi !</p>'}</section>
       </div>
-    </div>
-    ${equipHTML(s, eqItems, avCfg)}`;
+    </div>`;
 
   const $ = (sel) => view.querySelector(sel), $$ = (sel) => [...view.querySelectorAll(sel)];
   $('#rpg-fight').onclick = async () => {
@@ -354,7 +354,7 @@ function equipHTML(s, eqItems, avCfg) {
       </div></div>`;
   })() : '';
 
-  return `<section class="card rpg-eq" id="rpg-eq">
+  return `<section class="card rpg-equip" id="rpg-eq">
     <div class="card-head"><h2>🎒 Équipement</h2><span class="muted">${s.inv.length} objet${s.inv.length > 1 ? 's' : ''} · bonus porté +${totalBonus}</span></div>
     <div class="eq-layout">
       <div class="eq-doll" id="eq-doll">

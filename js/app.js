@@ -467,9 +467,10 @@ window.addEventListener('hashchange', router);
 /* =========================================================
    Événements Google
    ========================================================= */
-async function getEvents(from, to) {
-  // Les rappels créés par Life Planner (alarmes, habitudes) sont déjà dans l'app : on ne les montre pas en double
-  const own = (list) => list.filter((e) => !e.lp);
+async function getEvents(from, to, { plans = false } = {}) {
+  // Les rappels créés par Life Planner (alarmes, habitudes) sont déjà dans l'app : on ne les montre pas en double.
+  // Les missions planifiées envoyées à Google (« plan: ») s'affichent seulement là où l'app ne dessine pas déjà la mission (plans).
+  const own = (list) => list.filter((e) => !e.lp || (plans && e.lp.startsWith('plan:')));
   try {
     return { events: own(await gcal.listEvents(from, to)), source: 'live' };
   } catch (err) {
@@ -815,7 +816,7 @@ async function renderToday() {
   const agenda = async () => {
     const day = agendaDay; // 0 = aujourd'hui, 1 = demain
     const from = U.addDays(U.startOfDay(now), day), to = U.addDays(from, 1);
-    const { events, source } = await getEvents(from, to);
+    const { events, source } = await getEvents(from, to, { plans: true });
     const el = $('#c-agenda');
     if (!el || day !== agendaDay) return;
     el.innerHTML = `<div class="card-head"><h2>📅 Agenda</h2>
@@ -1656,7 +1657,7 @@ async function renderMonth(arg) {
     </div>`;
 
   // Événements Google du mois (3 par jour au maximum)
-  const { events, source } = await getEvents(gridStart, U.addDays(gridStart, weeks * 7));
+  const { events, source } = await getEvents(gridStart, U.addDays(gridStart, weeks * 7), { plans: true });
   if (!$('#sync')) return;
   $('#sync').innerHTML = await syncBadge(source);
   $$('.mc-day').forEach((cell) => {
@@ -3170,12 +3171,18 @@ async function renderSettings() {
         ${on ? '<button class="btn" id="rem-now">↻ Vérifier maintenant</button><button class="btn danger" id="rem-off">Désactiver et retirer les rappels</button>'
           : `<button class="btn primary" id="rem-on" ${connected ? '' : 'disabled'}>Activer les rappels fiables</button>`}
       </div>
+      <label class="check rem-plan"><input type="checkbox" id="rem-plan" ${(await reminders.planOn()) ? 'checked' : ''}> <span><b>Missions planifiées → Google Agenda</b> : une mission placée à une heure dans le planificateur devient un événement « ✅ … » dans ton agenda (déplacée, renommée ou retirée de l’horaire, l’événement suit).</span></label>
       <p class="hint muted">Sur ton cellulaire, installe l’app <b>Google Agenda</b> et autorise ses notifications. Les rappels apparaissent dans ton agenda avec ⏰ (missions) ou 🔁 (habitudes) ; Life Planner les cache de son propre agenda pour éviter les doublons. Une alarme retirée ou une mission faite est retirée de Google Agenda.</p>`;
     $('#rem-on', el)?.addEventListener('click', async (e) => {
       e.target.disabled = true; e.target.textContent = 'Création des rappels…';
       await reminders.setOn(true);
       const s2 = reminders.getStatus();
       toast(s2.error ? '⚠ ' + s2.error : `🔔 ${s2.count} rappel${s2.count > 1 ? 's' : ''} ajouté${s2.count > 1 ? 's' : ''} à Google Agenda`, s2.error ? 'err' : '');
+      drawRem();
+    });
+    $('#rem-plan', el)?.addEventListener('change', async (e) => {
+      await reminders.setPlanOn(e.target.checked);
+      toast(e.target.checked ? '📅 Tes missions planifiées vont dans Google Agenda' : 'Missions planifiées retirées de Google Agenda');
       drawRem();
     });
     $('#rem-now', el)?.addEventListener('click', async () => { await reminders.reconcile(true); drawRem(); toast('Rappels vérifiés'); });
