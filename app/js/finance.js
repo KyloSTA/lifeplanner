@@ -143,6 +143,7 @@ function withIds(list) {
   }
   return list;
 }
+const secs = (s) => String(s).split(':').reduce((x, y) => x * 60 + (Number(y) || 0), 0);
 const money = (v) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) * 100) / 100;
 const shortAcct = (n = '') => (n ? '••' + String(n).slice(-3) : '');
 
@@ -222,6 +223,12 @@ export async function importFiles(files) {
       const old = byId.get(t.id);
       if (old?.manual) { t.cat = old.cat; t.manual = true; } // une catégorie choisie à la main reste
       if (t.cat == null) t.cat = defaultCat(t, rules);
+      // Même transaction dans un autre relevé, avec un détail qui a changé (heure, libellé) : on garde la même fiche.
+      // Un vrai double prélèvement apparaît deux fois dans le MÊME relevé : il n'est pas touché.
+      const w1 = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9à-ÿ ]/g, ' ').trim().split(/\s+/)[0];
+      const twin = !old && [...byId.values()].find((p) => p.src === t.src && p.date === t.date && p.amount === t.amount && p.account === t.account && (p.key === t.key || w1(p.rawName) === w1(t.rawName)) && !p.pending
+        && !list.some((x) => x.id === p.id) && (!p.time || !t.time || Math.abs(secs(p.time) - secs(t.time)) <= 600));
+      if (twin) { if (twin.manual) { t.cat = twin.cat; t.manual = true; } toPut.push({ ...twin, ...t, id: twin.id }); byId.set(twin.id, { ...twin, ...t, id: twin.id }); updated++; continue; }
       if (old) { if (JSON.stringify({ ...old }) !== JSON.stringify({ ...old, ...t })) { toPut.push({ ...old, ...t }); updated++; } }
       else { toPut.push(t); added++; }
       byId.set(t.id, { ...old, ...t });
@@ -424,7 +431,7 @@ export async function renderPage(ctx, arg) {
   $('#fi-next')?.addEventListener('click', () => { month = monthsBack(month, -1); renderPage(ctx); });
   if (tab === 'budget') drawBudget(ctx, body, all, budget);
   else if (tab === 'transactions') drawTransactions(ctx, body, all);
-  else drawOverview(ctx, body, all, budget);
+  else drawOverview(ctx, body, all, budget).catch(console.error);
 }
 
 /* =========================================================
@@ -1026,7 +1033,7 @@ function importReport(ctx, rep) {
 }
 
 /* ---------- Aperçu du mois ---------- */
-function drawOverview(ctx, el, all, budget) {
+async function drawOverview(ctx, el, all, budget) {
   if (overView === 'semaine') return drawOverviewWeek(ctx, el, all, budget);
   const s = summarize(all, month);
   const avg = averages(all, month);
@@ -1038,7 +1045,7 @@ function drawOverview(ctx, el, all, budget) {
   const pace = isNow && day > 2 ? (s.spent / day) * dim : s.spent;
   const perDay = isNow && dim - day + 1 > 0 ? left / (dim - day + 1) : 0;
   const pct = total ? Math.round((s.spent / total) * 100) : 0;
-  const dismissed = new Set([]);
+  const dismissed = new Set((await db.get('settings', 'moneyDismissed')) || []);
   const rec = recurring(all, month);
 
   const cats = CATS.map(([id]) => ({ ...catOf(id), spent: s.byCat[id] || 0, budget: Number(budget.cats?.[id]) || 0, avg: avg.cats[id] || 0 }))
@@ -1063,7 +1070,8 @@ function drawOverview(ctx, el, all, budget) {
 
     ${over.length || doubles(s.list, dismissed).length ? `<section class="card fi-alerts"><h2>⚠ À surveiller</h2><ul>
       ${over.map((c) => `<li><b>${c.emoji} ${esc(c.name)}</b> : ${$$$(c.spent, true)} sur ${$$$(c.budget, true)} (dépassé de ${$$$(c.spent - c.budget, true)}).</li>`).join('')}
-      ${doubles(s.list, dismissed).map((t) => `<li><b>Prélèvement en double possible</b> : ${esc(t.merchant)} ${$$$(-t.amount)} deux fois le ${esc(U.fmtShort(U.parseISO(t.date)))} à ${esc(t.time.slice(0, 5))}. Vérifie auprès du marchand.</li>`).join('')}
+      ${doubles(s.list, dismissed).map((t) => `<li class="fi-dbl"><span><b>Prélèvement en double possible</b> : ${esc(t.merchant)} ${$$$(-t.amount)} deux fois le ${esc(U.fmtShort(U.parseISO(t.date)))} à ${esc(t.time.slice(0, 5))}. Vérifie dans Wealthsimple.</span>
+        <span class="fi-dbl-acts"><button type="button" class="btn sm-text" data-dbl-del="${esc(t.id)}" title="Wealthsimple ne montre qu’un seul achat : la copie est retirée de l’app">Une seule dans Wealthsimple : retirer la copie</button><button type="button" class="btn sm-text" data-dbl-ok="${esc(t.id)}" title="C’est bien deux achats : ne plus avertir">Ce sont 2 achats</button></span></li>`).join('')}
     </ul></section>` : ''}
 
     <div class="fi-grid">
@@ -1085,6 +1093,18 @@ function drawOverview(ctx, el, all, budget) {
     </div>`;
   bindOverSwitch(ctx, el);
   el.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { tab = b.dataset.go; renderPage(ctx); }));
+  // Double possible : retirer la copie (Wealthsimple n'en montre qu'un) ou garder les deux sans plus avertir
+  el.querySelectorAll('[data-dbl-del]').forEach((b) => (b.onclick = async () => {
+    const t = await db.get('money', b.dataset.dblDel);
+    await db.del('money', b.dataset.dblDel);
+    renderPage(ctx);
+    if (t) showUndo('🧾 Copie retirée', async () => { await db.put('money', t); renderPage(ctx); }, 5000);
+  }));
+  el.querySelectorAll('[data-dbl-ok]').forEach((b) => (b.onclick = async () => {
+    const list = (await db.get('settings', 'moneyDismissed')) || [];
+    await db.put('settings', [...new Set([...list, b.dataset.dblOk])], 'moneyDismissed');
+    renderPage(ctx);
+  }));
   el.querySelectorAll('[data-cat]').forEach((b) => (b.onclick = () => { txFilter = { q: '', cat: b.dataset.cat }; tab = 'transactions'; renderPage(ctx); }));
 }
 

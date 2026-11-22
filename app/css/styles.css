@@ -3454,3 +3454,7 @@ html:fullscreen #habit-root { top: 16px; }
 .dayv-task.tiny { padding-top: 0; padding-bottom: 0; font-size: 11.5px; align-items: center; overflow: hidden; }
 .dayv-task.tiny .ev-time { display: none; }
 .dayv-task.tiny .dvt-cb { transform: scale(.8); }
+
+/* Finances : double prélèvement possible */
+.fi-dbl { display: grid; gap: 6px; }
+.fi-dbl-acts { display: flex; flex-wrap: wrap; gap: 6px; }
