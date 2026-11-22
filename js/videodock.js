@@ -34,7 +34,7 @@ function draw({ autoplay = false } = {}) {
   document.body.classList.toggle('vdock-on', st.open);
   document.body.classList.toggle('vdock-min', st.open && st.min);
   document.documentElement.style.setProperty('--vdock-w', WIDTHS[st.w] + 'px');
-  if (!st.open) { d.innerHTML = ''; d.hidden = true; return; }
+  if (!st.open) { d.innerHTML = ''; d.hidden = true; placeFloat(); return; }
   d.hidden = false;
   const v = st.v;
   d.innerHTML = `<div class="vd-head">
@@ -103,7 +103,7 @@ function placeFloat() {
   if (!d) return;
   const free = st.open && isFloat() && st.f;
   document.body.classList.toggle('vdock-free', !!free);
-  if (!free) { d.style.left = d.style.top = d.style.width = d.style.right = d.style.bottom = ''; return; }
+  if (!free) { d.style.left = d.style.top = d.style.width = d.style.right = d.style.bottom = ''; wrapAround(null); return; }
   const w = Math.max(MIN_W, Math.min(st.f.w || 400, innerWidth - 16));
   d.style.width = st.min ? '' : w + 'px';
   d.style.right = d.style.bottom = 'auto';
@@ -112,6 +112,28 @@ function placeFloat() {
   const y = Math.max(8, Math.min(st.f.y, innerHeight - Math.min(r.height, innerHeight - 16) - 8));
   d.style.left = x + 'px';
   d.style.top = y + 'px';
+  if (!d.classList.contains('vd-moving')) wrapAround(d);
+}
+
+/** La page se replace autour de la carte : on lui retire la bande (haut, bas, gauche ou droite) qui coûte le moins de place. */
+function wrapAround(d) {
+  const s = document.body.style;
+  const SIDES = ['t', 'r', 'b', 'l'];
+  SIDES.forEach((k) => s.removeProperty(`--vd-m${k}`));
+  const main = document.querySelector('main');
+  if (!d || !main) return;
+  const m = main.getBoundingClientRect(), r = d.getBoundingClientRect();
+  if (r.right <= m.left || r.left >= m.right || r.bottom <= m.top || r.top >= m.bottom) return; // ne cache rien
+  const gap = 10;
+  const opts = [
+    { k: 't', v: r.bottom - m.top + gap, lost: (r.bottom - m.top + gap) * m.width },
+    { k: 'b', v: m.bottom - r.top + gap, lost: (m.bottom - r.top + gap) * m.width },
+    { k: 'l', v: r.right - m.left + gap, lost: (r.right - m.left + gap) * m.height, w: true },
+    { k: 'r', v: m.right - r.left + gap, lost: (m.right - r.left + gap) * m.height, w: true },
+  ].filter((o) => (o.w ? m.width - o.v >= 360 : m.height - o.v >= 200));
+  if (!opts.length) return;
+  const best = opts.sort((a, b) => a.lost - b.lost)[0];
+  s.setProperty(`--vd-m${best.k}`, Math.round(best.v) + 'px');
 }
 
 function bindFloat(d) {
@@ -128,6 +150,7 @@ function bindFloat(d) {
     const move = (ev) => { onMove(ev.clientX - sx, ev.clientY - sy, start); placeFloat(); };
     const up = () => {
       d.classList.remove('vd-moving');
+      placeFloat();
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', up);
       removeEventListener('pointercancel', up);
