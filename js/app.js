@@ -3676,8 +3676,6 @@ $('#rail-more').onclick = () => {
 
 // Lanceur rapide : petite icône à droite du logo -> menu de tes applications
 $('#brand-launch').onclick = (e) => { e.stopPropagation(); toggleLaunchPop(e.currentTarget); };
-// Barre de titre (fenêtre installée, mode « barre de titre masquée ») : l'icône de l'app ouvre aussi le Lanceur
-$('#tb-launch')?.addEventListener('click', (e) => { e.stopPropagation(); toggleLaunchPop(e.currentTarget); });
 async function toggleLaunchPop(btn) {
   const old = $('#launch-pop');
   if (old) { old.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
