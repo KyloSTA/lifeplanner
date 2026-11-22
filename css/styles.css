@@ -3483,3 +3483,8 @@ html:fullscreen #habit-root { top: 16px; }
 .pp-owner { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--muted); }
 .pp-profit h3 { margin: 0 0 6px; font-size: 15px; }
 .pp-profit .pp-h3 { margin: 10px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+
+/* Cerveau : lien sans image -> logo du site */
+.nc-img.nc-site { display: grid; place-items: center; align-content: center; gap: 6px; background: radial-gradient(circle at 50% 40%, var(--surface-2, #222), var(--surface)); min-height: 96px; }
+.nc-img.nc-site img { width: 48px; height: 48px; object-fit: contain; border-radius: 10px; }
+.nc-img.nc-site small { font-weight: 700; color: var(--muted); }
