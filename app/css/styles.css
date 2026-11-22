@@ -3477,3 +3477,9 @@ html:fullscreen #habit-root { top: 16px; }
 /* Menu étroit (tablette) : pochette et lecture seulement */
 @media (max-width: 900px) { .mini-player { flex-direction: column; padding: 6px; gap: 6px; } .mp-txt, .mp-next { display: none; } }
 @media (max-width: 600px) { .mini-player { display: none !important; } }
+
+/* 💰 Profits du condo loué */
+.pp-profits .card-head { flex-wrap: wrap; gap: 10px; }
+.pp-owner { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--muted); }
+.pp-profit h3 { margin: 0 0 6px; font-size: 15px; }
+.pp-profit .pp-h3 { margin: 10px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }

@@ -7,18 +7,23 @@ import * as docs from './docs.js';
 const { esc } = U;
 const money = (v) => new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(Number(v) || 0);
 
-// Étape 1 : les preuves, de la plus convaincante à la plus simple
-export const PROOFS = [
-  { id: 'hypo', title: 'Historique de paiements de l’hypothèque du condo', why: 'Ta meilleure preuve : un paiement de logement fait chaque mois, sans retard. Demande à ton prêteur un relevé des 12 derniers mois (ou le relevé annuel).' },
-  { id: 'paie', title: 'Talons de paie récents (2 ou 3)', why: 'Pour vous deux. Montre un revenu stable et récent.' },
-  { id: 'emploi', title: 'Lettre d’emploi', why: 'Poste, salaire, date d’embauche, permanent ou non. Signée par l’employeur, datée de moins d’un mois.' },
-  { id: 'avis', title: 'Avis de cotisation de la dernière année', why: 'Revenu Québec ou l’ARC : confirme le revenu annuel. Utile surtout si une partie du revenu est variable.' },
-  { id: 'epargne', title: 'Relevé d’épargne ou de placements', why: 'Un coussin de quelques mois de loyer rassure beaucoup. Tu peux cacher les numéros de compte.' },
-  { id: 'bailcondo', title: 'Bail du condo (si tu le loues)', why: 'Montre un revenu de location en plus. À joindre dès que ton locataire a signé.' },
-  { id: 'credit', title: 'Ton propre rapport de crédit', why: 'Gratuit chez Equifax et TransUnion. Le connaître évite les surprises et t’aide à expliquer ta situation.' },
-  { id: 'refs', title: 'Références', why: 'Un employeur, et le syndicat de copropriété ou un ancien locateur qui peut confirmer que tu paies bien.' },
-  { id: 'assur', title: 'Soumission d’assurance locataire', why: 'Responsabilité civile de 2 M$ : souvent exigée à la signature.' },
-];
+// Étape 1 : les preuves, de la plus convaincante à la plus simple.
+// herOwns : le condo appartient à l'autre personne (celle qui a le bon crédit) ; her : son nom.
+export function proofs(herOwns, her = 'ta conjointe') {
+  return [
+    herOwns
+      ? { id: 'hypo', title: `Historique de paiements de l’hypothèque du condo de ${her}`, why: `Le condo est à ${her} : son historique de 12 mois de paiements sans retard renforce encore son bon dossier, qui couvre tout le loyer quand vous signez solidairement. Elle le demande à son prêteur (ou le relevé annuel).` }
+      : { id: 'hypo', title: 'Historique de paiements de l’hypothèque du condo', why: 'Ta meilleure preuve : un paiement de logement fait chaque mois, sans retard. Demande à ton prêteur un relevé des 12 derniers mois (ou le relevé annuel).' },
+    { id: 'paie', title: 'Talons de paie récents (2 ou 3)', why: herOwns ? 'Pour vous deux. Pour toi, c’est la meilleure façon de compenser un crédit plus faible : un revenu stable et récent.' : 'Pour vous deux. Montre un revenu stable et récent.' },
+    { id: 'emploi', title: 'Lettre d’emploi', why: 'Poste, salaire, date d’embauche, permanent ou non. Signée par l’employeur, datée de moins d’un mois.' },
+    { id: 'avis', title: 'Avis de cotisation de la dernière année', why: 'Revenu Québec ou l’ARC : confirme le revenu annuel. Utile surtout si une partie du revenu est variable.' },
+    { id: 'epargne', title: 'Relevé d’épargne ou de placements', why: 'Un coussin de quelques mois de loyer rassure beaucoup. Tu peux cacher les numéros de compte.' },
+    { id: 'bailcondo', title: herOwns ? `Bail du condo de ${her} (s’il est loué)` : 'Bail du condo (si tu le loues)', why: herOwns ? `Montre un revenu de location en plus pour ${her}. À joindre dès que son locataire a signé.` : 'Montre un revenu de location en plus. À joindre dès que ton locataire a signé.' },
+    { id: 'credit', title: 'Ton propre rapport de crédit', why: 'Gratuit chez Equifax et TransUnion. Le connaître évite les surprises et t’aide à expliquer ta situation.' },
+    { id: 'refs', title: 'Références', why: herOwns ? `Ton employeur et un ancien locateur qui peut confirmer que tu payais bien ; pour ${her}, le syndicat de copropriété.` : 'Un employeur, et le syndicat de copropriété ou un ancien locateur qui peut confirmer que tu paies bien.' },
+    { id: 'assur', title: 'Soumission d’assurance locataire', why: 'Responsabilité civile de 2 M$ : souvent exigée à la signature.' },
+  ];
+}
 
 export function letterText(d, A) {
   const s = d.dossier;
@@ -28,6 +33,7 @@ export function letterText(d, A) {
   const revenu = Number(s.revenu) || 0;
   const ratio = revenu ? Math.round((loyer / revenu) * 100) : null;
   const pay = Number(A.paiementCondo) || 0;
+  const herOwns = A.condoProprio !== 'moi';
   return `Bonjour ${s.proprio || '[nom du propriétaire]'},
 
 Nous sommes très intéressés à louer votre maison du ${adr}${s.debut ? ` à partir du ${s.debut}` : ''}. Voici notre situation, en toute transparence.
@@ -36,7 +42,9 @@ Nous serons deux locataires et signerons le bail solidairement : chacun de nous 
 
 ${her} a un bon dossier de crédit. Pour ma part, mon pointage de crédit est plus faible ${s.raison ? `(${s.raison})` : '[explique en une phrase pourquoi, par exemple une ancienne dette maintenant réglée]'}. Je préfère vous le dire d’emblée plutôt que vous le découvriez à l’enquête.
 
-En revanche, je suis propriétaire d’un condo depuis ${A.anneeAchatCondo || '[année]'} et je paie mon hypothèque${pay ? ` de ${money(pay)}` : ''} chaque mois, sans aucun retard. Je peux vous fournir l’historique de paiements de mon prêteur.${s.condoLoue ? ' Le condo sera loué, ce qui ajoute un revenu stable à notre budget.' : ''}
+${herOwns
+  ? `${her} est propriétaire d’un condo depuis ${A.anneeAchatCondo || '[année]'} et paie son hypothèque${pay ? ` de ${money(pay)}` : ''} chaque mois, sans aucun retard : nous pouvons vous fournir l’historique de paiements de son prêteur. De mon côté, j’ai un emploi stable et je vous joins mes preuves de revenu.${s.condoLoue ? ' Son condo sera loué, ce qui ajoute un revenu stable à notre budget.' : ''}`
+  : `En revanche, je suis propriétaire d’un condo depuis ${A.anneeAchatCondo || '[année]'} et je paie mon hypothèque${pay ? ` de ${money(pay)}` : ''} chaque mois, sans aucun retard. Je peux vous fournir l’historique de paiements de mon prêteur.${s.condoLoue ? ' Le condo sera loué, ce qui ajoute un revenu stable à notre budget.' : ''}`}
 
 ${revenu ? `Nos revenus nets combinés sont d’environ ${money(revenu)} par mois : le loyer en représenterait ${ratio} %.` : 'Nos revenus nets combinés sont d’environ [montant] par mois.'} Nous joignons nos talons de paie, nos lettres d’emploi${s.epargne ? ' et un relevé d’épargne' : ''}.
 
@@ -53,6 +61,9 @@ export async function drawDossier(body, ctx, d, A, save) {
   const s = d.dossier;
   s.proofs ||= {};
   s.caution ||= { statut: '' };
+  const herOwns = A.condoProprio !== 'moi';
+  const herName = s.sonNom || A.partNom || 'ta conjointe';
+  const PROOFS = proofs(herOwns, herName);
   const done = PROOFS.filter((p) => s.proofs[p.id]?.done).length;
   const allDocs = PROOFS.flatMap((p) => s.proofs[p.id]?.docs || []);
   const metas = Object.fromEntries((await docs.metas(allDocs)).map((m) => [m.id, m]));
@@ -66,7 +77,7 @@ export async function drawDossier(body, ctx, d, A, save) {
       <ol>
         <li><b>Signer tous les deux, solidairement</b> : chacun répond du loyer complet. Le bon crédit de ${esc(s.sonNom || 'ta conjointe')} couvre alors 100 % du loyer, ce qui rassure le propriétaire.</li>
         <li><b>Jouer la transparence</b> : expliquer ta situation avant l’enquête de crédit (lettre ci-dessous), jamais de fausse déclaration.</li>
-        <li><b>Compenser avec des preuves</b> : surtout ton historique de paiements hypothécaires.</li>
+        <li><b>Compenser avec des preuves</b> : ${herOwns ? `l’historique hypothécaire de ${esc(herName)} (le condo est à elle) appuie son dossier, et tes talons de paie et ta lettre d’emploi montrent ton revenu stable` : 'surtout ton historique de paiements hypothécaires'}.</li>
         <li><b>Si le propriétaire hésite</b> : proposer une caution, plutôt que de laisser ton nom hors du bail.</li>
       </ol>
       <p class="muted small">À éviter : payer plus que le premier mois d’avance (il ne peut pas l’exiger), et faire signer ${esc(s.sonNom || 'ta conjointe')} seule si tu veux rester dans la maison à long terme ou l’acheter plus tard. Repères généraux au Québec, pas un avis juridique.</p>
@@ -93,7 +104,7 @@ export async function drawDossier(body, ctx, d, A, save) {
         ${inp('revenu', 'Revenus nets combinés ($/mois)', '', 'number')}
         ${inp('raison', 'Pourquoi ton crédit est plus faible', 'en quelques mots, ex. une carte de crédit remboursée en 2025')}
         ${inp('contact', 'Téléphone et courriel')}
-        <label class="pp-check"><input type="checkbox" data-s="condoLoue" ${s.condoLoue ? 'checked' : ''}> <span>Le condo sera loué (revenu en plus)</span></label>
+        <label class="pp-check"><input type="checkbox" data-s="condoLoue" ${s.condoLoue ? 'checked' : ''}> <span>Le condo ${herOwns ? `de ${esc(herName)} ` : ''}sera loué (revenu en plus)</span></label>
         <label class="pp-check"><input type="checkbox" data-s="epargne" ${s.epargne ? 'checked' : ''}> <span>Joindre un relevé d’épargne</span></label>
       </div>
       ${ratio ? `<p class="pd-ratio ${ratio > 40 ? 'bad' : ratio > 33 ? 'warn' : 'ok'}">Le loyer représenterait <b>${ratio} %</b> de vos revenus nets. ${ratio > 40 ? 'Au-delà de 40 % : un propriétaire risque d’hésiter, la caution devient utile.' : ratio > 33 ? 'Entre 33 et 40 % : acceptable, tes preuves feront la différence.' : 'Sous 33 % : un bon point pour votre dossier.'}</p>` : ''}

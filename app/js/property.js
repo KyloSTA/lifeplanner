@@ -455,6 +455,43 @@ export async function renderPage(ctx, arg) {
   }
 
   /* ---------- 🏠 Location ---------- */
+  /* ---------- 💰 Profits du condo loué (pour sa propriétaire) ---------- */
+  const ownerName = (a) => (a.condoProprio === 'moi' ? a.monNom || 'Moi' : a.partNom || 'Conjoint·e');
+  function profitsCard(r) {
+    const a = r.a, N = r.N, last = r.years[r.years.length - 1];
+    const owner = ownerName(a);
+    const sg = (v) => (v < 0 ? `<span class="pp-neg">−${money(-v)}</span>` : `<span class="pp-pos">${money(v)}</span>`);
+    const col = (id) => {
+      const L = r.month1.loc[id], Y = last[id];
+      const appr = Y.valeur - (Number(a.prixVente) || 0);
+      return `<div class="pp-profit"><h3>${id === 'bail' ? '🏠 Bail complet' : '🛏 À la chambre'}</h3>
+        <p class="pp-h3">Par mois (1re année)</p>
+        ${rows([
+          ['Loyers reçus (après inoccupation)', money(L.revenu)],
+          ['− Intérêts de l’hypothèque', money(L.interet)],
+          [`− Frais de condo, taxes, assurance, entretien${id === 'chambres' ? ', services, gestion' : L.depenses ? '' : ''}`, money(L.depenses)],
+          ['= Profit avant impôt', sg(L.netLoc), 'pp-total'],
+          [L.impot >= 0 ? `− Impôt (au taux de ${esc(owner)})` : '+ Économie d’impôt (perte locative)', L.impot >= 0 ? money(L.impot) : `<span class="pp-pos">${money(-L.impot)}</span>`],
+          ['= Profit après impôt', sg(L.apresImpot), 'pp-total'],
+          ['Argent qui reste après le paiement complet de l’hypothèque (− : à sortir de la poche)', sg(L.cash)],
+        ])}
+        <p class="pp-h3">Sur ${N} an${N > 1 ? 's' : ''}</p>
+        ${rows([
+          ['Profit après impôt', sg(Y.profit)],
+          ['Hypothèque remboursée (dette en moins)', `<span class="pp-pos">${money(Y.capital)}</span>`],
+          ['Prise de valeur du condo', sg(appr)],
+          ['= Enrichissement avant la vente', `<b>${sg(Y.profit + Y.capital + appr)}</b>`, 'pp-total'],
+          ['Argent pour le condo : sorti de la poche (−) ou reçu (+)', sg(Y.cash)],
+        ])}</div>`;
+    };
+    return `<section class="card pp-profits"><div class="card-head"><h2>💰 Profits du condo loué</h2>
+        <label class="pp-owner">Propriétaire <select id="pp-owner"><option value="part" ${a.condoProprio !== 'moi' ? 'selected' : ''}>${esc(a.partNom || 'Conjoint·e')}</option><option value="moi" ${a.condoProprio === 'moi' ? 'selected' : ''}>${esc(a.monNom || 'Moi')}</option></select></label></div>
+      <p class="muted" style="margin-top:0">Le condo appartient à <b>${esc(owner)}</b> : les loyers, les profits, l’impôt sur ces revenus et la prise de valeur sont à son nom. L’impôt est calculé avec le taux marginal entré dans ⚙ Hypothèses (mets celui de ${esc(owner)}).</p>
+      <div class="pp-two">${col('bail')}${col('chambres')}</div>
+      <p class="hint muted">« Profit avant impôt » : ce que Revenu Québec et l’ARC imposent (loyers moins intérêts et dépenses ; le capital remboursé n’est pas une dépense). « Argent qui reste » : ce qui reste vraiment chaque mois une fois l’hypothèque complète payée. Estimations ; l’amortissement fiscal (DPA) n’est pas compté.</p>
+    </section>`;
+  }
+
   function drawLocation(r) {
     const col = (id) => {
       const m = r.month1.det[id];
@@ -516,8 +553,10 @@ export async function renderPage(ctx, arg) {
           ${col('chambres')}
         </section>
       </div>
+      ${profitsCard(r)}
       <p class="hint muted">La location à la chambre doit être permise par la déclaration de copropriété : vérifie-la avant tout. L’impôt est calculé sur le revenu de location moins les intérêts et les dépenses (estimation).</p>`;
     bindFields(body);
+    body.querySelector('#pp-owner')?.addEventListener('change', async (e) => { sc().a.condoProprio = e.target.value; await save(); draw(); });
   }
 
   /* ---------- ⚙ Hypothèses ---------- */
@@ -534,7 +573,7 @@ export async function renderPage(ctx, arg) {
       </section>
       <section class="card"><div class="card-head"><h2>👥 Ménage et impôts</h2></div>
         <div class="pp-fields">
-          ${field('tauxMarginal', 'Ton taux d’imposition marginal', { suf: '%', hint: 'Québec + fédéral, environ 37 % à 48 % selon ton revenu' })}
+          ${field('tauxMarginal', 'Taux d’imposition marginal de la personne propriétaire du condo', { suf: '%', hint: 'Sert à l’impôt sur les loyers et sur le gain du condo. Québec + fédéral, environ 37 % à 48 % selon le revenu' })}
           ${field('partPct', 'Ta part du coût net du couple', { suf: '%', hint: 'Tout est calculé pour le couple ; le reste est payé par l’autre personne.' })}
           <label class="pp-field"><span class="pp-lbl">Nom de l’autre personne</span><span class="pp-in"><input type="text" id="pp-partnom" value="${esc(sc().a.partNom ?? DEFAULTS.partNom)}"></span></label>
           ${check('liquidation', 'Patrimoine « si tout était vendu » (frais de vente et impôt déduits)')}
