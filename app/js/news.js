@@ -8,13 +8,14 @@ import { db } from './db.js';
 import * as U from './util.js';
 import * as brain from './brain.js';
 import * as habs from './habs.js';
+import * as stocks from './stocks.js';
 
 const { esc } = U;
 // cat : la section (onglet) de la source
 export const SECTIONS = [['general', '📰 Actualités'], ['tech', '💻 Tech'], ['inter', '🌍 International'], ['business', '💼 Business'],
-  ['finance', '💰 Finance'], ['arts', '🎭 Art & Spectacle'], ['sports', '⚽ Sports'], ['lnh', '🏒 LNH'], ['media', '🍿 Média']];
+  ['finance', '💰 Finance'], ['bourse', '📈 Bourse'], ['arts', '🎭 Art & Spectacle'], ['sports', '⚽ Sports'], ['lnh', '🏒 LNH'], ['media', '🍿 Média']];
 const FEED_SECTIONS = SECTIONS.filter(([k]) => k !== 'media'); // Média n'a pas de fils RSS
-const SECTION_TAGS = { lnh: '#lnh #hockey', tech: '#tech', inter: '#international', business: '#business', finance: '#finance', arts: '#culture', sports: '#sports' };
+const SECTION_TAGS = { lnh: '#lnh #hockey', tech: '#tech', inter: '#international', business: '#business', finance: '#finance', bourse: '#bourse', arts: '#culture', sports: '#sports' };
 export const DEFAULT_FEEDS = [
   { id: 'rc', cat: 'general', name: 'Radio-Canada', url: 'https://ici.radio-canada.ca/info/rss/info/a-la-une', color: '#e11d48', on: true },
   { id: 'devoir', cat: 'general', name: 'Le Devoir', url: 'https://www.ledevoir.com/rss/manchettes.xml', color: '#94a3b8', on: true },
@@ -37,6 +38,11 @@ export const DEFAULT_FEEDS = [
   { id: 'jdm-argent', cat: 'finance', name: 'Journal de Montréal Argent', url: 'https://www.journaldemontreal.com/argent/rss.xml', color: '#f97316', on: true },
   { id: 'presse-finances', cat: 'finance', name: 'La Presse Finances personnelles', url: 'https://www.lapresse.ca/affaires/finances-personnelles/rss', color: '#0c4a6e', on: true },
   { id: 'gnews-finance', cat: 'finance', name: 'Google Actualités Bourse', url: 'https://news.google.com/rss/search?q=bourse+OR+placements&hl=fr-CA&gl=CA&ceid=CA:fr', color: '#16a34a', on: false },
+  // Bourse (marchés)
+  { id: 'gnews-bourse', cat: 'bourse', name: 'Google Actualités Marchés', url: 'https://news.google.com/rss/search?q=bourse+OR+TSX+OR+%22Wall+Street%22+OR+%22march%C3%A9s+boursiers%22&hl=fr-CA&gl=CA&ceid=CA:fr', color: '#16a34a', on: true },
+  { id: 'presse-marches', cat: 'bourse', name: 'La Presse Marchés', url: 'https://www.lapresse.ca/affaires/marches/rss', color: '#0c4a6e', on: true },
+  { id: 'yahoo-fin', cat: 'bourse', name: 'Yahoo Finance (anglais)', url: 'https://finance.yahoo.com/news/rssindex', color: '#7c3aed', on: true },
+  { id: 'cnbc-markets', cat: 'bourse', name: 'CNBC Markets (anglais)', url: 'https://www.cnbc.com/id/20910258/device/rss/rss.html', color: '#0ea5e9', on: false },
   // Art & Spectacle
   { id: 'rc-culture', cat: 'arts', name: 'Radio-Canada Culture', url: 'https://ici.radio-canada.ca/info/rss/culture/en-continu', color: '#e11d48', on: true },
   { id: 'devoir-culture', cat: 'arts', name: 'Le Devoir Culture', url: 'https://www.ledevoir.com/rss/section/culture.xml', color: '#94a3b8', on: true },
@@ -88,7 +94,7 @@ function parseXML(text, feed) {
 // Sources qui refusent la lecture directe : on va directement au convertisseur (pas d'erreur inutile)
 const NEEDS_PROXY = new Set(['devoir', 'presse', 'tva', 'gnews', 'presse-hockey', 'jdm-hockey', 'gnews-lnh',
   'presse-techno', 'gnews-tech', 'devoir-monde', 'presse-inter', 'presse-affaires', 'devoir-eco', 'jdm-argent', 'presse-finances',
-  'gnews-finance', 'devoir-culture', 'presse-arts', 'jdm-spectacles', 'presse-sports', 'jdm-sports']);
+  'gnews-finance', 'gnews-bourse', 'presse-marches', 'yahoo-fin', 'cnbc-markets', 'devoir-culture', 'presse-arts', 'jdm-spectacles', 'presse-sports', 'jdm-sports']);
 const blocked = new Set(); // sources ajoutées qui ont refusé (pour la session)
 async function fetchFeed(feed) {
   // 1) Lecture directe (si le site le permet)
@@ -104,7 +110,14 @@ async function fetchFeed(feed) {
   // 2) Convertisseur RSS -> JSON
   const r = await fetch(CONVERTER + encodeURIComponent(feed.url));
   const d = await r.json();
-  if (d.status !== 'ok') throw new Error(d.message || 'fil illisible');
+  if (d.status !== 'ok') {
+    // 3) Le convertisseur refuse (trop de nouveaux fils d'un coup) : on lit le fil tel quel par allorigins.win
+    try {
+      const x = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(feed.url), { signal: AbortSignal.timeout?.(15_000) });
+      if (x.ok) { const items = parseXML(await x.text(), feed); if (items.length) return items; }
+    } catch { /* on garde l'erreur du convertisseur */ }
+    throw new Error(d.message || 'fil illisible');
+  }
   return (d.items || []).map((x) => ({
     title: strip(x.title), link: x.link, date: Date.parse((x.pubDate || '').replace(' ', 'T')) || 0,
     text: strip(x.description).slice(0, 260), img: x.thumbnail || x.enclosure?.link || firstImg(x.description), src: feed.id,
@@ -380,6 +393,7 @@ export async function renderPage(ctx, force = false) {
     ${section === 'lnh' ? `<div class="seg lnh-tabs" role="tablist" aria-label="LNH">
       <button role="tab" data-lv="habs" class="${lnhView === 'habs' ? 'on' : ''}" aria-selected="${lnhView === 'habs'}"><img src="https://a.espncdn.com/i/teamlogos/nhl/500/mtl.png" alt="" referrerpolicy="no-referrer"> Canadiens</button>
       <button role="tab" data-lv="all" class="${lnhView === 'all' ? 'on' : ''}" aria-selected="${lnhView === 'all'}">Toute la LNH</button></div>` : ''}
+    ${section === 'bourse' ? '<section class="card sk-panel" id="sk-panel"></section>' : ''}
     <div class="nw-filters filters" id="nw-filters"></div>
     <div id="nw-list"><div class="card empty-card"><p>Chargement des titres…</p></div></div>`;
   const draw = async (f) => {
@@ -415,11 +429,12 @@ export async function renderPage(ctx, force = false) {
     $('#nw-more')?.addEventListener('click', () => { shown += 24; draw(false); });
   };
   const $ = (s) => view.querySelector(s), $$ = (s) => [...view.querySelectorAll(s)];
-  $('#nw-ref').onclick = () => { $('#nw-list').innerHTML = '<div class="card empty-card"><p>Actualisation…</p></div>'; draw(true); };
+  $('#nw-ref').onclick = () => { if (section === 'bourse') stocks.drawPanel($('#sk-panel'), { modal, toast }, true); $('#nw-list').innerHTML = '<div class="card empty-card"><p>Actualisation…</p></div>'; draw(true); };
   $('#nw-src').onclick = () => sourcesModal(modal, toast, () => renderPage(ctx, true));
   $$('[data-sec]').forEach((b) => (b.onclick = () => { if (section === b.dataset.sec) return; section = b.dataset.sec; filter = 'all'; renderPage(ctx); }));
   $$('[data-lv]').forEach((b) => (b.onclick = () => { if (lnhView === b.dataset.lv) return; lnhView = b.dataset.lv; filter = 'all'; renderPage(ctx); }));
   draw(force);
+  if (section === 'bourse') stocks.drawPanel($('#sk-panel'), { modal, toast }, force);
 }
 
 function sourcesModal(modal, toast, onDone) {

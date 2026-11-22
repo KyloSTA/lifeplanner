@@ -117,6 +117,18 @@ function bindCapture(form, after) {
     if (list.length) drawImgs();
   };
   form._addImages = add; // utilisé par le « coller » global de la page
+  // Échap : retire les images et documents en attente et sort de la zone de texte (le texte tapé reste)
+  const onEsc = (e) => {
+    if (!form.isConnected) { removeEventListener('keydown', onEsc); return; }
+    if (e.key !== 'Escape' || document.querySelector('#modal-root > *, .an-root, .img-zoom')) return;
+    const inForm = form.contains(document.activeElement);
+    if (!files.length && !inForm) return;
+    files.forEach((f) => f.url && URL.revokeObjectURL(f.url));
+    files = [];
+    drawImgs();
+    if (inForm) document.activeElement.blur();
+  };
+  addEventListener('keydown', onEsc);
   let busy = false;
   const submit = async () => {
     const v = form.t.value.trim();

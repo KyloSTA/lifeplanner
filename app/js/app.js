@@ -3018,6 +3018,7 @@ async function renderSettings() {
         <div class="card-head"><h2>Google Agenda</h2>${connected ? `<span class="sync live">${gcal.staysConnected() ? 'Connecté · reste connecté' : 'Connecté'}</span>` : ''}</div>
         ${cSecret && gcal.codeError() ? `<p class="warn-text" style="margin-top:0">⚠ Connexion durable impossible : ${esc(gcal.codeError())}. L’app utilise la connexion simple en attendant ; corrige le code secret puis « Enregistrer » pour réessayer.</p>`
           : connected && cSecret && !gcal.staysConnected() ? '<p class="warn-text" style="margin-top:0">Pour ne plus avoir à te reconnecter : clique « Déconnecter », puis reconnecte-toi une fois.</p>' : ''}
+        <details class="cfg-fold" ${clientId && connected ? '' : 'open'}><summary>${clientId && connected ? '✓ Configuré · identifiant Google et code secret' : 'Configuration'}</summary>
         <p class="muted" style="margin-top:0">Une seule fois : crée ton propre identifiant Google (gratuit, ~5 minutes).</p>
         <ol class="steps">
           <li>Va sur <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">console.cloud.google.com</a> et crée un projet (ex. « Life Planner »).</li>
@@ -3033,6 +3034,7 @@ async function renderSettings() {
           <div class="head-actions"><button class="btn">Enregistrer</button>${cSecret ? '<button class="btn danger" type="button" id="cs-del">Retirer le code secret</button>' : ''}</div>
           <p class="muted hint" style="margin:0">Le code secret reste sur cet appareil : il n’est envoyé qu’à Google et n’est jamais synchronisé ni inclus dans les sauvegardes exportées.</p>
         </form>
+        </details>
         <div class="status-line">
           ${connected
             ? '<button class="btn" id="g-off">Déconnecter</button>'
@@ -3046,6 +3048,7 @@ async function renderSettings() {
 
       <section class="card">
         <div class="card-head"><h2>Assistant (Claude)</h2>${aKey ? '<span class="sync live">Activé</span>' : ''}</div>
+        <details class="cfg-fold" ${aKey ? '' : 'open'}><summary>${aKey ? '✓ Configuré · clé API et modèle' : 'Configuration'}</summary>
         <p class="muted" style="margin-top:0">Sans clé, l’assistant de la page Aujourd’hui comprend des commandes simples. Avec une clé API Claude, tu peux lui demander n’importe quoi en langage libre.</p>
         <ol class="steps">
           <li>Crée un compte sur <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> et ajoute un peu de crédit (facturé à l’usage : une demande coûte en général moins d’un cent avec Opus).</li>
@@ -3057,6 +3060,7 @@ async function renderSettings() {
           <div class="head-actions"><button class="btn">Enregistrer</button>${aKey ? '<button class="btn danger" type="button" id="ak-del">Retirer la clé</button>' : ''}</div>
         </form>
         <p class="muted hint">La clé reste sur cet appareil : elle n’est envoyée qu’à api.anthropic.com et n’est jamais incluse dans les sauvegardes exportées.</p>
+        </details>
       </section>
 
       <section class="card">

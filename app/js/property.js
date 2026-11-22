@@ -173,8 +173,12 @@ export async function renderPage(ctx, arg) {
         <div class="pp-scroll"><table class="pp-table pp-years"><thead><tr><th>Année</th>${OPTIONS.map((o) => `<th class="num">${o.icon} Coût</th>`).join('')}${OPTIONS.map((o) => `<th class="num">${o.icon} Patrimoine</th>`).join('')}</tr></thead>
         <tbody>${r.years.map((y, i) => {
           const prev = r.years[i - 1];
-          const top = OPTIONS.map((o) => o.id).sort((x, z) => y[z].patrimoine - y[x].patrimoine)[0];
-          return `<tr><td>${y.year}</td>${OPTIONS.map((o) => `<td class="num">${money(y[o.id].cumul - (prev ? prev[o.id].cumul : 0))}</td>`).join('')}${OPTIONS.map((o) => `<td class="num ${o.id === top ? 'pp-top' : ''}">${money(y[o.id].patrimoine)}</td>`).join('')}</tr>`;
+          // Vert : le choix le plus payant · rouge : le moins payant (patrimoine le plus haut / le plus bas, coût le plus bas / le plus haut)
+          const byPat = OPTIONS.map((o) => o.id).sort((x, z) => y[z].patrimoine - y[x].patrimoine);
+          const cost = Object.fromEntries(OPTIONS.map((o) => [o.id, y[o.id].cumul - (prev ? prev[o.id].cumul : 0)]));
+          const byCost = OPTIONS.map((o) => o.id).sort((x, z) => cost[x] - cost[z]);
+          const cls = (order, id, best) => (id === order[0] ? best : id === order[order.length - 1] ? 'pp-low' : '');
+          return `<tr><td>${y.year}</td>${OPTIONS.map((o) => `<td class="num ${cls(byCost, o.id, 'pp-top-c')}">${money(cost[o.id])}</td>`).join('')}${OPTIONS.map((o) => `<td class="num ${cls(byPat, o.id, 'pp-top')}">${money(y[o.id].patrimoine)}</td>`).join('')}</tr>`;
         }).join('')}</tbody></table></div>
       </section>
       <section class="card"><div class="card-head"><h2>Au départ</h2><span class="muted">l’argent qui bouge le jour du changement</span></div>
