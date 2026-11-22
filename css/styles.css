@@ -3338,6 +3338,17 @@ body.an-open { overflow: hidden; }
 .pp-share-btn span { opacity: .6; }
 .sh-in { margin-top: 6px; max-width: 220px; }
 
+/* Barre de titre maison (app installée, « Masquer la barre de titre ») : l'icône ouvre le Lanceur */
+.titlebar { display: none; }
+@media (display-mode: window-controls-overlay) {
+  .titlebar { display: flex; align-items: center; gap: 8px; position: fixed; z-index: 50; top: env(titlebar-area-y, 0); left: env(titlebar-area-x, 0); width: env(titlebar-area-width, 100%); height: env(titlebar-area-height, 33px); padding: 0 8px; box-sizing: border-box; background: var(--rail-bg, #0a0909); color: var(--rail-text, #eee); font-size: 12.5px; app-region: drag; -webkit-app-region: drag; user-select: none; }
+  .tb-launch { app-region: no-drag; -webkit-app-region: no-drag; display: grid; place-items: center; width: 34px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+  .tb-launch img { width: 24px; height: 24px; border-radius: 50%; }
+  .tb-launch:hover, .tb-launch[aria-expanded="true"] { background: rgba(255,255,255,.14); }
+  .tb-title { opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app { margin-top: env(titlebar-area-height, 33px); height: calc(100% - env(titlebar-area-height, 33px)); }
+}
+
 /* 📺 Carte vidéo flottante : déplacer (titre) et redimensionner (coin) */
 .vd-grip { display: none; }
 @media (orientation: portrait) and (min-width: 601px) {
@@ -3353,3 +3364,8 @@ body.an-open { overflow: hidden; }
   body.vdock-free.vdock-on #fab-dock { bottom: 24px; }
   body.vdock-free.vdock-on #to-top { bottom: 92px; }
 }
+
+/* Lanceur du mini-menu : caché quand la barre de titre maison a déjà l'icône ; revient en plein écran (plus de barre) */
+@media (display-mode: window-controls-overlay) { #brand-launch { display: none; } }
+@media (display-mode: fullscreen) { #brand-launch { display: grid; } }
+html:fullscreen #brand-launch { display: grid; }
