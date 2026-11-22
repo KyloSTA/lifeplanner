@@ -18,7 +18,7 @@ export const DEFAULT_STOCKS = [
   { s: 'GC=F', n: 'Or' },
   { s: 'BTC-CAD', n: 'Bitcoin ($ CA)' },
 ];
-const timed = (u) => fetch(u, { signal: AbortSignal.timeout?.(15_000) });
+const timed = (u) => fetch(u, { signal: AbortSignal.timeout?.(25_000) });
 const PROXIES = [
   (u) => timed('https://api.allorigins.win/raw?url=' + encodeURIComponent(u)).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
   (u) => timed('https://api.allorigins.win/get?url=' + encodeURIComponent(u)).then((r) => r.json()).then((d) => JSON.parse(d.contents)),
@@ -34,24 +34,41 @@ async function getJSON(url) {
 export async function list() { return (await db.get('settings', KEY)) || DEFAULT_STOCKS.map((x) => ({ ...x })); }
 const save = (l) => db.put('settings', l.map(({ s, n }) => ({ s, n })), KEY);
 
-/** Cotes { symbole: { price, prev, pct } } (cache 5 min). */
-export async function quotes(syms, force = false) {
-  const c = await db.get('cache', CACHE);
+// Périodes : [id, range Yahoo, intervalle, étiquette]
+export const RANGES = [['1d', '1d', '15m', '24H'], ['5d', '5d', '1h', '5J'], ['1mo', '1mo', '1d', '1M'], ['6mo', '6mo', '1d', '6M'], ['ytd', 'ytd', '1d', 'YTD'], ['1y', '1y', '1wk', '1A']];
+const RANGE_LS = 'lp.skRange';
+const getRange = () => { try { const r = localStorage.getItem(RANGE_LS); return RANGES.some(([k]) => k === r) ? r : '1d'; } catch { return '1d'; } };
+const setRange = (r) => { try { localStorage.setItem(RANGE_LS, r); } catch { /* ignore */ } };
+
+/** Cotes sur une période : { symbole: { price, prev, pct, pts } } (cache 5 min par période). */
+export async function quotes(syms, force = false, range = '1d', onPart = null) {
+  const [, yr, iv] = RANGES.find(([k]) => k === range) || RANGES[0];
+  const ck = `${CACHE}:${range}`;
+  const c = await db.get('cache', ck);
   const want = syms.join(',');
-  if (!force && c && c.want === want && Date.now() - c.at < TTL) return c;
+  if (!force && c && !c.partial && c.want === want && Date.now() - c.at < TTL) return c;
   const out = {};
-  for (let i = 0; i < syms.length; i += 20) { // l'API accepte 20 symboles à la fois
-    const part = syms.slice(i, i + 20);
-    const d = await getJSON(`https://query1.finance.yahoo.com/v8/finance/spark?symbols=${encodeURIComponent(part.join(','))}&range=1d&interval=1d`);
+  // Petits lots en parallèle : le service gratuit répond plus vite à de petites demandes
+  const parts = [];
+  for (let i = 0; i < syms.length; i += 4) parts.push(syms.slice(i, i + 4));
+  const take = (d) => {
     for (const [k, v] of Object.entries(d || {})) {
-      const price = v.fulldayPrice ?? v.close?.at(-1);
-      const prev = v.chartPreviousClose ?? v.previousClose;
+      const closes = (v.close || []).filter((x) => x != null);
+      const price = (range === '1d' ? v.fulldayPrice : null) ?? closes.at(-1);
+      const prev = v.chartPreviousClose ?? v.previousClose ?? closes[0];
       if (price == null) continue;
-      out[k] = { price, prev, pct: v.fulldayChangePercent ?? (prev ? ((price - prev) / prev) * 100 : 0) };
+      const pct = range === '1d' && v.fulldayChangePercent != null ? v.fulldayChangePercent : prev ? ((price - prev) / prev) * 100 : 0;
+      // Au plus 60 points pour la mini-courbe
+      const step = Math.max(1, Math.ceil(closes.length / 60));
+      const pts = closes.filter((_, j) => j % step === 0 || j === closes.length - 1);
+      out[k] = { price, prev, pct, pts };
     }
-  }
-  const res = { want, at: Date.now(), q: out };
-  await db.put('cache', res, CACHE);
+  };
+  // Chaque lot s'affiche dès qu'il arrive (onPart)
+  const got = await Promise.allSettled(parts.map((part) => getJSON(`https://query1.finance.yahoo.com/v8/finance/spark?symbols=${encodeURIComponent(part.join(','))}&range=${yr}&interval=${iv}`).then((d) => { take(d); onPart?.({ ...out }); })));
+  if (!got.some((g) => g.status === 'fulfilled')) throw new Error('indisponible');
+  const res = { want, at: Date.now(), q: out, partial: got.some((g) => g.status === 'rejected') };
+  await db.put('cache', res, ck);
   return res;
 }
 
@@ -61,38 +78,56 @@ export async function search(q) {
   return (d.quotes || []).filter((x) => x.symbol).map((x) => ({ s: x.symbol, n: x.shortname || x.longname || x.symbol, ex: x.exchDisp || '', type: x.typeDisp || '' }));
 }
 
+
 const fmtPrice = (v) => (v >= 1000 ? v.toLocaleString('fr-CA', { maximumFractionDigits: 0 }) : v.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: v < 10 ? 4 : 2 }));
 const fmtPct = (p) => `${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`;
 const yLink = (s) => `https://ca.finance.yahoo.com/quote/${encodeURIComponent(s)}`;
 
+/** Mini-courbe de la période (ligne pointillée : le niveau de départ). */
+function spark(pts, prev) {
+  if (!pts || pts.length < 2) return '';
+  const W = 120, H = 30;
+  const all = prev != null ? [...pts, prev] : pts;
+  const lo = Math.min(...all), hi = Math.max(...all), span = hi - lo || 1;
+  const y = (v) => (H - 2 - ((v - lo) / span) * (H - 4)).toFixed(1);
+  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * W).toFixed(1)} ${y(v)}`).join('');
+  return `<svg class="sk-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${prev != null ? `<line x1="0" x2="${W}" y1="${y(prev)}" y2="${y(prev)}" class="sk-base"/>` : ''}<path d="${d}"/></svg>`;
+}
+
 /** Panneau des cotes, dessiné dans el. */
 export async function drawPanel(el, { modal, toast }, force = false) {
   const l = await list();
-  const head = `<div class="card-head"><h2>📈 Valeurs suivies</h2><span class="muted" id="sk-at"></span><button type="button" class="btn sm-text" id="sk-edit">✎ Modifier</button></div>`;
+  const range = getRange();
+  const label = RANGES.find(([k]) => k === range)[3];
+  const head = `<div class="card-head sk-head"><h2>📈 Valeurs suivies</h2>
+      <div class="seg seg-sm sk-ranges" role="group" aria-label="Période">${RANGES.map(([k, , , lb]) => `<button type="button" data-rg="${k}" class="${k === range ? 'on' : ''}" aria-pressed="${k === range}">${lb}</button>`).join('')}</div>
+      <span class="muted" id="sk-at"></span><button type="button" class="btn sm-text" id="sk-edit">✎ Modifier</button></div>`;
   const tiles = (q = {}) => l.map((x) => {
     const v = q[x.s];
     const dir = !v ? '' : v.pct > 0 ? 'up' : v.pct < 0 ? 'down' : '';
-    return `<a class="sk-tile ${dir}" href="${yLink(x.s)}" target="_blank" rel="noopener" title="${esc(x.s)}">
+    return `<a class="sk-tile ${dir}" href="${yLink(x.s)}" target="_blank" rel="noopener" title="${esc(x.s)} · variation sur ${label}">
       <span class="sk-name">${esc(x.n)}</span>
       <b class="sk-price">${v ? fmtPrice(v.price) : '…'}</b>
-      <span class="sk-pct">${v ? `${v.pct > 0 ? '▲' : v.pct < 0 ? '▼' : '■'} ${fmtPct(v.pct)}` : esc(x.s)}</span></a>`;
+      <span class="sk-pct">${v ? `${v.pct > 0 ? '▲' : v.pct < 0 ? '▼' : '■'} ${fmtPct(v.pct)}` : esc(x.s)}</span>
+      ${v ? spark(v.pts, v.prev) : ''}</a>`;
   }).join('');
   el.innerHTML = `${head}<div class="sk-grid">${l.length ? tiles() : '<p class="empty-sm">Aucune valeur : ajoute-en avec ✎ Modifier.</p>'}</div>`;
   el.querySelector('#sk-edit').onclick = () => editModal(modal, toast, () => drawPanel(el, { modal, toast }, true));
+  el.querySelectorAll('[data-rg]').forEach((b) => (b.onclick = () => { if (b.dataset.rg === range) return; setRange(b.dataset.rg); drawPanel(el, { modal, toast }); }));
   if (!l.length) return;
   // Dernières cotes connues tout de suite, puis les fraîches
-  const old = await db.get('cache', CACHE);
+  const old = await db.get('cache', `${CACHE}:${range}`);
   if (old?.q) {
     el.querySelector('.sk-grid').innerHTML = tiles(old.q);
     el.querySelector('#sk-at').textContent = `Cotes de ${U.fmtTime(new Date(old.at))} · mise à jour…`;
-  }
+  } else el.querySelector('#sk-at').textContent = 'Chargement…';
   try {
-    const r = await quotes(l.map((x) => x.s), force);
-    if (!el.isConnected) return;
+    const r = await quotes(l.map((x) => x.s), force, range, (part) => { if (el.isConnected && getRange() === range) el.querySelector('.sk-grid').innerHTML = tiles({ ...(old?.q || {}), ...part }); });
+    if (!el.isConnected || getRange() !== range) return;
     el.querySelector('.sk-grid').innerHTML = tiles(r.q);
     el.querySelector('#sk-at').textContent = `Mis à jour ${U.fmtTime(new Date(r.at))} · cotes différées`;
   } catch {
-    if (el.isConnected) el.querySelector('#sk-at').textContent = 'Cotes indisponibles pour le moment';
+    if (el.isConnected && getRange() === range) el.querySelector('#sk-at').textContent = 'Cotes indisponibles pour le moment';
   }
 }
 
