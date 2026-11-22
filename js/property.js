@@ -135,8 +135,11 @@ export async function renderPage(ctx, arg) {
       // Coûts de la maison partagés selon les parts ; le condo (et ses revenus) reste à toi
       const det = r.month1.det[id];
       const houseCost = id === 'achat' ? det.hypotheque + det.taxes + det.assurance + det.entretien + det.energie : det.loyer + det.assurLocataire + det.energie;
-      const p = (Number(r.a.partPct) || 0) / 100;
-      return { moi: v - houseCost * (1 - p), autre: houseCost * (1 - p) };
+      // Part de l'autre personne : un % des coûts de la maison, ou un montant fixe par mois (jamais plus que ces coûts)
+      const autre = r.a.partMode === 'montant'
+        ? Math.min(houseCost, Math.max(0, Number(r.a.partMontant) || 0))
+        : houseCost * (1 - (Number(r.a.partPct) || 0) / 100);
+      return { moi: v - autre, autre };
     };
     body.innerHTML = `${warnBox(r)}
       <section class="card pp-horizon">
@@ -161,7 +164,7 @@ export async function renderPage(ctx, arg) {
         return `<section class="card pp-card ${isBest ? 'best' : ''}" style="--oc:${o.color}">
           <div class="pp-card-head"><span class="pp-ico">${o.icon}</span><h3>${esc(o.name)}</h3>${isBest ? '<span class="pp-badge">🏆 Meilleur</span>' : ''}</div>
           <div class="pp-big"><small>Coût net par mois (an 1)</small><b>${money(y1)}</b></div>
-          <p class="pp-share muted">Ta part ≈ <b>${money(s.moi)}</b> · ${esc(r.a.partNom || 'Conjoint·e')} ≈ <b>${money(s.autre)}</b></p>
+          <button type="button" class="pp-share pp-share-btn" data-share title="Modifier les noms et la part de chacun">${esc(r.a.monNom || 'Moi')} ≈ <b>${money(s.moi)}</b> · ${esc(r.a.partNom || 'Conjoint·e')} ≈ <b>${money(s.autre)}</b> <span aria-hidden="true">✎</span></button>
           <div class="pp-big"><small>Patrimoine dans ${r.N} an${r.N > 1 ? 's' : ''}</small><b>${money(L.patrimoine)}</b></div>
           <p class="muted pp-share">${isBest ? 'Option la plus avantageuse' : `${signed(L.patrimoine - last[best.id].patrimoine)} vs la meilleure`}</p>
         </section>`;
@@ -199,6 +202,41 @@ export async function renderPage(ctx, arg) {
     const hz = body.querySelector('#pp-hz');
     hz.oninput = () => { body.querySelector('.pp-hz-v').textContent = `${hz.value} an${hz.value > 1 ? 's' : ''}`; };
     hz.onchange = async () => { sc().a.horizon = Number(hz.value); await save(); draw(); };
+    body.querySelectorAll('[data-share]').forEach((b) => (b.onclick = () => editShare()));
+  }
+
+  /* ---------- Qui paie quoi : noms et part de chacun (% des coûts de la maison ou montant fixe) ---------- */
+  function editShare() {
+    const a = A();
+    modal(`<h2>Qui paie quoi</h2>
+      <p class="muted small" style="margin-top:0">Les coûts de la maison (hypothèque ou loyer, taxes, assurance, énergie) se partagent. Le condo et ses revenus restent à ${esc(a.monNom || 'toi')}.</p>
+      <div class="pp-fields">
+        <label class="pp-field"><span class="pp-lbl">Ton prénom</span><span class="pp-in"><input id="sh-me" value="${esc(a.monNom === 'Moi' ? '' : a.monNom || '')}" placeholder="Moi"></span></label>
+        <label class="pp-field"><span class="pp-lbl">L’autre personne</span><span class="pp-in"><input id="sh-other" value="${esc(a.partNom === 'Conjoint·e' ? '' : a.partNom || '')}" placeholder="Conjoint·e"></span></label>
+      </div>
+      <div class="pp-presets">
+        <label class="pp-preset"><input type="radio" name="sh-mode" value="pct" ${a.partMode !== 'montant' ? 'checked' : ''}><span><b>En pourcentage</b><small>Chacun paie une part des coûts de la maison</small>
+          <span class="pp-in sh-in"><input type="number" inputmode="decimal" id="sh-pct" min="0" max="100" value="${esc(String(a.partPct ?? 50))}"><b>% pour toi</b></span></span></label>
+        <label class="pp-preset"><input type="radio" name="sh-mode" value="montant" ${a.partMode === 'montant' ? 'checked' : ''}><span><b>Montant fixe</b><small>L’autre personne verse le même montant chaque mois ; tu paies le reste</small>
+          <span class="pp-in sh-in"><input type="number" inputmode="decimal" id="sh-amt" min="0" step="50" value="${esc(String(a.partMontant ?? ''))}" placeholder="ex. 1500"><b>$ / mois</b></span></span></label>
+      </div>
+      <div class="modal-actions"><button class="btn" data-close>Annuler</button><button class="btn primary" id="sh-ok">Enregistrer</button></div>`, (m, close) => {
+      // Taper un montant ou un % choisit le mode correspondant
+      m.querySelector('#sh-pct').oninput = () => { m.querySelector('[name="sh-mode"][value="pct"]').checked = true; };
+      m.querySelector('#sh-amt').oninput = () => { m.querySelector('[name="sh-mode"][value="montant"]').checked = true; };
+      m.querySelector('#sh-ok').onclick = async () => {
+        const s = sc().a;
+        s.monNom = m.querySelector('#sh-me').value.trim() || 'Moi';
+        s.partNom = m.querySelector('#sh-other').value.trim() || 'Conjoint·e';
+        s.partMode = m.querySelector('[name="sh-mode"]:checked').value;
+        s.partPct = Math.max(0, Math.min(100, Number(m.querySelector('#sh-pct').value) || 0));
+        s.partMontant = m.querySelector('#sh-amt').value === '' ? '' : Math.max(0, Number(m.querySelector('#sh-amt').value));
+        await save();
+        close();
+        draw();
+        toast('👥 Parts mises à jour');
+      };
+    });
   }
 
   function chart(r) {

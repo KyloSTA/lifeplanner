@@ -60,7 +60,7 @@ const n = (v, d = 0) => (Number.isFinite(Number(v)) && v !== '' && v !== null ? 
 export const DEFAULTS = {
   // Général
   horizon: 5, apprMaison: 3, apprCondo: 2.5, rendement: 5, hausseLoyer: 3, inflation: 2.5, tauxMarginal: 37,
-  partPct: 50, partNom: 'Conjoint·e', liquidation: true,
+  partPct: 50, partNom: 'Conjoint·e', monNom: 'Moi', partMode: 'pct', partMontant: '', liquidation: true,
   // Maison visée (à remplir)
   prix: '', taxesMaison: '', assurMaison: 150, entretienMaison: 1, energie: 230,
   notaire: 2000, inspection: 800, demenagement: 2500, taxeBienvenue: '', epargne: 0, taux: 4.29, amort: 25,
