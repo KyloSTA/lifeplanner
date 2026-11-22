@@ -61,6 +61,8 @@ async function load() {
   return d;
 }
 const store = (d) => db.put('settings', d, KEY);
+// Ordre du menu : Réaliste, Prudent, Optimiste, puis les autres
+const scRank = (id, s) => (!s.base && (id === 'reel' || /r[ée]aliste/i.test(s.name)) ? 0 : s.base === 'prudent' || /prudent/i.test(s.name) ? 1 : s.base === 'optimiste' || /optimiste/i.test(s.name) ? 2 : 3);
 
 /* =========================================================
    Page
@@ -87,7 +89,7 @@ export async function renderPage(ctx, arg) {
     <header class="page-head">
       <div><p class="eyebrow">Projet</p><h1>🏡 Projet Propriété</h1><p class="muted pp-sub">${d.bien.adresse ? `Acheter la maison du ${esc(d.bien.adresse)}, ou la louer et garder le condo en location ?` : 'Acheter la maison visée (et vendre le condo), ou la louer et garder le condo en location ?'}</p><a class="pp-mini" href="#/propriete/dossier" title="Préparer le dossier pour louer à deux (preuves, lettre, caution)">🗂 Dossier de location</a></div>
       <div class="head-actions pp-scen">
-        <label class="pp-scen-pick">Scénario <select id="pp-scen" aria-label="Scénario">${Object.entries(d.scenarios).map(([k, s]) => `<option value="${k}" ${k === d.cur ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+        <label class="pp-scen-pick">Scénario <select id="pp-scen" aria-label="Scénario">${Object.entries(d.scenarios).sort(([ka, a], [kb, b]) => scRank(ka, a) - scRank(kb, b)).map(([k, s]) => `<option value="${k}" ${k === d.cur ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
         <button class="btn" id="pp-scen-new" title="Nouveau scénario (copie, prudent ou optimiste)">＋</button>
         <button class="btn icon" id="pp-reset" title="Remettre les 3 scénarios (Réaliste, Prudent, Optimiste) à leurs valeurs d’origine" aria-label="Réinitialiser les scénarios">↺</button>
         <button class="btn icon" id="pp-scen-more" title="Renommer, supprimer, importer, exporter" aria-label="Options du scénario">⋯</button>
@@ -656,16 +658,23 @@ export async function renderPage(ctx, arg) {
   const PEOPLE = ['monNom', 'partNom', 'partPct', 'partMode'];
   const isReal = ([id, s]) => !s.base && (id === 'reel' || /r[ée]aliste/i.test(s.name));
   const realEntry = () => Object.entries(d.scenarios).find(isReal) || Object.entries(d.scenarios).find(([, s]) => !s.base) || Object.entries(d.scenarios)[0];
-  const findBase = (b) => Object.entries(d.scenarios).find(([, s]) => s.base === b || (!s.base && new RegExp(b, 'i').test(s.name)));
+  const findBase = (b, skip) => Object.entries(d.scenarios).find(([id, s]) => id !== skip && (s.base === b || (!s.base && new RegExp(b, 'i').test(s.name))));
 
   /** Reset : le Réaliste revient à ses valeurs d'origine, Prudent et Optimiste sont recalculés à partir de lui. */
   async function resetScenario() {
     if (!(await confirmBox('Remettre les 3 scénarios (Réaliste, Prudent et Optimiste) à leurs valeurs d’origine ? Les changements faits depuis seront perdus (tes autres scénarios ne changent pas). Exporte-les d’abord (⋯) si tu veux les garder.', 'Réinitialiser'))) return;
-    const [rid, real] = realEntry();
+    // Le Réaliste : celui qu'on reconnaît (id « reel » ou nommé Réaliste) ; s'il n'existe plus, on le recrée (jamais à la place d'un autre)
+    let found = Object.entries(d.scenarios).find(isReal);
+    if (!found) {
+      const nid = d.scenarios.reel ? U.uid() : 'reel';
+      d.scenarios[nid] = { name: 'Réaliste', a: {} };
+      found = [nid, d.scenarios[nid]];
+    }
+    const [rid, real] = found;
     const keep = Object.fromEntries(PEOPLE.filter((k) => k in real.a).map((k) => [k, real.a[k]]));
     real.a = { ...(d.origin || {}), ...keep };
     for (const b of ['prudent', 'optimiste']) {
-      const e = findBase(b);
+      const e = findBase(b, rid);
       const a = { ...presetFrom(b, real.a), ...Object.fromEntries(PEOPLE.filter((k) => e && k in e[1].a).map((k) => [k, e[1].a[k]])) };
       if (e) Object.assign(e[1], { a, base: b });
       else d.scenarios[U.uid()] = { name: b === 'prudent' ? 'Prudent' : 'Optimiste', base: b, a };
