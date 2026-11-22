@@ -4,7 +4,7 @@
 // sa propre base, ses propres fichiers (page, manifeste, icônes) et le code commun via « base » (« ../ »).
 const CFG = self.LP_SW || {};
 const PREFIX = CFG.cache || 'lifeplanner';
-const CACHE = 'lifeplanner-v181'.replace('lifeplanner', PREFIX);
+const CACHE = 'lifeplanner-v182'.replace('lifeplanner', PREFIX);
 const BASE = CFG.base || '';
 const OWN = CFG.own || ['./', 'index.html', 'widget.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/logo.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 const SHARED = [
