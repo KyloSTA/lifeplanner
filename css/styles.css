@@ -3488,3 +3488,19 @@ html:fullscreen #habit-root { top: 16px; }
 .nc-img.nc-site { display: grid; place-items: center; align-content: center; gap: 6px; background: radial-gradient(circle at 50% 40%, var(--surface-2, #222), var(--surface)); min-height: 96px; }
 .nc-img.nc-site img { width: 48px; height: 48px; object-fit: contain; border-radius: 10px; }
 .nc-img.nc-site small { font-weight: 700; color: var(--muted); }
+
+/* Missions : prioritaire et urgente */
+.chip.prio-chip { background: color-mix(in srgb, var(--gold, #c9a24a) 20%, transparent); color: var(--gold-text, #b8913d); border-color: transparent; font-weight: 700; }
+.chip.urgent-chip { background: color-mix(in srgb, #dc2626 18%, transparent); color: #ef4444; border-color: transparent; font-weight: 700; }
+.task.is-prio > .task-row { box-shadow: inset 3px 0 0 var(--gold, #c9a24a); }
+.task.is-urgent > .task-row { box-shadow: inset 3px 0 0 #dc2626; }
+.tm-flags { display: flex; gap: 8px; margin: 4px 0 10px; }
+.tm-flag { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.tm-flag.on { background: color-mix(in srgb, var(--gold, #c9a24a) 22%, transparent); border-color: var(--gold, #c9a24a); color: var(--text); }
+.tm-flag.urgent.on { background: color-mix(in srgb, #dc2626 20%, transparent); border-color: #dc2626; }
+
+/* Mini-menu du haut : il reste Lanceur et Espace vidéo -> icônes plus grandes ; la synchro est en bas, à côté du plein écran */
+.rail .brand-tools .brand-ico { width: 40px; height: 40px; border-radius: 11px; }
+.rail .brand-tools .brand-ico svg { width: 22px; height: 22px; }
+.rail-fs.sync-dot i { width: 12px; height: 12px; }
+@media (max-width: 900px) { .rail .brand-tools .brand-ico { width: 36px; height: 36px; } .rail .brand-tools .brand-ico svg { width: 20px; height: 20px; } }

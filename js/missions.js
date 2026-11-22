@@ -3,7 +3,7 @@
 
 import { db } from './db.js';
 import * as U from './util.js';
-import { taskHTML, bindTaskList, addTask, loadGoals, deleteTask, trashList, restoreTask, purgeTasks } from './tasks.js';
+import { taskHTML, prioRank, bindTaskList, addTask, loadGoals, deleteTask, trashList, restoreTask, purgeTasks } from './tasks.js';
 import * as couple from './couple.js';
 
 const { esc, iso } = U;
@@ -132,7 +132,7 @@ export async function renderPage(ctx) {
     // App couple : missions de qui
     if (couple.ON && state.who) list = list.filter((t) => (state.who === 'me' ? couple.isMine(t) : state.who === 'both' ? !t.who : t.who === state.who));
     if (nq) list = list.filter((t) => `${t.title} ${t.notes || ''} ${(t.subtasks || []).map((s) => s.title).join(' ')}`.toLowerCase().includes(nq));
-    const sortM = (a, b) => a.done - b.done || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
+    const sortM = (a, b) => a.done - b.done || prioRank(b) - prioRank(a) || (a.date || '9999').localeCompare(b.date || '9999') || (a.order ?? 1e15) - (b.order ?? 1e15) || a.createdAt - b.createdAt;
     list.sort(state.f === 'done' ? (a, b) => (b.doneAt || b.createdAt) - (a.doneAt || a.createdAt) : sortM);
 
     const groups = new Map();
