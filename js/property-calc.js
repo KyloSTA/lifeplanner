@@ -61,6 +61,7 @@ export const DEFAULTS = {
   // Général
   horizon: 5, apprMaison: 3, apprCondo: 2.5, rendement: 5, hausseLoyer: 3, inflation: 2.5, tauxMarginal: 37,
   partPct: 50, partNom: 'Conjoint·e', monNom: 'Moi', partMode: 'pct', partMontant: '', liquidation: true,
+  condoProprio: 'part', // à qui appartient le condo : 'moi' ou 'part' (l'autre personne)
   // Maison visée (à remplir)
   prix: '', taxesMaison: '', assurMaison: 150, entretienMaison: 1, energie: 230,
   notaire: 2000, inspection: 800, demenagement: 2500, taxeBienvenue: '', epargne: 0, taux: 4.29, amort: 25,
@@ -126,8 +127,8 @@ export function compute(input) {
   // Simulation mois par mois
   const st = {
     achat: { bal: loan, inv: leftoverAchat, cum: 0 },
-    bail: { bal: solde, inv: n(a.epargne), cum: 0, pay: payCondo0, rate: tauxCondo },
-    chambres: { bal: solde, inv: n(a.epargne) - n(a.meubles), cum: 0, pay: payCondo0, rate: tauxCondo },
+    bail: { bal: solde, inv: n(a.epargne), cum: 0, pay: payCondo0, rate: tauxCondo, profit: 0, cash: 0, capital: 0 },
+    chambres: { bal: solde, inv: n(a.epargne) - n(a.meubles), cum: 0, pay: payCondo0, rate: tauxCondo, profit: 0, cash: 0, capital: 0 },
   };
   // Départ des options location : déménagement payé aussi
   st.bail.inv -= n(a.demenagement); st.chambres.inv -= n(a.demenagement);
@@ -139,7 +140,7 @@ export function compute(input) {
   for (let m = 1; m <= months; m++) {
     const y = Math.floor((m - 1) / 12); // année 0, 1, 2…
     const g = Math.pow(1 + infl, y), gl = Math.pow(1 + n(a.hausseLoyer) / 100, y);
-    const out = {}, det = {};
+    const out = {}, det = {}, loc = {};
 
     // Achat
     {
@@ -176,9 +177,13 @@ export function compute(input) {
         hypothequeCondo: s.bal + princ > 0 ? s.pay : 0, fraisCondo: frais, taxesCondo: taxes, assurCondo: assur, entretienCondo: entretien,
         services, gestion, revenu: -revenu, impot,
       };
+      // Profits du condo loué (pour sa propriétaire) : revenu imposable, impôt, liquidités après le paiement complet
+      const depenses = frais + taxes + assur + entretien + services + gestion;
+      loc[id] = { revenu, interet: interest, capital: princ, depenses, netLoc, impot, apresImpot: netLoc - impot, cash: revenu - depenses - (s.bal + princ > 0 ? s.pay : 0) - impot };
+      s.profit += netLoc - impot; s.cash += loc[id].cash; s.capital += princ;
       det[id] = d; out[id] = sum(d);
     }
-    if (m === 1) month1 = { out: { ...out }, det: JSON.parse(JSON.stringify(det)) };
+    if (m === 1) month1 = { out: { ...out }, det: JSON.parse(JSON.stringify(det)), loc: JSON.parse(JSON.stringify(loc)) };
 
     // Le même argent sort de tes poches : la différence est placée dans l'option la moins chère
     const max = Math.max(...Object.values(out));
@@ -207,7 +212,7 @@ export function compute(input) {
     const impotGain = a.liquidation ? gain * (1 - exempt) * 0.5 * mt : 0;
     for (const id of ['bail', 'chambres']) {
       const s = st[id];
-      res[id] = { valeur: cv, solde: s.bal, impotGain, equite: cv - s.bal - saleCost(cv) - impotGain, placements: s.inv, cumul: s.cum };
+      res[id] = { valeur: cv, solde: s.bal, impotGain, equite: cv - s.bal - saleCost(cv) - impotGain, placements: s.inv, cumul: s.cum, profit: s.profit, cash: s.cash, capital: s.capital };
       res[id].patrimoine = res[id].equite + res[id].placements;
     }
     return res;
