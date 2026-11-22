@@ -274,7 +274,22 @@ new MutationObserver(() => { if (document.querySelector('img[data-img]:not([src]
   .observe(document.body, { childList: true, subtree: true });
 document.addEventListener('click', (e) => {
   const img = e.target.closest?.('.n-img img');
-  if (img?.src) images.zoom(img.src);
+  if (img?.src) {
+    // Dans une note : « ✏️ Annoter » remplace l'image de la note par sa version annotée
+    const old = img.dataset.img, nid = (location.hash.match(/^#\/note\/([^/?]+)/) || [])[1];
+    images.zoom(img.src, old && nid ? {
+      onAnnotate: async (blob) => {
+        await images.replaceWith(old, blob, async (newId) => {
+          const n = await db.get('notes', nid);
+          if (!n) return;
+          n.body = n.body.split(`(img:${old})`).join(`(img:${newId})`);
+          await brain.saveNote(n);
+        });
+        toast('✏️ Image annotée');
+        router();
+      },
+    } : {});
+  }
   // Documents joints : un clic ouvre le PDF (ou télécharge le fichier Word, EPUB…)
   const d = e.target.closest?.('[data-doc-open]');
   if (d) { e.preventDefault(); e.stopPropagation(); docs.open(d.dataset.docOpen).catch((err) => toast(err.message, 'err')); }
