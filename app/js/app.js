@@ -267,7 +267,7 @@ function openTaskFromSearch(id) {
   const obs = new MutationObserver(() => { if (!root.children.length) { obs.disconnect(); if (changed && !document.body.classList.contains('ink-mode')) router(); } });
   obs.observe(root, { childList: true });
 }
-$('#brand-search')?.addEventListener('click', () => openSearch());
+$('#gs-fab')?.addEventListener('click', () => openSearch());
 
 /* ---------- 🟢 Pastille de synchro (à côté du logo sur PC, sur « Plus » sur cellulaire) ---------- */
 function syncState() {
@@ -304,7 +304,6 @@ $('#sync-dot')?.addEventListener('click', syncDotClick);
 drawSyncDot();
 
 $('#qa-fab')?.addEventListener('click', () => openQuickAdd());
-$('#brand-add')?.addEventListener('click', () => openQuickAdd());
 $('#brand-video')?.addEventListener('click', () => videodock.toggle());
 videodock.start(); // remet le dock vidéo tel qu'il était
 // ↑ Remonter en haut : un bouton apparaît quand on a défilé ; toucher l'onglet déjà ouvert du menu fait la même chose
@@ -3637,7 +3636,7 @@ $('#rail-more').onclick = () => {
     const on = b.classList.contains('active');
     return `<a href="${href}" data-close class="${on ? 'active' : ''}">${b.querySelector('svg').outerHTML}<span>${esc(b.getAttribute('aria-label'))}</span></a>`;
   }).join('');
-  const search = `<a href="#" data-gs>${$('#brand-search svg').outerHTML}<span>Rechercher</span></a><a href="#" data-vd>${$("#brand-video svg").outerHTML}<span>${videodock.isOpen() ? "Fermer l’espace vidéo" : "Espace vidéo"}</span></a>`;
+  const search = `<a href="#" data-gs>${$('#gs-fab svg').outerHTML}<span>Rechercher</span></a><a href="#" data-vd>${$("#brand-video svg").outerHTML}<span>${videodock.isOpen() ? "Fermer l’espace vidéo" : "Espace vidéo"}</span></a>`;
   const ss = syncState();
   modal(`<h2>Plus</h2><button type="button" class="more-sync" data-s="${ss.c}" data-sync><i></i><span>${esc(ss.t)}</span></button><nav class="more-sheet">${search}${launch}${links.map((a) => {
     const route = a.dataset.route;
