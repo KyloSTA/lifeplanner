@@ -65,6 +65,7 @@ export async function renderPage(ctx, arg) {
   let d = await load();
   const sc = () => d.scenarios[d.cur];
   const A = () => ({ ...DEFAULTS, ...sc().a });
+  const pctOf = (a) => Math.max(0, Math.min(100, Number(a.partPct ?? 50)));
   const save = async () => { await store(d); };
 
   // 🗂 Sous-page « Dossier de location » (#/propriete/dossier)
@@ -131,15 +132,10 @@ export async function renderPage(ctx, arg) {
     const last = r.years[r.years.length - 1];
     const sorted = [...OPTIONS].sort((x, y) => last[y.id].patrimoine - last[x.id].patrimoine);
     const best = sorted[0], second = sorted[1];
-    const share = (id, v) => {
-      // Coûts de la maison partagés selon les parts ; le condo (et ses revenus) reste à toi
-      const det = r.month1.det[id];
-      const houseCost = id === 'achat' ? det.hypotheque + det.taxes + det.assurance + det.entretien + det.energie : det.loyer + det.assurLocataire + det.energie;
-      // Part de l'autre personne : un % des coûts de la maison, ou un montant fixe par mois (jamais plus que ces coûts)
-      const autre = r.a.partMode === 'montant'
-        ? Math.min(houseCost, Math.max(0, Number(r.a.partMontant) || 0))
-        : houseCost * (1 - (Number(r.a.partPct) || 0) / 100);
-      return { moi: v - autre, autre };
+    // Tout est calculé pour le couple ; le coût net total se partage selon la part de chacun (%)
+    const share = (v) => {
+      const pct = pctOf(r.a);
+      return { moi: v * pct / 100, autre: v * (100 - pct) / 100 };
     };
     body.innerHTML = `${warnBox(r)}
       <section class="card pp-horizon">
@@ -159,12 +155,12 @@ export async function renderPage(ctx, arg) {
         })()}
       </section>
       <div class="pp-cards">${OPTIONS.map((o) => {
-        const y1 = r.month1.out[o.id], s = share(o.id, y1), L = last[o.id];
+        const y1 = r.month1.out[o.id], s = share(y1), L = last[o.id];
         const isBest = o.id === best.id;
         return `<section class="card pp-card ${isBest ? 'best' : ''}" style="--oc:${o.color}">
           <div class="pp-card-head"><span class="pp-ico">${o.icon}</span><h3>${esc(o.name)}</h3>${isBest ? '<span class="pp-badge">🏆 Meilleur</span>' : ''}</div>
           <div class="pp-big"><small>Coût net par mois (an 1)</small><b>${money(y1)}</b></div>
-          <button type="button" class="pp-share pp-share-btn" data-share title="Modifier les noms et la part de chacun">${esc(r.a.monNom || 'Moi')} ≈ <b>${money(s.moi)}</b> · ${esc(r.a.partNom || 'Conjoint·e')} ≈ <b>${money(s.autre)}</b> <span aria-hidden="true">✎</span></button>
+          <button type="button" class="pp-share pp-share-btn" data-share title="Modifier les noms et la part de chacun">${esc(r.a.monNom || 'Moi')} ${pctOf(r.a)} % ≈ <b>${money(s.moi)}</b> · ${esc(r.a.partNom || 'Conjoint·e')} ${100 - pctOf(r.a)} % ≈ <b>${money(s.autre)}</b> <span aria-hidden="true">✎</span></button>
           <div class="pp-big"><small>Patrimoine dans ${r.N} an${r.N > 1 ? 's' : ''}</small><b>${money(L.patrimoine)}</b></div>
           <p class="muted pp-share">${isBest ? 'Option la plus avantageuse' : `${signed(L.patrimoine - last[best.id].patrimoine)} vs la meilleure`}</p>
         </section>`;
@@ -205,32 +201,34 @@ export async function renderPage(ctx, arg) {
     body.querySelectorAll('[data-share]').forEach((b) => (b.onclick = () => editShare()));
   }
 
-  /* ---------- Qui paie quoi : noms et part de chacun (% des coûts de la maison ou montant fixe) ---------- */
+  /* ---------- Qui paie quoi : le couple est une seule entité ; seule la part de chacun (%) change ---------- */
   function editShare() {
     const a = A();
+    const p = pctOf(a);
     modal(`<h2>Qui paie quoi</h2>
-      <p class="muted small" style="margin-top:0">Les coûts de la maison (hypothèque ou loyer, taxes, assurance, énergie) se partagent. Le condo et ses revenus restent à ${esc(a.monNom || 'toi')}.</p>
+      <p class="muted small" style="margin-top:0">Tout est calculé pour le couple : maison, condo, revenus et impôts. Le coût net de chaque option se partage selon vos parts.</p>
       <div class="pp-fields">
         <label class="pp-field"><span class="pp-lbl">Ton prénom</span><span class="pp-in"><input id="sh-me" value="${esc(a.monNom === 'Moi' ? '' : a.monNom || '')}" placeholder="Moi"></span></label>
         <label class="pp-field"><span class="pp-lbl">L’autre personne</span><span class="pp-in"><input id="sh-other" value="${esc(a.partNom === 'Conjoint·e' ? '' : a.partNom || '')}" placeholder="Conjoint·e"></span></label>
+        <label class="pp-field"><span class="pp-lbl" id="sh-me-l">Part de ${esc(a.monNom || 'Moi')}</span><span class="pp-in"><input type="number" inputmode="decimal" id="sh-pct" min="0" max="100" step="5" value="${p}"><b>%</b></span></label>
+        <label class="pp-field"><span class="pp-lbl" id="sh-other-l">Part de ${esc(a.partNom || 'Conjoint·e')}</span><span class="pp-in"><input type="number" inputmode="decimal" id="sh-pct2" min="0" max="100" step="5" value="${100 - p}"><b>%</b></span></label>
       </div>
-      <div class="pp-presets">
-        <label class="pp-preset"><input type="radio" name="sh-mode" value="pct" ${a.partMode !== 'montant' ? 'checked' : ''}><span><b>En pourcentage</b><small>Chacun paie une part des coûts de la maison</small>
-          <span class="pp-in sh-in"><input type="number" inputmode="decimal" id="sh-pct" min="0" max="100" value="${esc(String(a.partPct ?? 50))}"><b>% pour toi</b></span></span></label>
-        <label class="pp-preset"><input type="radio" name="sh-mode" value="montant" ${a.partMode === 'montant' ? 'checked' : ''}><span><b>Montant fixe</b><small>L’autre personne verse le même montant chaque mois ; tu paies le reste</small>
-          <span class="pp-in sh-in"><input type="number" inputmode="decimal" id="sh-amt" min="0" step="50" value="${esc(String(a.partMontant ?? ''))}" placeholder="ex. 1500"><b>$ / mois</b></span></span></label>
-      </div>
+      <input type="range" id="sh-range" min="0" max="100" step="5" value="${p}" aria-label="Répartition" style="width:100%;margin:6px 0 2px">
       <div class="modal-actions"><button class="btn" data-close>Annuler</button><button class="btn primary" id="sh-ok">Enregistrer</button></div>`, (m, close) => {
-      // Taper un montant ou un % choisit le mode correspondant
-      m.querySelector('#sh-pct').oninput = () => { m.querySelector('[name="sh-mode"][value="pct"]').checked = true; };
-      m.querySelector('#sh-amt').oninput = () => { m.querySelector('[name="sh-mode"][value="montant"]').checked = true; };
+      const one = m.querySelector('#sh-pct'), two = m.querySelector('#sh-pct2'), rg = m.querySelector('#sh-range');
+      const clamp = (v) => Math.max(0, Math.min(100, Number(v) || 0));
+      const set = (v) => { v = clamp(v); one.value = v; two.value = Math.round((100 - v) * 100) / 100; rg.value = v; };
+      one.oninput = () => set(one.value);
+      two.oninput = () => { const v = 100 - clamp(two.value); one.value = v; rg.value = v; };
+      rg.oninput = () => set(rg.value);
+      m.querySelector('#sh-me').oninput = (e) => { m.querySelector('#sh-me-l').textContent = `Part de ${e.target.value.trim() || 'Moi'}`; };
+      m.querySelector('#sh-other').oninput = (e) => { m.querySelector('#sh-other-l').textContent = `Part de ${e.target.value.trim() || 'Conjoint·e'}`; };
       m.querySelector('#sh-ok').onclick = async () => {
         const s = sc().a;
         s.monNom = m.querySelector('#sh-me').value.trim() || 'Moi';
         s.partNom = m.querySelector('#sh-other').value.trim() || 'Conjoint·e';
-        s.partMode = m.querySelector('[name="sh-mode"]:checked').value;
-        s.partPct = Math.max(0, Math.min(100, Number(m.querySelector('#sh-pct').value) || 0));
-        s.partMontant = m.querySelector('#sh-amt').value === '' ? '' : Math.max(0, Number(m.querySelector('#sh-amt').value));
+        s.partMode = 'pct';
+        s.partPct = clamp(one.value);
         await save();
         close();
         draw();
@@ -401,7 +399,7 @@ export async function renderPage(ctx, arg) {
       <section class="card"><div class="card-head"><h2>👥 Ménage et impôts</h2></div>
         <div class="pp-fields">
           ${field('tauxMarginal', 'Ton taux d’imposition marginal', { suf: '%', hint: 'Québec + fédéral, environ 37 % à 48 % selon ton revenu' })}
-          ${field('partPct', 'Ta part des coûts de la maison', { suf: '%', hint: 'Le reste est payé par l’autre personne. Le condo et ses revenus restent à toi.' })}
+          ${field('partPct', 'Ta part du coût net du couple', { suf: '%', hint: 'Tout est calculé pour le couple ; le reste est payé par l’autre personne.' })}
           <label class="pp-field"><span class="pp-lbl">Nom de l’autre personne</span><span class="pp-in"><input type="text" id="pp-partnom" value="${esc(sc().a.partNom ?? DEFAULTS.partNom)}"></span></label>
           ${check('liquidation', 'Patrimoine « si tout était vendu » (frais de vente et impôt déduits)')}
           ${check('art452', 'Condo loué : garder le statut de résidence principale jusqu’à 4 ans (choix 45(2))', 'Possible quand tu n’as pas d’autre résidence principale — le cas si tu loues la maison. À confirmer avec un comptable.')}
