@@ -3053,6 +3053,13 @@ async function renderSettings() {
   view.innerHTML = `
     <header class="page-head"><div><p class="eyebrow">Configuration</p><h1>Réglages</h1></div></header>
     <div class="settings">
+      <section class="card">
+        <div class="card-head"><h2>Apparence</h2></div>
+        <select id="theme" style="width:auto">
+          <option value="">Selon Windows</option><option value="light">Clair</option><option value="dark">Sombre</option>
+        </select>
+      </section>
+
       ${couple.ON ? `<section class="card" id="cp-card"><div class="card-head"><h2>👫 Vous deux</h2><button class="btn" id="cp-edit" type="button">Modifier</button></div>
         <p class="muted" style="margin:0">${esc(couple.nameOf('a'))} et ${esc(couple.nameOf('b'))} · sur cet appareil : <b>${couple.me() ? esc(couple.nameOf(couple.me())) : 'à choisir'}</b>. Les deux utilisez le même compte Google : connectez-vous avec lui dans Synchronisation et Google Agenda.</p></section>` : ''}
       <section class="card">
@@ -3133,12 +3140,6 @@ async function renderSettings() {
         <ol class="nav-order" id="nav-order"></ol>
       </section>
 
-      <section class="card">
-        <div class="card-head"><h2>Apparence</h2></div>
-        <select id="theme" style="width:auto">
-          <option value="">Selon Windows</option><option value="light">Clair</option><option value="dark">Sombre</option>
-        </select>
-      </section>
       <p class="muted legal-links"><a href="${APP.couple ? '../' : ''}privacy.html" target="_blank" rel="noopener">Règles de confidentialité</a> · <a href="${APP.couple ? '../' : ''}terms.html" target="_blank" rel="noopener">Conditions d’utilisation</a></p>
     </div>`;
 
