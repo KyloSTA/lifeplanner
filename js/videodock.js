@@ -48,11 +48,13 @@ function draw({ autoplay = false } = {}) {
     <div class="vd-body">${v ? `<div class="vd-frame"><iframe id="vd-iframe" src="https://www.youtube-nocookie.com/embed/${esc(v.id)}?rel=0&modestbranding=1&enablejsapi=1&playsinline=1${v.start ? '&start=' + Math.floor(v.start) : ''}${autoplay ? '&autoplay=1' : ''}&origin=${encodeURIComponent(location.origin)}"
         title="Lecteur vidéo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
       <div class="vd-foot"><span class="muted" id="vd-at">${v.start ? `Reprise à ${fmt(v.start)}` : ''}</span><a href="https://www.youtube.com/watch?v=${esc(v.id)}${v.start ? '&t=' + Math.floor(v.start) + 's' : ''}" target="_blank" rel="noopener" class="vd-link">Ouvrir sur YouTube ↗</a></div>`
-      : `<div class="vd-empty"><b>Place réservée</b><p>Glisse ici ta fenêtre « image dans l'image », ou lance une vidéo de ton Cerveau avec <b>▶</b> sur sa carte.</p></div>`}</div>`;
+      : `<div class="vd-empty"><b>Place réservée</b><p>Glisse ici ta fenêtre « image dans l'image », ou lance une vidéo de ton Cerveau avec <b>▶</b> sur sa carte.</p></div>`}</div><span class="vd-grip" title="Glisser pour redimensionner" aria-hidden="true"></span>`;
   d.querySelectorAll('[data-w]').forEach((b) => (b.onclick = () => { st.w = b.dataset.w; save(); draw(); }));
   d.querySelector('[data-act="min"]').onclick = () => { st.min = !st.min; save(); draw(); };
   d.querySelector('[data-act="close"]').onclick = () => close();
   d.querySelector('[data-act="eject"]')?.addEventListener('click', () => { st.v = null; save(); draw(); });
+  bindFloat(d);
+  placeFloat();
   // Le lecteur YouTube envoie l'heure de lecture : on la garde pour reprendre au même endroit
   const f = d.querySelector('#vd-iframe');
   if (f) f.addEventListener('load', () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'vdock' }), '*'); } catch { /* ignore */ } });
@@ -89,3 +91,65 @@ export function start() {
   if (st.open) draw();
   addEventListener('beforeunload', save);
 }
+
+/* ---------- Carte flottante (fenêtre verticale) : on la déplace par son titre et on la redimensionne par le coin ---------- */
+const FLOAT_MQ = matchMedia('(orientation: portrait) and (min-width: 601px)');
+const isFloat = () => FLOAT_MQ.matches;
+const MIN_W = 240;
+
+/** Applique la position/taille gardées (st.f = { x, y, w }), en restant dans l'écran. */
+function placeFloat() {
+  const d = document.getElementById('vdock');
+  if (!d) return;
+  const free = st.open && isFloat() && st.f;
+  document.body.classList.toggle('vdock-free', !!free);
+  if (!free) { d.style.left = d.style.top = d.style.width = d.style.right = d.style.bottom = ''; return; }
+  const w = Math.max(MIN_W, Math.min(st.f.w || 400, innerWidth - 16));
+  d.style.width = st.min ? '' : w + 'px';
+  d.style.right = d.style.bottom = 'auto';
+  const r = d.getBoundingClientRect();
+  const x = Math.max(8, Math.min(st.f.x, innerWidth - r.width - 8));
+  const y = Math.max(8, Math.min(st.f.y, innerHeight - Math.min(r.height, innerHeight - 16) - 8));
+  d.style.left = x + 'px';
+  d.style.top = y + 'px';
+}
+
+function bindFloat(d) {
+  const head = d.querySelector('.vd-head');
+  const grip = d.querySelector('.vd-grip');
+  const drag = (e, onMove) => {
+    if (!isFloat() || e.button > 0) return;
+    e.preventDefault();
+    const r = d.getBoundingClientRect();
+    st.f = { w: st.f?.w || (st.min ? 400 : r.width), x: r.left, y: r.top };
+    const sx = e.clientX, sy = e.clientY, start = { ...st.f };
+    d.classList.add('vd-moving');
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    const move = (ev) => { onMove(ev.clientX - sx, ev.clientY - sy, start); placeFloat(); };
+    const up = () => {
+      d.classList.remove('vd-moving');
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', up);
+      save();
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
+  };
+  head?.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button, a')) return;
+    drag(e, (dx, dy, s) => { st.f.x = s.x + dx; st.f.y = s.y + dy; });
+  });
+  // Double-clic sur le titre : remettre la carte à sa place (coin en bas à droite)
+  head?.addEventListener('dblclick', (e) => {
+    if (e.target.closest('button, a') || !isFloat()) return;
+    st.f = null; save(); placeFloat();
+  });
+  grip?.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    drag(e, (dx, dy, s) => { st.f.w = Math.max(MIN_W, Math.min(s.w + Math.max(dx, dy * 16 / 9), innerWidth - s.x - 8)); });
+  });
+}
+FLOAT_MQ.addEventListener?.('change', placeFloat);
+addEventListener('resize', () => { if (st.open && st.f) placeFloat(); });

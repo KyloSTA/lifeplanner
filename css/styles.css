@@ -3343,3 +3343,19 @@ body.an-open { overflow: hidden; }
   .tb-title { opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .app { margin-top: env(titlebar-area-height, 33px); height: calc(100% - env(titlebar-area-height, 33px)); }
 }
+
+/* 📺 Carte vidéo flottante : déplacer (titre) et redimensionner (coin) */
+.vd-grip { display: none; }
+@media (orientation: portrait) and (min-width: 601px) {
+  #vdock .vd-head { cursor: grab; touch-action: none; user-select: none; }
+  #vdock.vd-moving .vd-head { cursor: grabbing; }
+  #vdock.vd-moving iframe { pointer-events: none; }
+  .vd-grip { display: block; position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; border-radius: 0 0 12px 0;
+    background: linear-gradient(135deg, transparent 50%, var(--muted) 50%, var(--muted) 58%, transparent 58%, transparent 70%, var(--muted) 70%, var(--muted) 78%, transparent 78%); opacity: .7; }
+  .vd-grip:hover { opacity: 1; }
+  body.vdock-min .vd-grip { display: none; }
+  /* Une fois déplacée, la carte ne réserve plus d'espace en bas de la page */
+  body.vdock-free.vdock-on:not(.vdock-min) main { padding-bottom: 0 !important; }
+  body.vdock-free.vdock-on #qa-fab { bottom: 24px; }
+  body.vdock-free.vdock-on #to-top { bottom: 92px; }
+}
