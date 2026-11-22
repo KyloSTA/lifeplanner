@@ -385,7 +385,7 @@ export async function renderPage(ctx) {
       ? `<div class="hb-embed-head"><div><h2>🔁 Habitudes</h2><p class="muted">Chaque habitude complétée donne +${game.XP.habit} XP à ton héros.</p></div><button class="btn primary" id="hb-new">+ Nouvelle habitude</button></div>`
       : `<header class="page-head">
       <div><p class="eyebrow">Suivi quotidien</p><h1>Habitudes</h1></div>
-      <div class="head-actions"><button class="btn primary" id="hb-new">+ Nouvelle habitude</button></div>
+      <div class="head-actions"><label class="btn" title="Ajouter des habitudes depuis un fichier .json (sans rien effacer)">⤓ Importer<input type="file" id="hb-imp" accept="application/json,.json" hidden></label><button class="btn primary" id="hb-new">+ Nouvelle habitude</button></div>
     </header>`}
     ${perm === 'default' ? `<div class="card hb-perm"><span>🔔 Autorise les notifications pour recevoir tes rappels d’habitudes, même quand Life Planner est en arrière-plan.</span><button class="btn primary" id="hb-perm">Autoriser</button></div>` : ''}
     ${perm === 'denied' ? `<p class="hint muted">🔕 Les notifications sont bloquées : les rappels s’affichent seulement dans l’app. Pour les activer, clique le cadenas à côté de l’adresse → Notifications → Autoriser.</p>` : ''}
@@ -407,6 +407,28 @@ export async function renderPage(ctx) {
   bindChips(todayEl, day, redraw);
 
   view.querySelector('#hb-new').onclick = () => editor(ctx, null, redraw);
+  // Importer des habitudes d'un fichier { habits: [{ name, emoji, times, target, days }] } : ajoutées, rien n'est effacé, pas de doublon de nom
+  view.querySelector('#hb-imp')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      const rows = Array.isArray(data) ? data : data.habits;
+      if (!Array.isArray(rows) || !rows.length) throw new Error('aucune habitude dans le fichier');
+      const have = new Set(all.map((h) => h.name.trim().toLowerCase()));
+      let n = 0;
+      for (const r of rows) {
+        if (!r?.name || have.has(String(r.name).trim().toLowerCase())) continue;
+        const times = (Array.isArray(r.times) ? r.times : []).filter((t) => /^\d{1,2}:\d{2}$/.test(t));
+        const days = Array.isArray(r.days) && r.days.length ? r.days.map(Number).filter((d) => d >= 0 && d <= 6) : undefined;
+        await create({ name: String(r.name), emoji: r.emoji || '✅', times, target: Number(r.target) || 1, ...(days ? { days } : {}) });
+        have.add(String(r.name).trim().toLowerCase());
+        n++;
+      }
+      toast(n ? `🔁 ${n} habitude${n > 1 ? 's' : ''} ajoutée${n > 1 ? 's' : ''}` : 'Ces habitudes existent déjà');
+      redraw();
+    } catch (err) { toast('Import impossible : ' + err.message, 'err'); }
+  });
   view.querySelector('#hb-perm')?.addEventListener('click', async () => { try { await Notification.requestPermission(); } catch { /* ignore */ } redraw(); });
   view.querySelectorAll('[data-sugg]').forEach((b) => (b.onclick = async () => {
     const [emoji, name, times, target] = SUGGESTIONS[Number(b.dataset.sugg)];
