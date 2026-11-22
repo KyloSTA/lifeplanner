@@ -397,7 +397,12 @@ export async function renderPage(ctx, arg) {
     if (!bar || !st.on) return;
     if (st.perm !== 'granted') {
       bar.innerHTML = `<div class="fi-autobar warn">📁 Import auto : Edge demande de confirmer l’accès au dossier « ${esc(st.name)} ». <button class="btn sm-text" id="fi-perm">Autoriser et vérifier</button></div>`;
-      bar.querySelector('#fi-perm').onclick = async () => { const r = await autoImport({ ask: true }); afterAuto(ctx, r, () => renderPage(ctx)); };
+      bar.querySelector('#fi-perm').onclick = async (e) => {
+        e.target.disabled = true; e.target.textContent = 'Vérification…';
+        try { afterAuto(ctx, await autoImport({ ask: true }), () => renderPage(ctx)); }
+        catch (err) { ctx.toast('Import auto : ' + (err?.message || 'erreur'), 'err'); }
+        finally { if (e.target.isConnected) { e.target.disabled = false; e.target.textContent = 'Autoriser et vérifier'; } }
+      };
       return;
     }
     const r = await autoImport();
@@ -900,8 +905,10 @@ async function chooseDir() {
 export async function autoImport({ ask = false } = {}) {
   const h = await db.get('cache', DIR_KEY).catch(() => null);
   if (!h) return null;
-  let perm = await h.queryPermission({ mode: 'read' }).catch(() => 'denied');
-  if (perm !== 'granted' && ask) perm = await h.requestPermission({ mode: 'read' }).catch(() => 'denied');
+  // Edge reste parfois sans répondre pour un dossier enregistré : on n'attend jamais indéfiniment
+  const wait = (p, ms, v) => Promise.race([p.catch(() => 'denied'), new Promise((r) => setTimeout(() => r(v), ms))]);
+  let perm = ask ? await wait(h.requestPermission({ mode: 'read' }), 15000, 'stuck') : await wait(h.queryPermission({ mode: 'read' }), 2000, 'prompt');
+  if (perm === 'stuck' || (ask && perm !== 'granted')) return { needPick: true, name: h.name };
   if (perm !== 'granted') return { needPermission: true };
   const seen = (await db.get('cache', SEEN_KEY)) || {};
   const files = [];
@@ -922,6 +929,17 @@ export async function autoImport({ ask = false } = {}) {
 }
 function afterAuto(ctx, r, redraw) {
   if (!r) return;
+  if (r.needPick) { // l'autorisation n'a pas marché : rechoisir le dossier redonne l'accès à coup sûr
+    const bar = document.querySelector('#fi-autobar');
+    if (bar) {
+      bar.innerHTML = `<div class="fi-autobar warn">📁 Edge n’a pas donné l’accès au dossier « ${esc(r.name || '')} ». Choisis-le à nouveau pour réactiver l’import auto. <button class="btn sm-text" id="fi-repick">📁 Choisir le dossier</button></div>`;
+      bar.querySelector('#fi-repick').onclick = async () => {
+        try { await chooseDir(); afterAuto(ctx, await autoImport({ ask: true }), redraw); } catch (err) { if (err?.name !== 'AbortError') ctx.toast(err.message || 'Impossible', 'err'); }
+      };
+    }
+    ctx.toast('Accès au dossier non accordé : rechoisis le dossier', 'err');
+    return;
+  }
   if (r.needPermission) { ctx.toast('Accès au dossier refusé : l’import auto attendra ton autorisation', 'err'); return; }
   ctx.toast(r.files ? `📁 ${r.files} relevé${r.files > 1 ? 's' : ''} importé${r.files > 1 ? 's' : ''} automatiquement · ${r.added} nouvelle${r.added > 1 ? 's' : ''} transaction${r.added > 1 ? 's' : ''}` : '📁 Aucun nouveau relevé dans le dossier');
   redraw();
