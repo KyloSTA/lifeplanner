@@ -3424,3 +3424,12 @@ html:fullscreen #habit-root { top: 16px; }
 /* Aujourd'hui : boutons du haut en icônes seulement (le nom est dans l'infobulle) */
 .head-ico { min-width: 42px; padding: 0 10px; font-size: 18px; justify-content: center; }
 .head-ico[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.sk-head { flex-wrap: wrap; }
+.sk-ranges { margin-left: 8px; }
+.sk-ranges button { min-width: 38px; font-variant-numeric: tabular-nums; }
+.sk-tile { position: relative; }
+.sk-spark { width: 100%; height: 30px; margin-top: 4px; overflow: visible; }
+.sk-spark path { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.sk-spark .sk-base { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.sk-tile.up .sk-spark path { stroke: #16a34a; }
+.sk-tile.down .sk-spark path { stroke: #dc2626; }
