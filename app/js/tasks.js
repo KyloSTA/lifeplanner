@@ -61,9 +61,19 @@ export async function addTask(title, date, goalId = null, projectId = null) {
   const orders = (await db.all('tasks')).map((x) => x.order).filter((o) => typeof o === 'number');
   const order = (orders.length ? Math.min(0, ...orders) : 0) - 10;
   const t = { id: U.uid(), title, date, goalId, projectId, done: false, createdAt: Date.now(), subtasks: [], notes: '', order };
+  if (nextImages?.length) { t.images = [...nextImages]; nextImages = null; clearTimeout(nextTimer); } // photo collée dans la case
   await db.put('tasks', t);
   if (goalId) await syncGoalProgress(goalId);
   return t;
+}
+
+/* ---------- Photo collée dans une case « + mission » : elle accompagne la prochaine mission créée ---------- */
+let nextImages = null, nextTimer = 0;
+export function setNextTaskImages(ids) {
+  nextImages = [...ids];
+  clearTimeout(nextTimer);
+  // Formulaire envoyé sans créer de mission (titre vide…) : les photos ne restent pas en attente
+  nextTimer = setTimeout(() => { const left = nextImages; nextImages = null; if (left?.length) images.removeUnused(left); }, 4000);
 }
 
 /* ---------- Supprimées : une mission supprimée va dans la corbeille (réglage synchronisé « taskTrash ») ---------- */
