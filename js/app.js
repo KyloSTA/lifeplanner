@@ -740,9 +740,9 @@ async function renderToday() {
     <header class="page-head">
       <div><p class="eyebrow">${greeting()}</p><h1>${cap(U.fmtLong(now))}</h1></div>
       <div class="head-actions">
-        <button class="btn" id="focus-toggle" aria-pressed="false" title="Mode Focus : seulement l’essentiel (3 missions, agenda, habitudes)">🎯 Focus</button>
-        <button class="btn" id="as-open" title="Demander à l’assistant (ajouter, déplacer, cocher…)">✨ Assistant</button>
-        <button class="btn" id="add-ev">+ Événement</button>
+        <button class="btn head-ico" id="focus-toggle" aria-pressed="false" title="Mode Focus : seulement l’essentiel (3 missions, agenda, habitudes)" aria-label="Mode Focus">🎯</button>
+        <button class="btn head-ico" id="as-open" title="Demander à l’assistant (ajouter, déplacer, cocher…)" aria-label="Assistant">✨</button>
+        <button class="btn head-ico" id="add-ev" title="Ajouter un événement à Google Agenda" aria-label="Ajouter un événement">📅＋</button>
         <a class="journal-btn" href="#/page/day-${today}" title="Écrire à la main dans le journal du jour" aria-label="Écrire à la main dans le journal du jour">
           <svg viewBox="0 0 48 48" aria-hidden="true">
             <defs><linearGradient id="jb-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6c56e"/><stop offset="1" stop-color="#a8842f"/></linearGradient></defs>
@@ -750,7 +750,7 @@ async function renderToday() {
             <path d="M42 12c-5-2-11-2-17 1v26c6-3 12-3 17-1z" fill="#9b2c3a" stroke="url(#jb-g)" stroke-width="1.6" stroke-linejoin="round"/>
             <path d="M10 18c3-1 6-1 9 .5M10 23c3-1 6-1 9 .5M10 28c3-1 6-1 9 .5" stroke="#f2ede6" stroke-opacity=".55" stroke-width="1.2" fill="none" stroke-linecap="round"/>
             <path d="M33 31l9-15 3 2-9 15-4 1.5z" fill="url(#jb-g)" stroke="#1a1414" stroke-width=".8" stroke-linejoin="round"/>
-          </svg><span>Journal</span></a>
+          </svg></a>
       </div>
     </header>
     <div class="today">
@@ -801,7 +801,7 @@ async function renderToday() {
     const b = $('#focus-toggle');
     b.classList.toggle('primary', on);
     b.setAttribute('aria-pressed', String(on));
-    b.textContent = on ? '🎯 Focus activé' : '🎯 Focus';
+    b.textContent = '🎯'; b.title = on ? 'Focus activé : clique pour tout réafficher' : 'Mode Focus : seulement l’essentiel (3 missions, agenda, habitudes)';
   };
   $('#focus-toggle').onclick = () => { try { localStorage.setItem('lp.focus', focusOn() ? '0' : '1'); } catch { /* ignore */ } applyFocus(); };
   applyFocus();

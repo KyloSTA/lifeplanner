@@ -389,7 +389,7 @@ export async function renderPage(ctx, arg) {
   };
   $('#fi-import input').onchange = (e) => doImport(e.target.files);
   view.querySelector('[data-fi-pick]')?.addEventListener('click', () => $('#fi-import input').click());
-  $('#fi-auto').onclick = () => autoSettings(ctx, () => renderPage(ctx));
+  $('#fi-auto').onclick = () => autoSettings(ctx, () => renderPage(ctx)).catch((err) => { console.error(err); ctx.toast('Import auto : ' + (err?.message || 'erreur'), 'err'); });
   // Dossier surveillé : nouveaux relevés importés à l'ouverture de la page
   (async () => {
     const st = await dirStatus();
@@ -886,7 +886,8 @@ export async function dirStatus() {
   const h = await db.get('cache', DIR_KEY).catch(() => null);
   if (!h) return { on: false };
   let perm = 'prompt';
-  try { perm = await h.queryPermission({ mode: 'read' }); } catch { /* ignore */ }
+  // Edge peut tarder à répondre pour un dossier enregistré : on n'attend pas plus de 2 s
+  try { perm = await Promise.race([h.queryPermission({ mode: 'read' }), new Promise((r) => setTimeout(() => r('prompt'), 2000))]); } catch { /* ignore */ }
   return { on: true, name: h.name, perm, last: (await db.get('cache', 'financeDirLast')) || 0 };
 }
 async function chooseDir() {

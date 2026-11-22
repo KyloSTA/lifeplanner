@@ -3420,3 +3420,7 @@ html:fullscreen #habit-root { top: 16px; }
 .cfg-fold > summary::after { content: '▾'; float: right; color: var(--muted); }
 .cfg-fold[open] > summary { margin-bottom: 12px; }
 .cfg-fold[open] > summary::after { content: '▴'; }
+
+/* Aujourd'hui : boutons du haut en icônes seulement (le nom est dans l'infobulle) */
+.head-ico { min-width: 42px; padding: 0 10px; font-size: 18px; justify-content: center; }
+.head-ico[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }

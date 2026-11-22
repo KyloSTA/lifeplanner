@@ -83,6 +83,7 @@ export async function renderPage(ctx, arg) {
       <div class="head-actions pp-scen">
         <label class="pp-scen-pick">Scénario <select id="pp-scen" aria-label="Scénario">${Object.entries(d.scenarios).map(([k, s]) => `<option value="${k}" ${k === d.cur ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
         <button class="btn" id="pp-scen-new" title="Nouveau scénario (copie, prudent ou optimiste)">＋</button>
+        <button class="btn icon" id="pp-reset" title="Réinitialiser les chiffres de ce scénario (valeurs par défaut)" aria-label="Réinitialiser le scénario">↺</button>
         <button class="btn icon" id="pp-scen-more" title="Renommer, supprimer, importer, exporter" aria-label="Options du scénario">⋯</button>
       </div>
     </header>
@@ -94,6 +95,7 @@ export async function renderPage(ctx, arg) {
   $('#pp-scen').onchange = async (e) => { d.cur = e.target.value; await save(); renderPage(ctx); };
   $('#pp-scen-new').onclick = () => newScenario();
   $('#pp-scen-more').onclick = () => scenarioMenu();
+  $('#pp-reset').onclick = () => resetScenario();
 
   const body = $('#pp-body');
   const draw = () => {
@@ -553,12 +555,23 @@ export async function renderPage(ctx, arg) {
     });
   }
 
+  /** Remet les chiffres du scénario affiché aux valeurs par défaut (les noms et la part de chacun restent). */
+  async function resetScenario() {
+    if (!(await confirmBox(`Réinitialiser les chiffres du scénario « ${sc().name} » ? Prix, taux, loyers et autres hypothèses reviennent aux valeurs par défaut. Exporte-le d'abord (⋯) si tu veux le garder.`, 'Réinitialiser'))) return;
+    const keep = Object.fromEntries(['monNom', 'partNom', 'partPct', 'partMode'].filter((k) => k in sc().a).map((k) => [k, sc().a[k]]));
+    sc().a = keep;
+    await save();
+    renderPage(ctx);
+    toast('↺ Scénario réinitialisé');
+  }
+
   function scenarioMenu() {
     modal(`<h2>Scénario « ${esc(sc().name)} »</h2>
       <div class="pp-menu">
         <button class="btn" id="pp-ren">✎ Renommer</button>
         <label class="btn"><input type="file" id="pp-imp" accept=".json,application/json" hidden>⬆ Importer des chiffres (.json)</label>
         <button class="btn" id="pp-exp">⬇ Exporter ce scénario (.json)</button>
+        <button class="btn" id="pp-rst">↺ Réinitialiser les chiffres</button>
         <button class="btn danger" id="pp-del" ${Object.keys(d.scenarios).length < 2 ? 'disabled title="Il faut garder au moins un scénario"' : ''}>🗑 Supprimer</button>
       </div>
       <div class="modal-actions"><button class="btn" data-close>Fermer</button></div>`, (m, close) => {
@@ -566,6 +579,7 @@ export async function renderPage(ctx, arg) {
         const v = prompt('Nom du scénario', sc().name);
         if (v && v.trim()) { sc().name = v.trim(); await save(); close(); renderPage(ctx); }
       };
+      m.querySelector('#pp-rst').onclick = async () => { close(); await resetScenario(); };
       m.querySelector('#pp-del').onclick = async () => {
         if (!(await confirmBox(`Supprimer le scénario « ${sc().name} » ?`, 'Supprimer'))) return;
         delete d.scenarios[d.cur];
