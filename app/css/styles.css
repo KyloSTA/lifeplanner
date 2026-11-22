@@ -3373,3 +3373,13 @@ body.an-open { overflow: hidden; }
 @media (display-mode: window-controls-overlay) { #brand-launch { display: none; } }
 @media (display-mode: fullscreen) { #brand-launch { display: grid; } }
 html:fullscreen #brand-launch { display: grid; }
+
+/* Plein écran : pas de barre de titre maison, l'app reprend tout l'écran */
+html:fullscreen .titlebar { display: none !important; }
+html:fullscreen .app { margin-top: 0; height: 100%; }
+html:fullscreen :is(.alarm-back, .modal-back, .img-zoom, .fi-drop, .sx-player, .ink-shell.ink-full, .an-root) { top: 0; }
+html:fullscreen #habit-root { top: 16px; }
+@media (display-mode: fullscreen) {
+  .titlebar { display: none !important; }
+  .app { margin-top: 0; height: 100%; }
+}
