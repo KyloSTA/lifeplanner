@@ -11,7 +11,7 @@ import { drawDossier } from './property-dossier.js';
 const { esc } = U;
 const KEY = 'propriete';
 let tab = 'comparatif';
-const TABS = [['comparatif', '📊', 'Comparatif'], ['achat', '🔑', 'Achat'], ['location', '🏠', 'Location'], ['hypotheses', '⚙', 'Hypothèses'], ['etapes', '✅', 'Étapes'], ['documents', '📎', 'Documents'], ['notes', '📝', 'Notes']];
+const TABS = [['comparatif', '📊', 'Comparatif'], ['scenarios', '🧭', 'Scénarios'], ['achat', '🔑', 'Achat'], ['location', '🏠', 'Location'], ['hypotheses', '⚙', 'Hypothèses'], ['etapes', '✅', 'Étapes'], ['documents', '📎', 'Documents'], ['notes', '📝', 'Notes']];
 
 const money = (v, dec = 0) => new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: dec, minimumFractionDigits: dec }).format(Number(v) || 0);
 const signed = (v) => `${v < 0 ? '−' : '+'}${money(Math.abs(v))}`;
@@ -101,6 +101,7 @@ export async function renderPage(ctx, arg) {
   const draw = () => {
     const r = compute(A());
     if (tab === 'comparatif') drawCompare(r);
+    else if (tab === 'scenarios') drawScenarios(r);
     else if (tab === 'achat') drawAchat(r);
     else if (tab === 'location') drawLocation(r);
     else if (tab === 'hypotheses') drawHyp(r);
@@ -128,6 +129,89 @@ export async function renderPage(ctx, arg) {
   };
   const rows = (list) => `<table class="pp-table"><tbody>${list.filter(Boolean).map(([l, v, cls = '']) => `<tr class="${cls}"><td>${l}</td><td class="num">${v}</td></tr>`).join('')}</tbody></table>`;
   const warnBox = (r) => (r.warnings.length ? `<div class="pp-warn">${r.warnings.map((w) => `<p>⚠ ${esc(w)}</p>`).join('')}</div>` : '');
+
+  /* ---------- 🧭 Scénarios : les options et les scénarios expliqués, et le résultat en mots simples ---------- */
+  // Chaque bloc est une liste de paragraphes (texte simple) : affichée ici et ajoutée telle quelle aux notes.
+  function optionsText() {
+    return [
+      'Les 3 choix comparés',
+      '🔑 Acheter la maison : on vend le condo et on achète la maison. On devient propriétaires : on paie une hypothèque, les taxes et l’entretien, et la maison prend (normalement) de la valeur. Au départ, il faut payer la mise de fonds, la taxe de bienvenue, le notaire, et la commission pour vendre le condo.',
+      '🏠 Louer la maison et louer le condo à un seul locataire : on paie un loyer pour la maison et on garde le condo, loué au complet à quelqu’un d’autre. Son loyer aide à payer l’hypothèque du condo, et le condo continue de prendre de la valeur. Pas de gros frais d’achat ni de vente.',
+      '🛏 Louer la maison et louer le condo à la chambre : comme le choix précédent, mais le condo est loué chambre par chambre à plusieurs personnes. Ça rapporte souvent plus, mais il faut le meubler, trouver plusieurs locataires et gérer plus de choses (et les chambres peuvent rester vides un moment).',
+    ];
+  }
+  function scenariosText() {
+    return [
+      'Réaliste, Prudent, Optimiste : c’est quoi ?',
+      'On ne connaît pas l’avenir : les taux d’intérêt, la valeur des maisons et les loyers vont bouger. Un scénario, c’est un ensemble de suppositions sur l’avenir. On en compare plusieurs pour voir si la décision tient même quand les choses tournent mal.',
+      '📊 Réaliste : nos meilleures estimations d’aujourd’hui (taux actuels, hausse normale de la valeur des maisons, loyers du marché).',
+      '🛡 Prudent : on suppose que ça va moins bien : taux d’intérêt 1 % plus haut, maisons qui prennent peu de valeur (1,5 % par année), loyers reçus 10 % plus bas, chambres plus souvent vides.',
+      '🚀 Optimiste : on suppose que ça va bien : taux 0,5 % plus bas, maisons qui prennent plus de valeur (3,5 à 4 % par année), loyers reçus 5 % plus hauts.',
+      'Si le même choix gagne dans les trois scénarios, c’est une décision solide. S’il gagne seulement quand tout va bien, c’est plus risqué.',
+    ];
+  }
+  function plainText(r) {
+    const a = r.a, N = r.N, last = r.years[r.years.length - 1];
+    const ans = `${N} an${N > 1 ? 's' : ''}`;
+    const sorted = [...OPTIONS].sort((x, y) => last[y.id].patrimoine - last[x.id].patrimoine);
+    const best = sorted[0], worst = sorted[sorted.length - 1];
+    const cost = (id) => r.month1.out[id];
+    const me = a.monNom || 'Moi', other = a.partNom || 'Conjoint·e', p = pctOf(a);
+    const shareTxt = (v) => `${me} environ ${money(Math.abs(v) * p / 100)} et ${other} environ ${money(Math.abs(v) * (100 - p) / 100)}`;
+    const costWord = (v) => (v < 0 ? `rapporte ${money(-v)}` : `coûte ${money(v)}`);
+    const long = compute({ ...A(), horizon: 25 }).years;
+    let from = null;
+    for (let k = long.length - 1; k >= 0; k--) {
+      const y = long[k];
+      if (y.achat.patrimoine >= Math.max(y.bail.patrimoine, y.chambres.patrimoine)) from = y.year; else break;
+    }
+    const out = [`En mots simples (scénario « ${sc().name} », sur ${ans})`];
+    out.push(`🏆 Le choix qui nous laisserait le plus d’argent dans ${ans} : ${best.name.toLowerCase()}.`);
+    out.push(`💸 Chaque mois, au début : ${OPTIONS.map((o) => `« ${o.short.toLowerCase()} » ${costWord(cost(o.id))}`).join(', ')} (après les loyers reçus, s’il y en a).`);
+    out.push(cost(best.id) < 0
+      ? `👥 Avec le choix gagnant, les loyers reçus paient plus que nos dépenses : il reste environ ${money(-cost(best.id))} par mois, partagé ainsi : ${shareTxt(cost(best.id))}.`
+      : `👥 Avec le choix gagnant, on paierait chaque mois : ${shareTxt(cost(best.id))}.`);
+    const gap = last[best.id].patrimoine - last[worst.id].patrimoine;
+    out.push(`💰 Dans ${ans}, si on vendait tout et qu’on payait toutes les dettes, il nous resterait environ ${money(last[best.id].patrimoine)} avec le choix gagnant, contre ${money(last[worst.id].patrimoine)} avec « ${worst.short.toLowerCase()} ». La différence : ${money(gap)}, soit environ ${money(gap / (N * 12))} par mois.`);
+    if (best.id === 'achat') {
+      out.push('🔑 Pourquoi acheter gagne ici : chaque paiement d’hypothèque rembourse un peu la maison (c’est comme une épargne forcée) et la maison prend de la valeur, alors qu’un loyer payé ne revient jamais.');
+    } else {
+      out.push('🏠 Pourquoi louer gagne ici : acheter coûte très cher au départ (taxe de bienvenue, notaire, commission pour vendre le condo) et il faut des années pour rattraper ces frais. En louant, on garde le condo : son locataire nous aide à le payer et il continue de prendre de la valeur.');
+    }
+    out.push(from
+      ? `⏳ Acheter devient le meilleur choix seulement si on reste ${from} ans ou plus. ${from > N ? `Si on pense déménager avant ${from} ans, louer est plus avantageux.` : 'Comme on regarde déjà sur une durée assez longue, acheter est gagnant.'}`
+      : '⏳ Même sur 25 ans, louer reste plus avantageux avec ces suppositions.');
+    out.push('📌 À retenir : le « patrimoine », c’est ce qui nous resterait en poche si on vendait tout. Ce ne sont pas des montants garantis : ce sont des estimations qui dépendent des taux, des loyers et de la valeur des maisons. À valider avec un courtier hypothécaire et un comptable.');
+    return out;
+  }
+
+  function drawScenarios(r) {
+    const blocks = [['opts', optionsText()], ['scen', scenariosText()], ['plain', plainText(r)]];
+    // Chaque scénario enregistré : le choix gagnant et son patrimoine
+    const rows = Object.entries(d.scenarios).map(([id, s]) => {
+      const rr = compute({ ...DEFAULTS, ...s.a, horizon: r.N });
+      const L = rr.years[rr.years.length - 1];
+      const b = [...OPTIONS].sort((x, y) => L[y.id].patrimoine - L[x.id].patrimoine)[0];
+      return { id, name: s.name, best: b, pat: L[b.id].patrimoine, cur: id === d.cur };
+    });
+    const card = ([k, lines], extra = '') => `<section class="card pp-explain" data-blk="${k}">
+        <div class="card-head"><h2>${esc(lines[0])}</h2><button type="button" class="btn sm-text" data-tonote="${k}" title="Ajouter ce texte au journal de la section Notes">📝 Ajouter aux notes</button></div>
+        ${lines.slice(1).map((t) => `<p>${esc(t)}</p>`).join('')}${extra}</section>`;
+    body.innerHTML = `
+      ${card(blocks[2])}
+      ${card(blocks[0])}
+      ${card(blocks[1], `<h3 class="pp-h3">Tes scénarios sur ${r.N} an${r.N > 1 ? 's' : ''}</h3>
+        <table class="pp-table"><tbody>${rows.map((x) => `<tr class="${x.cur ? 'pp-cur' : ''}"><td>${esc(x.name)}${x.cur ? ' <small class="muted">(affiché)</small>' : ''}</td><td>${x.best.icon} ${esc(x.best.short)}</td><td class="num">${money(x.pat)}</td></tr>`).join('')}</tbody></table>
+        ${rows.length < 2 ? '<p class="hint muted">Crée « Prudent » et « Optimiste » avec ＋ (à côté du scénario) pour les comparer ici.</p>' : ''}`)}`;
+    body.querySelectorAll('[data-tonote]').forEach((b) => (b.onclick = async () => {
+      const lines = blocks.find(([k]) => k === b.dataset.tonote)[1];
+      d.journal.push({ at: Date.now(), text: `${lines[0]}\n\n${lines.slice(1).join('\n\n')}` });
+      await save();
+      b.textContent = '✓ Ajouté aux notes';
+      b.disabled = true;
+      toast('📝 Ajouté au journal de la section Notes');
+    }));
+  }
 
   /* ---------- 📊 Comparatif ---------- */
   function drawCompare(r) {

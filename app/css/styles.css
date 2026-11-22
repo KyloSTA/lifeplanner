@@ -3433,3 +3433,9 @@ html:fullscreen #habit-root { top: 16px; }
 .sk-spark .sk-base { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
 .sk-tile.up .sk-spark path { stroke: #16a34a; }
 .sk-tile.down .sk-spark path { stroke: #dc2626; }
+
+/* 🧭 Scénarios expliqués */
+.pp-explain p { margin: 0 0 10px; line-height: 1.55; }
+.pp-explain .card-head h2 { font-size: 16px; }
+.pp-explain .pp-table tr.pp-cur td { font-weight: 700; }
+.pp-journal p { white-space: pre-line; }
