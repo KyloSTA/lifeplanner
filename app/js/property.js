@@ -52,6 +52,12 @@ async function load() {
   d.questions ||= [];
   d.journal ||= [];
   d.decision ||= '';
+  // Valeurs d'origine du bouton ↺ : pas encore enregistrées -> les chiffres actuels du Réaliste
+  if (!d.origin) {
+    const all = Object.entries(d.scenarios);
+    const [, real] = all.find(([id, s]) => !s.base && (id === 'reel' || /r[ée]aliste/i.test(s.name))) || all.find(([, s]) => !s.base) || all[0];
+    d.origin = Object.fromEntries(Object.entries(real.a || {}).filter(([k]) => !['monNom', 'partNom', 'partPct', 'partMode'].includes(k)));
+  }
   return d;
 }
 const store = (d) => db.put('settings', d, KEY);
@@ -83,7 +89,7 @@ export async function renderPage(ctx, arg) {
       <div class="head-actions pp-scen">
         <label class="pp-scen-pick">Scénario <select id="pp-scen" aria-label="Scénario">${Object.entries(d.scenarios).map(([k, s]) => `<option value="${k}" ${k === d.cur ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
         <button class="btn" id="pp-scen-new" title="Nouveau scénario (copie, prudent ou optimiste)">＋</button>
-        <button class="btn icon" id="pp-reset" title="Réinitialiser les chiffres de ce scénario (valeurs par défaut)" aria-label="Réinitialiser le scénario">↺</button>
+        <button class="btn icon" id="pp-reset" title="Remettre les 3 scénarios (Réaliste, Prudent, Optimiste) à leurs valeurs d’origine" aria-label="Réinitialiser les scénarios">↺</button>
         <button class="btn icon" id="pp-scen-more" title="Renommer, supprimer, importer, exporter" aria-label="Options du scénario">⋯</button>
       </div>
     </header>
@@ -618,6 +624,14 @@ export async function renderPage(ctx, arg) {
   }
 
   /* ---------- Scénarios ---------- */
+  /** Prudent / Optimiste calculés à partir d'un scénario de base. */
+  function presetFrom(base, aBase) {
+    const a = { ...aBase }, cur = { ...DEFAULTS, ...aBase };
+    if (base === 'prudent') Object.assign(a, { taux: cur.taux + 1, tauxRenouv: cur.tauxRenouv + 1, apprMaison: 1.5, apprCondo: 1.5, rendement: 4, loyerBail: Math.round(cur.loyerBail * 0.9), loyerChambre: Math.round(cur.loyerChambre * 0.9), vacanceChambres: 12 });
+    if (base === 'optimiste') Object.assign(a, { taux: cur.taux - 0.5, tauxRenouv: cur.tauxRenouv - 0.5, apprMaison: 4, apprCondo: 3.5, rendement: 6, loyerBail: Math.round(cur.loyerBail * 1.05), loyerChambre: Math.round(cur.loyerChambre * 1.05) });
+    return a;
+  }
+
   function newScenario() {
     modal(`<h2>Nouveau scénario</h2>
       <label class="pp-field"><span class="pp-lbl">Nom</span><span class="pp-in"><input id="pp-sn" value="Prudent" autofocus></span></label>
@@ -627,11 +641,9 @@ export async function renderPage(ctx, arg) {
       m.querySelectorAll('[name="pp-base"]').forEach((r) => (r.onchange = () => { m.querySelector('#pp-sn').value = { copy: `${sc().name} (copie)`, prudent: 'Prudent', optimiste: 'Optimiste' }[r.value]; }));
       m.querySelector('#pp-sok').onclick = async () => {
         const base = m.querySelector('[name="pp-base"]:checked').value;
-        const a = { ...sc().a }, cur = A();
-        if (base === 'prudent') Object.assign(a, { taux: cur.taux + 1, tauxRenouv: cur.tauxRenouv + 1, apprMaison: 1.5, apprCondo: 1.5, rendement: 4, loyerBail: Math.round(cur.loyerBail * 0.9), loyerChambre: Math.round(cur.loyerChambre * 0.9), vacanceChambres: 12 });
-        if (base === 'optimiste') Object.assign(a, { taux: cur.taux - 0.5, tauxRenouv: cur.tauxRenouv - 0.5, apprMaison: 4, apprCondo: 3.5, rendement: 6, loyerBail: Math.round(cur.loyerBail * 1.05), loyerChambre: Math.round(cur.loyerChambre * 1.05) });
+        const a = base === 'copy' ? { ...sc().a } : presetFrom(base, sc().a);
         const id = U.uid();
-        d.scenarios[id] = { name: m.querySelector('#pp-sn').value.trim() || 'Scénario', a };
+        d.scenarios[id] = { name: m.querySelector('#pp-sn').value.trim() || 'Scénario', a, ...(base !== 'copy' ? { base } : {}) };
         d.cur = id;
         await save(); close(); renderPage(ctx);
         toast('📊 Scénario créé');
@@ -640,13 +652,28 @@ export async function renderPage(ctx, arg) {
   }
 
   /** Remet les chiffres du scénario affiché aux valeurs par défaut (les noms et la part de chacun restent). */
+  /* ---------- Valeurs d'origine : le Réaliste (tes chiffres importés), d'où découlent Prudent et Optimiste ---------- */
+  const PEOPLE = ['monNom', 'partNom', 'partPct', 'partMode'];
+  const isReal = ([id, s]) => !s.base && (id === 'reel' || /r[ée]aliste/i.test(s.name));
+  const realEntry = () => Object.entries(d.scenarios).find(isReal) || Object.entries(d.scenarios).find(([, s]) => !s.base) || Object.entries(d.scenarios)[0];
+  const findBase = (b) => Object.entries(d.scenarios).find(([, s]) => s.base === b || (!s.base && new RegExp(b, 'i').test(s.name)));
+
+  /** Reset : le Réaliste revient à ses valeurs d'origine, Prudent et Optimiste sont recalculés à partir de lui. */
   async function resetScenario() {
-    if (!(await confirmBox(`Réinitialiser les chiffres du scénario « ${sc().name} » ? Prix, taux, loyers et autres hypothèses reviennent aux valeurs par défaut. Exporte-le d'abord (⋯) si tu veux le garder.`, 'Réinitialiser'))) return;
-    const keep = Object.fromEntries(['monNom', 'partNom', 'partPct', 'partMode'].filter((k) => k in sc().a).map((k) => [k, sc().a[k]]));
-    sc().a = keep;
+    if (!(await confirmBox('Remettre les 3 scénarios (Réaliste, Prudent et Optimiste) à leurs valeurs d’origine ? Les changements faits depuis seront perdus (tes autres scénarios ne changent pas). Exporte-les d’abord (⋯) si tu veux les garder.', 'Réinitialiser'))) return;
+    const [rid, real] = realEntry();
+    const keep = Object.fromEntries(PEOPLE.filter((k) => k in real.a).map((k) => [k, real.a[k]]));
+    real.a = { ...(d.origin || {}), ...keep };
+    for (const b of ['prudent', 'optimiste']) {
+      const e = findBase(b);
+      const a = { ...presetFrom(b, real.a), ...Object.fromEntries(PEOPLE.filter((k) => e && k in e[1].a).map((k) => [k, e[1].a[k]])) };
+      if (e) Object.assign(e[1], { a, base: b });
+      else d.scenarios[U.uid()] = { name: b === 'prudent' ? 'Prudent' : 'Optimiste', base: b, a };
+    }
+    d.cur = rid;
     await save();
     renderPage(ctx);
-    toast('↺ Scénario réinitialisé');
+    toast(d.origin ? '↺ Les 3 scénarios sont revenus à leurs valeurs d’origine' : '↺ Scénarios réinitialisés (valeurs par défaut : aucune valeur d’origine enregistrée)');
   }
 
   function scenarioMenu() {
@@ -655,7 +682,8 @@ export async function renderPage(ctx, arg) {
         <button class="btn" id="pp-ren">✎ Renommer</button>
         <label class="btn"><input type="file" id="pp-imp" accept=".json,application/json" hidden>⬆ Importer des chiffres (.json)</label>
         <button class="btn" id="pp-exp">⬇ Exporter ce scénario (.json)</button>
-        <button class="btn" id="pp-rst">↺ Réinitialiser les chiffres</button>
+        <button class="btn" id="pp-rst">↺ Remettre les 3 scénarios à l’origine</button>
+        <button class="btn" id="pp-org" title="Les chiffres actuels du scénario Réaliste deviennent les valeurs d’origine du bouton ↺">📌 Chiffres du Réaliste = valeurs d’origine</button>
         <button class="btn danger" id="pp-del" ${Object.keys(d.scenarios).length < 2 ? 'disabled title="Il faut garder au moins un scénario"' : ''}>🗑 Supprimer</button>
       </div>
       <div class="modal-actions"><button class="btn" data-close>Fermer</button></div>`, (m, close) => {
@@ -664,6 +692,7 @@ export async function renderPage(ctx, arg) {
         if (v && v.trim()) { sc().name = v.trim(); await save(); close(); renderPage(ctx); }
       };
       m.querySelector('#pp-rst').onclick = async () => { close(); await resetScenario(); };
+      m.querySelector('#pp-org').onclick = async () => { const [, real] = realEntry(); d.origin = Object.fromEntries(Object.entries(real.a).filter(([key]) => !PEOPLE.includes(key))); await save(); close(); toast(`📌 Les chiffres de « ${real.name} » sont maintenant les valeurs d’origine`); };
       m.querySelector('#pp-del').onclick = async () => {
         if (!(await confirmBox(`Supprimer le scénario « ${sc().name} » ?`, 'Supprimer'))) return;
         delete d.scenarios[d.cur];
@@ -690,6 +719,7 @@ export async function renderPage(ctx, arg) {
             k++;
           }
           if (!k) throw new Error('Aucun chiffre reconnu dans ce fichier');
+          if (realEntry()[1] === sc()) d.origin = Object.fromEntries(Object.entries(sc().a).filter(([key]) => !PEOPLE.includes(key))); // valeurs d'origine pour ↺
           await save(); close(); renderPage(ctx);
           toast(`⬆ ${k} chiffre${k > 1 ? 's' : ''} importé${k > 1 ? 's' : ''} dans « ${sc().name} »`);
         } catch (err) { toast('Import impossible : ' + err.message, 'err'); }
