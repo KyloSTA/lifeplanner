@@ -90,7 +90,8 @@ function draw() {
   const who = (it.artists || []).map((a) => a.name).join(', ') || it.show?.name || '';
   const dev = state.device?.name || '';
   const pct = it.duration_ms ? Math.min(100, ((state.progress_ms + (state.is_playing ? Date.now() - at : 0)) / it.duration_ms) * 100) : 0;
-  box.innerHTML = `<a class="mp-art" href="${esc(it.external_urls?.spotify || 'https://open.spotify.com')}" target="_blank" rel="noopener" title="Ouvrir dans Spotify">${art ? `<img src="${esc(art)}" alt="">` : '🎵'}</a>
+  // Lien « spotify: » : ouvre l'application Spotify installée (pas le site dans Edge)
+  box.innerHTML = `<a class="mp-art" href="${esc(it.uri || 'spotify:')}" title="Ouvrir dans l’application Spotify">${art ? `<img src="${esc(art)}" alt="">` : '🎵'}</a>
     <div class="mp-txt"><span class="mp-title" title="${esc(it.name)} • ${esc(who)}"><b>${esc(it.name)}</b> • ${esc(who)}</span>
       ${dev ? `<span class="mp-dev" title="Joue sur ${esc(dev)}">🔊 ${esc(dev)}</span>` : ''}</div>
     <button type="button" class="mp-btn mp-play" data-mp="${state.is_playing ? 'pause' : 'play'}" aria-label="${state.is_playing ? 'Pause' : 'Lecture'}" title="${state.is_playing ? 'Pause' : 'Lecture'}">${state.is_playing
