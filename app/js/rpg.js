@@ -376,7 +376,7 @@ function equipHTML(s, eqItems, avCfg) {
           return `<button type="button" class="eq-tile ${g.onUid ? 'on' : ''} ${eqSel === g.it.id ? 'sel' : ''} r-${g.it.rarity}" data-id="${g.it.id}" style="--rc:${RARITY[g.it.rarity].color}" title="${esc(g.it.name)} · ${RARITY[g.it.rarity].name}">
             ${AV.itemArt(g.it, 52)}${n > 1 ? `<span class="eq-n">×${n}</span>` : ''}${g.onUid ? '<span class="eq-on">✓</span>' : ''}
             <b>${esc(g.it.name)}</b><small>+${power(g.it)} · ${esc(SLOTS.find((x) => x.id === g.it.slot).name)}</small></button>`;
-        }).join('') || '<p class="empty-sm">Aucun objet pour ces filtres.</p>'}</div>
+        }).join('') || `<p class="empty-sm">Aucun objet pour ces filtres${eqf.q.trim() ? ` (recherche « ${esc(eqf.q.trim())} »)` : ''}. <button type="button" class="btn sm-text" id="eq-reset">Tout afficher</button></p>`}</div>
       </div>
     </div>
   </section>`;
@@ -405,6 +405,7 @@ function bindEquip(view, s, mutate, toast, redraw) {
     root.querySelectorAll('.eq-tile').forEach((t) => { t.hidden = !!w && !t.title.toLowerCase().includes(w); });
   };
   root.querySelector('#eq-sort').onchange = (e) => { eqf.sort = e.target.value; saveEqf(); redraw(); };
+  root.querySelector('#eq-reset')?.addEventListener('click', () => { Object.assign(eqf, { slot: 'all', rar: 'all', q: '', hideOn: false }); saveEqf(); redraw(); });
   root.querySelectorAll('[data-eqslot]').forEach((b) => (b.onclick = () => { eqf.slot = b.dataset.eqslot; saveEqf(); redraw(); }));
   root.querySelectorAll('[data-eqrar]').forEach((b) => (b.onclick = () => { eqf.rar = b.dataset.eqrar; saveEqf(); redraw(); }));
   root.querySelector('#eq-hide').onchange = (e) => { eqf.hideOn = e.target.checked; saveEqf(); redraw(); };
