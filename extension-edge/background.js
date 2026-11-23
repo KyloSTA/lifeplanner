@@ -52,7 +52,7 @@ async function launcherList() {
 async function focusTab(tabId) {
   try {
     const t = await chrome.tabs.update(tabId, { active: true });
-    await chrome.windows.update(t.windowId, { focused: true });
+    await chrome.windows.update(t.windowId, { focused: true, state: 'fullscreen' });
     return true;
   } catch { return false; }
 }
@@ -119,6 +119,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     } else if (msg?.type === 'lp-ready' && sender.tab) {
       // Un onglet Life Planner vient de s'ouvrir : on lui livre ce qui attendait
       await deliverTo(sender.tab.id);
+      // Life Planner s'ouvre aussi en plein écran (à chaque ouverture ; F11 ou Échap en sort)
+      await chrome.windows.update(sender.tab.windowId, { state: 'fullscreen' }).catch(() => {});
       reply({ ok: true });
     } else {
       reply({});
@@ -134,6 +136,7 @@ async function focusLifePlanner() {
   if (!t) return false;
   await chrome.tabs.update(t.id, { active: true });
   await chrome.windows.update(t.windowId, { focused: true });
+  await chrome.windows.update(t.windowId, { state: 'fullscreen' }).catch(() => {}); // retour à Life Planner : en plein écran
   return true;
 }
 chrome.action.onClicked.addListener(() => { focusLifePlanner().catch(() => {}); });
