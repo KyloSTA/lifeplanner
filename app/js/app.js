@@ -107,7 +107,7 @@ function openQuickAdd(prefill = '', type = null) {
     <div class="qa-types" role="radiogroup" aria-label="Type">${quick.TYPES.map(([k, e, l]) => `<button type="button" role="radio" data-qt="${k}" class="chip">${e} ${l}</button>`).join('')}</div>
     <div class="qa-pics" hidden></div>
     <p class="qa-prev" aria-live="polite"></p>
-    <div class="modal-actions"><label class="btn qa-pic-btn" title="Ajouter une photo (ou colle-la avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden id="qa-file">📷</label><span class="qa-hint muted">Entrée pour ajouter · Ctrl + V : coller une photo</span><button class="btn primary" id="qa-ok">Ajouter</button></div>`, (m, close) => {
+    <div class="modal-actions"><label class="btn qa-pic-btn" title="Ajouter une photo (ou colle-la avec Ctrl + V)"><input type="file" accept="image/*" multiple hidden id="qa-file">📷</label><button type="button" class="btn qa-paste" title="Coller ce que tu as copié (texte, image ou capture d’écran)">📋</button><span class="qa-hint muted">Entrée pour ajouter · Ctrl + V : coller une photo</span><button class="btn primary" id="qa-ok">Ajouter</button></div>`, (m, close) => {
     m.classList.add('qa-modal');
     const ta = m.querySelector('#qa-t'), prev = m.querySelector('.qa-prev'), ok = m.querySelector('#qa-ok'), picsEl = m.querySelector('.qa-pics');
     const fmtDay = (iso, word) => (iso === U.iso(new Date()) ? 'aujourd’hui' : word || U.fmtShort(U.parseISO(iso)));
@@ -129,9 +129,23 @@ function openQuickAdd(prefill = '', type = null) {
     };
     const drawPics = async () => {
       picsEl.hidden = !pics.length;
-      picsEl.innerHTML = pics.map((id) => `<figure class="qa-pic"><img data-pic="${id}" alt="Photo"><button type="button" class="x" data-rm="${id}" aria-label="Retirer la photo">×</button></figure>`).join('');
+      picsEl.innerHTML = pics.map((id) => `<figure class="qa-pic"><img data-pic="${id}" alt="Photo" title="Cliquer pour annoter (dessiner, écrire)"><i class="qa-annot" aria-hidden="true">✏️</i><button type="button" class="x" data-rm="${id}" aria-label="Retirer la photo">×</button></figure>`).join('');
       for (const img of picsEl.querySelectorAll('[data-pic]')) img.src = (await images.url(img.dataset.pic)) || '';
       picsEl.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { const id = b.dataset.rm; pics = pics.filter((x) => x !== id); images.removeUnused([id]); drawPics(); draw(); }));
+      // ✏️ Clic sur la miniature : l'annoter (stylo, surligneur, flèche, cadre, texte) ; elle est remplacée par la version annotée
+      picsEl.querySelectorAll('[data-pic]').forEach((img) => (img.onclick = async () => {
+        const id = img.dataset.pic;
+        try {
+          const { annotate } = await import('./annotate.js');
+          const out = await annotate(await (await fetch(img.src)).blob());
+          if (!out) return;
+          const nid = await images.save(out);
+          pics = pics.map((x) => (x === id ? nid : x));
+          images.removeUnused([id]);
+          drawPics();
+          toast('✏️ Annotations ajoutées à la photo');
+        } catch (err) { toast(err.message || 'Annotation impossible', 'err'); }
+      }));
     };
     ta.addEventListener('paste', (e) => {
       const files = images.imageFiles(e.clipboardData);
@@ -142,6 +156,28 @@ function openQuickAdd(prefill = '', type = null) {
     m.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
     m.addEventListener('drop', (e) => { const f = images.imageFiles(e.dataTransfer); if (f.length) { e.preventDefault(); addPics(f); } });
     m.querySelector('#qa-file').onchange = (e) => { addPics([...e.target.files]); e.target.value = ''; ta.focus(); };
+    // 📋 Coller : une image (capture d'écran) devient une photo jointe, du texte va dans la zone de texte
+    m.querySelector('.qa-paste').onclick = async () => {
+      try {
+        let got = false;
+        if (navigator.clipboard?.read) {
+          const imgs = [];
+          let text = '';
+          for (const item of await navigator.clipboard.read()) {
+            const it = item.types.find((t) => t.startsWith('image/'));
+            if (it) imgs.push(await item.getType(it));
+            else if (!text && item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+          }
+          if (imgs.length) { await addPics(imgs); got = true; }
+          if (text.trim()) { const at = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, at) + text + ta.value.slice(ta.selectionEnd ?? at); got = true; draw(); }
+        } else if (navigator.clipboard?.readText) {
+          const text = await navigator.clipboard.readText();
+          if (text.trim()) { ta.value += text; got = true; draw(); }
+        }
+        if (!got) toast('Le presse-papiers est vide : copie d’abord un texte ou une image');
+        ta.focus();
+      } catch { toast('Edge n’a pas permis de lire le presse-papiers : utilise Ctrl + V', 'err'); }
+    };
     // Fenêtre fermée sans ajouter : les photos rangées pour rien sont retirées
     const root = $('#modal-root');
     const obs = new MutationObserver(() => { if (!root.contains(m)) { obs.disconnect(); if (!saved && pics.length) images.removeUnused(pics); } });
@@ -3837,6 +3873,8 @@ game.init().catch(console.error).finally(async () => {
   priobar.start();
   // La fenêtre elle-même ne défile jamais (seul le contenu défile) : si elle glisse, on la remet en place
   addEventListener('scroll', () => { if (scrollY || scrollX) scrollTo(0, 0); }, { passive: true });
+  // Idem pour le corps de la page et le cadre de l'app (ils ne doivent jamais défiler : seul le contenu défile)
+  for (const el of [document.body, document.querySelector('.app')]) el?.addEventListener('scroll', () => { if (el.scrollTop || el.scrollLeft) { el.scrollTop = 0; el.scrollLeft = 0; } }, { passive: true });
   // Rappels d'habitudes : après « Fait » depuis un rappel, on rafraîchit la vue concernée
   habits.start(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';

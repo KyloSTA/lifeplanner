@@ -3601,3 +3601,9 @@ html:fullscreen #noel-garland { top: 0; }
 .hb-done-fold > summary:hover { background: var(--surface-2); }
 .hb-done-fold .hb-list { margin-top: 6px; }
 .hb-all-done { color: var(--ok); }
+
+/* Ajout rapide : miniature à annoter, bouton Coller */
+.qa-pic { position: relative; }
+.qa-pic img { cursor: zoom-in; }
+.qa-annot { position: absolute; left: 4px; bottom: 4px; font-style: normal; font-size: 13px; padding: 1px 4px; border-radius: 6px; background: rgba(0,0,0,.55); pointer-events: none; }
+.qa-paste { font-size: 16px; }
