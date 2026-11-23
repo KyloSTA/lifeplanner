@@ -328,18 +328,32 @@ function chip(h, day) {
 }
 
 /** Carte « Habitudes du jour » de la page Aujourd'hui. */
+// Habitudes du jour : celles à faire en haut, celles terminées regroupées dans une section repliée
+const DONE_FOLD = 'lp.hbDoneOpen';
+function chipsList(items, day) {
+  const todo = items.filter((h) => !doneOn(h, day)), done = items.filter((h) => doneOn(h, day));
+  let open = false;
+  try { open = localStorage.getItem(DONE_FOLD) === '1'; } catch { /* ignore */ }
+  return `${todo.length ? `<div class="hb-list">${todo.map((h) => chip(h, day)).join('')}</div>` : '<p class="empty-sm hb-all-done">🎉 Toutes les habitudes du jour sont faites !</p>'}
+    ${done.length ? `<details class="hb-done-fold" ${open ? 'open' : ''}><summary>✓ Terminées <span class="muted">${done.length}</span></summary><div class="hb-list">${done.map((h) => chip(h, day)).join('')}</div></details>` : ''}`;
+}
+function bindDoneFold(el) {
+  el.querySelector('.hb-done-fold')?.addEventListener('toggle', (e) => { try { localStorage.setItem(DONE_FOLD, e.target.open ? '1' : '0'); } catch { /* ignore */ } });
+}
+
 export async function todayCard(el) {
   if (!el) return;
   const day = iso(new Date());
   const items = (await list()).filter((h) => isDue(h, new Date()));
   const done = items.filter((h) => doneOn(h, day)).length;
   el.innerHTML = `<div class="card-head"><h2>🔁 Habitudes du jour</h2><span class="muted">${items.length ? `${done}/${items.length}` : ''} <a href="#/habits">Gérer →</a></span></div>
-    ${items.length ? `<div class="hb-list">${items.map((h) => chip(h, day)).join('')}</div>`
+    ${items.length ? chipsList(items, day)
       : '<p class="empty-sm">Aucune habitude prévue aujourd’hui. <a href="#/habits">En créer une</a></p>'}`;
   bindChips(el, day, () => todayCard(el));
 }
 
 function bindChips(el, day, redraw) {
+  bindDoneFold(el);
   el.querySelectorAll('.hb-chip').forEach((c) => {
     c.querySelector('[data-bump]').onclick = async () => { await bump(c.dataset.id, day); redraw(); };
     const m = c.querySelector('[data-minus]');
@@ -403,7 +417,7 @@ export async function renderPage(ctx) {
   view.querySelector('.hb-details')?.addEventListener('toggle', (e) => { detailsOpen = e.target.open; });
   const todayEl = view.querySelector('#hb-today');
   todayEl.innerHTML = `<div class="card-head"><h2>Aujourd’hui</h2><span class="muted">${due.filter((h) => doneOn(h, day)).length}/${due.length}</span></div>
-    ${due.length ? `<div class="hb-list">${due.map((h) => chip(h, day)).join('')}</div>` : '<p class="empty-sm">Rien de prévu aujourd’hui. <a href="#/habits">＋ Créer une habitude</a></p>'}`;
+    ${due.length ? chipsList(due, day) : '<p class="empty-sm">Rien de prévu aujourd’hui. <a href="#/habits">＋ Créer une habitude</a></p>'}`;
   bindChips(todayEl, day, redraw);
 
   view.querySelector('#hb-new').onclick = () => editor(ctx, null, redraw);
