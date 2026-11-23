@@ -56,13 +56,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (msg?.type === 'lp-is-launcher') {
       reply({ yes: (await launcherTabs()).includes(sender.tab?.id) });
     } else if (msg?.type === 'lp-focus') {
-      // ↩ Bouton « Life Planner » : ramène la fenêtre de Life Planner (app installée ou onglet) à l'avant
-      const tabs = await chrome.tabs.query({ url: LP_URLS });
-      const t = tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
-      if (!t) { reply({ ok: false }); return; }
-      await chrome.tabs.update(t.id, { active: true });
-      await chrome.windows.update(t.windowId, { focused: true });
-      reply({ ok: true });
+      reply({ ok: await focusLifePlanner() });
     } else if (msg?.type === 'lp-save' && msg.clip) {
       const queue = (await getQueue()).filter((c) => c.url !== msg.clip.url);
       await setQueue([...queue, msg.clip]);
@@ -77,3 +71,14 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   })();
   return true; // réponse asynchrone
 });
+
+/* ---------- ↩ Revenir à Life Planner (pastille dans la page, ou icône de l'extension dans la barre du haut) ---------- */
+async function focusLifePlanner() {
+  const tabs = await chrome.tabs.query({ url: LP_URLS });
+  const t = tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+  if (!t) return false;
+  await chrome.tabs.update(t.id, { active: true });
+  await chrome.windows.update(t.windowId, { focused: true });
+  return true;
+}
+chrome.action.onClicked.addListener(() => { focusLifePlanner().catch(() => {}); });
