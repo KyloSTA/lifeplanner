@@ -163,5 +163,20 @@ export function openWindow(item) {
   // Un nom de fenêtre par élément : un 2e clic ramène la même fenêtre au lieu d'en ouvrir une autre
   const win = window.open(item.url, 'lp-' + item.id, `popup,width=${w},height=${h},left=${left},top=${top}`);
   win?.focus?.();
+  if (win) { openWins.set(item.id, { win, item }); dispatchEvent(new CustomEvent('lp-launcher-windows')); }
   return !!win;
+}
+
+/* ---------- Fenêtres du Lanceur encore ouvertes (pour y revenir d'un clic) ---------- */
+const openWins = new Map(); // id -> { win, item }
+/** Les éléments dont la fenêtre est encore ouverte (les fenêtres fermées sont oubliées). */
+export function openWindows() {
+  for (const [id, o] of openWins) { let closed = true; try { closed = o.win.closed; } catch { /* ignore */ } if (closed) openWins.delete(id); }
+  return [...openWins.values()].map((o) => o.item);
+}
+/** Ramène la fenêtre d'un élément à l'avant. */
+export function focusWindow(id) {
+  const o = openWins.get(id);
+  if (!o) return false;
+  try { if (o.win.closed) { openWins.delete(id); return false; } o.win.focus(); return true; } catch { return false; }
 }
