@@ -64,7 +64,7 @@ const BY_HOST = [[/(^|\.)nhl\.com$/, 'nhl', '#0b0b0b'], [/(^|\.)amazon\./, 'amaz
   [/(^|\.)reddit\.com$/, 'reddit', '#ff4500'], [/(^|\.)facebook\.com$/, 'facebook', '#1877f2'], [/(^|\.)messenger\.com$/, 'messenger', '#7b5cff'],
   [/^mail\.google\.com$/, 'gmail', '#ffffff'], [/spotify\.com$/, 'spotify', '#1db954'], [/stremio\.com$/, 'stremio', '#2b1b5a'], [/^play\.google\.com$/, 'playbooks', '#ffffff']];
 function known(it) {
-  if (ICONS[it.id]) return null;
+  if (ICONS[it.iconId || it.id]) return null;
   let host = '';
   try { host = new URL(it.url).hostname; } catch { return null; }
   return BY_HOST.find(([re]) => re.test(host)) || null;
@@ -73,7 +73,7 @@ function known(it) {
 export const colorOf = (it) => known(it)?.[2] || it.color || '#4f46e5';
 
 export function iconHTML(it) {
-  if (ICONS[it.id]) return ICONS[it.id];
+  if (ICONS[it.iconId || it.id]) return ICONS[it.iconId || it.id];
   const k = known(it);
   if (k) return ICONS[k[1]];
   const letter = String(it.icon || it.name?.[0] || '★').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -169,13 +169,37 @@ export function openWindow(item) {
 
 /* ---------- Fenêtres du Lanceur encore ouvertes (pour y revenir d'un clic) ---------- */
 const openWins = new Map(); // id -> { win, item }
+// Avec l'extension Edge (1.12+), toutes les pages ouvertes depuis le Lanceur se signalent, quel que soit le
+// mode (app installée, onglet, fenêtre) et même après un rechargement de Life Planner.
+let extTabs = [], extItems = [];
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+addEventListener('message', (e) => {
+  if (e.source !== window || e.data?.type !== 'lp-lw-list-res') return;
+  extTabs = Array.isArray(e.data.tabs) ? e.data.tabs : [];
+  dispatchEvent(new CustomEvent('lp-launcher-windows-ext'));
+});
+/** Demande à l'extension la liste à jour (la réponse arrive par l'événement « lp-launcher-windows-ext »). */
+export async function refreshExtWindows() {
+  try { extItems = await list(); } catch { /* ignore */ }
+  postMessage({ type: 'lp-lw-list' }, location.origin);
+}
+function extItem(t) {
+  const h = hostOf(t.url);
+  const base = extItems.find((x) => /^https?:/.test(x.url || '') && hostOf(x.url) === h);
+  return { ...(base || { color: '#4f46e5' }), id: 'tab:' + t.tabId, iconId: base?.id, name: base?.name || t.title || h, url: t.url };
+}
+
 /** Les éléments dont la fenêtre est encore ouverte (les fenêtres fermées sont oubliées). */
 export function openWindows() {
   for (const [id, o] of openWins) { let closed = true; try { closed = o.win.closed; } catch { /* ignore */ } if (closed) openWins.delete(id); }
-  return [...openWins.values()].map((o) => o.item);
+  const ext = extTabs.map(extItem);
+  const hosts = new Set(ext.map((x) => hostOf(x.url)));
+  // Une fenêtre déjà signalée par l'extension n'est montrée qu'une fois
+  return [...[...openWins.values()].map((o) => o.item).filter((it) => !hosts.has(hostOf(it.url))), ...ext];
 }
 /** Ramène la fenêtre d'un élément à l'avant. */
 export function focusWindow(id) {
+  if (String(id).startsWith('tab:')) { postMessage({ type: 'lp-lw-focus', tabId: Number(String(id).slice(4)) }, location.origin); return true; }
   const o = openWins.get(id);
   if (!o) return false;
   try { if (o.win.closed) { openWins.delete(id); return false; } o.win.focus(); return true; } catch { return false; }
