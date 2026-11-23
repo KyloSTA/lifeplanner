@@ -3762,7 +3762,7 @@ $('#rail-more').onclick = () => {
   const sync = () => {
     const on = !!document.fullscreenElement || winFs.matches;
     fsBtn.innerHTML = on ? ICON_OUT : ICON_IN;
-    fsBtn.title = on ? 'Quitter le plein écran (Échap)' : 'Plein écran (F11)';
+    fsBtn.title = on ? 'Quitter le plein écran (F)' : 'Plein écran (F)';
     fsBtn.setAttribute('aria-label', on ? 'Quitter le plein écran' : 'Plein écran');
     fsBtn.classList.toggle('active', on);
   };
@@ -3776,6 +3776,13 @@ $('#rail-more').onclick = () => {
     };
     document.addEventListener('fullscreenchange', sync);
     winFs.addEventListener?.('change', sync);
+    // Touche F : entrer dans le plein écran ou en sortir (pas pendant qu'on écrit ou dessine)
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || (e.key !== 'f' && e.key !== 'F')) return;
+      if (e.target.closest?.('input, textarea, select, [contenteditable], canvas') || document.body.classList.contains('ink-mode')) return;
+      e.preventDefault();
+      fsBtn.click();
+    });
     sync();
   }
 }
