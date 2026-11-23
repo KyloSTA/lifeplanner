@@ -124,6 +124,8 @@ export const pcLink = (item) => 'lpapp:' + encodeURIComponent(item.appName || it
 
 /** Ouvre un élément. Renvoie false si le navigateur a bloqué la fenêtre. */
 export function open(item, onMissing = () => {}) {
+  // Prévient l'extension Edge : la page qui s'ouvre aura son bouton rond et son icône à côté de la loupe
+  if (/^https?:/.test(item.url || '')) postMessage({ type: 'lp-lw-expect', url: item.url }, location.origin);
   // 'pc' : application Windows du menu Démarrer (ex. NHL installée depuis Edge), ouverte par le lien « lpapp: »
   // (voir « Installer apps Windows.bat »). Sur cellulaire, ou si rien ne s'ouvre, on se rabat sur le site.
   if (item.mode === 'pc') {
@@ -158,8 +160,8 @@ function followLink(url) {
 export const MODES = { window: 'Fenêtre', installed: 'App installée', pc: 'App Windows', tab: 'Onglet' };
 
 export function openWindow(item) {
-  const w = Math.min(1280, screen.availWidth - 80), h = Math.min(900, screen.availHeight - 80);
-  const left = Math.round((screen.availWidth - w) / 2), top = Math.round((screen.availHeight - h) / 2);
+  // Tout l'écran (l'extension Edge la passe ensuite en vrai plein écran)
+  const w = screen.availWidth, h = screen.availHeight, left = 0, top = 0;
   // Un nom de fenêtre par élément : un 2e clic ramène la même fenêtre au lieu d'en ouvrir une autre
   const win = window.open(item.url, 'lp-' + item.id, `popup,width=${w},height=${h},left=${left},top=${top}`);
   win?.focus?.();

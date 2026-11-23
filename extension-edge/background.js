@@ -28,6 +28,13 @@ chrome.tabs.onRemoved.addListener(async (id) => {
   if (info[id]) { delete info[id]; await chrome.storage.session.set({ launcherInfo: info }); }
 });
 
+/* ---------- Sites que le Lanceur vient d'ouvrir (reconnus pendant 2 minutes) ---------- */
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^(www|m|old|new)\./, ''); } catch { return ''; } };
+async function expected() {
+  const list = (await chrome.storage.session.get('launcherExpect')).launcherExpect || [];
+  return list.filter((x) => Date.now() - x.at < 120000);
+}
+
 /* ---------- Pages du Lanceur encore ouvertes (pour l'icône à côté de la loupe dans l'app) ---------- */
 // Chaque page du Lanceur se signale elle-même (back.js) avec son adresse, son titre et son icône :
 // l'extension n'a pas besoin de la permission « onglets ».
@@ -78,13 +85,26 @@ async function deliver() {
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   (async () => {
     if (msg?.type === 'lp-is-launcher') {
-      reply({ yes: (await launcherTabs()).includes(sender.tab?.id) });
+      let yes = (await launcherTabs()).includes(sender.tab?.id);
+      // Le Lanceur vient d'ouvrir ce site (app installée, plein écran, onglet…) : c'est une page du Lanceur
+      if (!yes && sender.tab) {
+        const h = hostOf(sender.tab.url || sender.url || '');
+        yes = !!h && (await expected()).some((x) => x.host === h);
+        if (yes) await markLauncherTab(sender.tab.id);
+      }
+      reply({ yes });
+    } else if (msg?.type === 'lp-launcher-expect' && isLP(sender.tab?.url || sender.url)) {
+      const h = hostOf(msg.url);
+      if (h) await chrome.storage.session.set({ launcherExpect: [...(await expected()).filter((x) => x.host !== h), { host: h, at: Date.now() }] });
+      reply({ ok: true });
     } else if (msg?.type === 'lp-launcher-here' && sender.tab) {
       const info = await launcherInfo();
       const prev = info[sender.tab.id];
       info[sender.tab.id] = { url: String(msg.url || '').slice(0, 500), title: String(msg.title || '').slice(0, 160), icon: String(msg.icon || '').slice(0, 500), at: prev?.at || Date.now() };
       await chrome.storage.session.set({ launcherInfo: info });
       await markLauncherTab(sender.tab.id);
+      // Les pages du Lanceur s'ouvrent en plein écran (une seule fois : F11 ou Échap en sort, et ça reste ainsi)
+      if (!prev) await chrome.windows.update(sender.tab.windowId, { state: 'fullscreen' }).catch(() => {});
       reply({ ok: true });
     } else if (msg?.type === 'lp-launcher-list') {
       reply({ tabs: await launcherList() });
