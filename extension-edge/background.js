@@ -82,3 +82,6 @@ async function focusLifePlanner() {
   return true;
 }
 chrome.action.onClicked.addListener(() => { focusLifePlanner().catch(() => {}); });
+// Raccourci clavier (Alt+L par défaut, modifiable dans edge://extensions/shortcuts) : marche aussi dans les
+// fenêtres ouvertes par le Lanceur, qui n'affichent pas les icônes d'extensions
+chrome.commands.onCommand.addListener((cmd) => { if (cmd === 'lp-back') focusLifePlanner().catch(() => {}); });
