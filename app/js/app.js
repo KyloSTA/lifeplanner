@@ -38,6 +38,7 @@ import { swipeable } from './swipe.js';
 import * as videodock from './videodock.js';
 import * as spotify from './spotify.js';
 import * as noel from './noel.js';
+import * as priobar from './priobar.js';
 import * as property from './property.js';
 import { bindCapture, brainState, captureForm, evoCard, renderBrain, renderNote } from './page-brain.js';
 
@@ -3831,6 +3832,7 @@ game.init().catch(console.error).finally(async () => {
   reminders.start();
   addEventListener('lp-toast', (e) => toast(e.detail));
   spotify.start().catch(console.error);
+  priobar.start();
   // Rappels d'habitudes : après « Fait » depuis un rappel, on rafraîchit la vue concernée
   habits.start(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';

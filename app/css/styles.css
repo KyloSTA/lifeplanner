@@ -3571,3 +3571,19 @@ html:fullscreen #noel-garland { top: 0; }
 @keyframes noelStar { 50% { transform: scale(1.25); filter: drop-shadow(0 0 4px #ffd23f); } }
 @media (prefers-reduced-motion: reduce) { #noel-garland .ng-b, .nb-l, .nb-star, :root[data-theme="noel"] .brand-logo::after { animation: none; } }
 .noel-snow-opt[hidden] { display: none !important; }
+
+/* 🔥 Missions en vedette (haut de toutes les pages) */
+.prio-bar { margin: 0 0 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, #dc2626 45%, var(--border)); background: linear-gradient(90deg, color-mix(in srgb, #dc2626 10%, var(--surface)), var(--surface)); overflow: hidden; }
+.pb-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 14px; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+.pb-n { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #dc2626; color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
+.pb-caret { margin-left: auto; color: var(--muted); transition: transform .15s; }
+.prio-bar.folded .pb-caret { transform: rotate(-90deg); }
+.prio-bar.folded .pb-list { display: none; }
+.pb-list { list-style: none; margin: 0; padding: 0 10px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.pb-list li { display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); max-width: 100%; }
+.pb-list li.urgent { border-color: color-mix(in srgb, #dc2626 55%, transparent); }
+.pb-list li.prio { border-color: color-mix(in srgb, var(--gold, #c9a24a) 60%, transparent); }
+.pb-title { border: 0; background: none; padding: 0; color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42ch; }
+.pb-title:hover { color: var(--accent); }
+.pb-list small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.pb-list small.pb-late { color: #ef4444; font-weight: 700; }
