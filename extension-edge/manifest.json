@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Life Planner — Reddit, YouTube, Amazon et Facebook → Life Planner",
-  "version": "1.10.0",
-  "description": "Ajoute un bouton « Cerveau » aux posts Reddit, aux vidéos YouTube et aux produits Amazon (et « Activités » aux événements Facebook) ouverts depuis le Lanceur de Life Planner (ou dans leur app installée), pour les enregistrer comme note. Un clic sur l'icône de l'extension ramène Life Planner à l'avant.",
+  "version": "1.11.0",
+  "description": "Ajoute un bouton « Cerveau » aux posts Reddit, aux vidéos YouTube et aux produits Amazon (et « Activités » aux événements Facebook) ouverts depuis le Lanceur de Life Planner (ou dans leur app installée), pour les enregistrer comme note. Un bouton rond (ou Alt+L, ou l'icône de l'extension) ramène Life Planner à l'avant depuis les pages ouvertes par le Lanceur.",
   "permissions": ["storage"],
   "host_permissions": [
     "http://localhost:5173/*",
@@ -14,6 +14,12 @@
   "action": { "default_title": "Revenir à Life Planner", "default_icon": { "16": "icon16.png", "32": "icon32.png", "48": "icon48.png", "128": "icon128.png" } },
   "background": { "service_worker": "background.js" },
   "content_scripts": [
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "exclude_matches": ["http://localhost:5173/*", "https://kylosta.github.io/lifeplanner/*"],
+      "js": ["back.js"],
+      "run_at": "document_idle"
+    },
     {
       "matches": ["https://www.reddit.com/*", "https://old.reddit.com/*", "https://new.reddit.com/*", "https://reddit.com/*"],
       "js": ["reddit.js"],
@@ -41,5 +47,6 @@
       "run_at": "document_start"
     }
   ],
+  "web_accessible_resources": [{ "resources": ["icon128.png"], "matches": ["https://*/*", "http://*/*"] }],
   "icons": { "16": "icon16.png", "32": "icon32.png", "48": "icon48.png", "128": "icon128.png" }
 }
