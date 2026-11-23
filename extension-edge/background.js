@@ -24,7 +24,31 @@ chrome.tabs.onCreated.addListener(async (tab) => {
 chrome.tabs.onRemoved.addListener(async (id) => {
   const ids = await launcherTabs();
   if (ids.includes(id)) await chrome.storage.session.set({ launcherTabs: ids.filter((x) => x !== id) });
+  const info = await launcherInfo();
+  if (info[id]) { delete info[id]; await chrome.storage.session.set({ launcherInfo: info }); }
 });
+
+/* ---------- Pages du Lanceur encore ouvertes (pour l'icône à côté de la loupe dans l'app) ---------- */
+// Chaque page du Lanceur se signale elle-même (back.js) avec son adresse, son titre et son icône :
+// l'extension n'a pas besoin de la permission « onglets ».
+async function launcherInfo() { return (await chrome.storage.session.get('launcherInfo')).launcherInfo || {}; }
+async function launcherList() {
+  const info = await launcherInfo();
+  const out = [];
+  for (const [id, it] of Object.entries(info)) {
+    try { await chrome.tabs.get(Number(id)); out.push({ tabId: Number(id), ...it }); }
+    catch { delete info[id]; } // onglet fermé entre-temps
+  }
+  await chrome.storage.session.set({ launcherInfo: info });
+  return out.sort((a, b) => a.at - b.at);
+}
+async function focusTab(tabId) {
+  try {
+    const t = await chrome.tabs.update(tabId, { active: true });
+    await chrome.windows.update(t.windowId, { focused: true });
+    return true;
+  } catch { return false; }
+}
 
 /* ---------- File d'attente et livraison ---------- */
 const getQueue = async () => (await chrome.storage.local.get('queue')).queue || [];
@@ -55,6 +79,17 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   (async () => {
     if (msg?.type === 'lp-is-launcher') {
       reply({ yes: (await launcherTabs()).includes(sender.tab?.id) });
+    } else if (msg?.type === 'lp-launcher-here' && sender.tab) {
+      const info = await launcherInfo();
+      const prev = info[sender.tab.id];
+      info[sender.tab.id] = { url: String(msg.url || '').slice(0, 500), title: String(msg.title || '').slice(0, 160), icon: String(msg.icon || '').slice(0, 500), at: prev?.at || Date.now() };
+      await chrome.storage.session.set({ launcherInfo: info });
+      await markLauncherTab(sender.tab.id);
+      reply({ ok: true });
+    } else if (msg?.type === 'lp-launcher-list') {
+      reply({ tabs: await launcherList() });
+    } else if (msg?.type === 'lp-launcher-focus') {
+      reply({ ok: await focusTab(Number(msg.tabId)) });
     } else if (msg?.type === 'lp-focus') {
       reply({ ok: await focusLifePlanner() });
     } else if (msg?.type === 'lp-save' && msg.clip) {

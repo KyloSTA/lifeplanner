@@ -3881,6 +3881,10 @@ game.init().catch(console.error).finally(async () => {
     box.querySelectorAll('[data-lw]').forEach((b) => (b.onclick = () => { if (!launcher.focusWindow(b.dataset.lw)) { toast('Cette fenêtre est fermée'); drawLw(); } }));
   };
   addEventListener('lp-launcher-windows', drawLw);
+  addEventListener('lp-launcher-windows-ext', drawLw);
+  launcher.refreshExtWindows();
+  addEventListener('focus', () => launcher.refreshExtWindows());
+  setInterval(() => { if (document.visibilityState === 'visible') launcher.refreshExtWindows(); }, 4000);
   addEventListener('focus', drawLw);
   setInterval(drawLw, 3000);
   // La fenêtre elle-même ne défile jamais (seul le contenu défile) : si elle glisse, on la remet en place

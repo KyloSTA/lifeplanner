@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Life Planner — Reddit, YouTube, Amazon et Facebook → Life Planner",
-  "version": "1.11.1",
+  "version": "1.12.0",
   "description": "Ajoute un bouton « Cerveau » aux posts Reddit, aux vidéos YouTube et aux produits Amazon (et « Activités » aux événements Facebook) ouverts depuis le Lanceur de Life Planner (ou dans leur app installée), pour les enregistrer comme note. Un bouton rond (ou Alt+L, ou l'icône de l'extension) ramène Life Planner à l'avant depuis les pages ouvertes par le Lanceur.",
   "permissions": ["storage"],
   "host_permissions": [

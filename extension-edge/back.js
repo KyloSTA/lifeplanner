@@ -13,6 +13,13 @@
   if (!yes) return;
   try { sessionStorage.setItem(FLAG, '1'); } catch { /* ignore */ }
 
+  // Se signale à l'extension : Life Planner affiche une icône à côté de sa loupe pour revenir ici
+  const iconUrl = () => { const l = document.querySelector('link[rel~="icon"][href], link[rel="apple-touch-icon"][href]'); return l ? new URL(l.getAttribute('href'), location.href).href : location.origin + '/favicon.ico'; };
+  const report = () => chrome.runtime.sendMessage({ type: 'lp-launcher-here', url: location.href, title: document.title, icon: iconUrl() }).catch(() => {});
+  report();
+  setInterval(report, 15000); // titre et adresse à jour (sites qui changent de page sans recharger)
+  document.addEventListener('visibilitychange', report);
+
   const KEY = 'lpFab:' + location.hostname;
   const saved = (await chrome.storage.local.get(KEY))[KEY]; // { x, y } en % de la fenêtre
   const SIZE = 52;

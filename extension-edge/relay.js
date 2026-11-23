@@ -14,6 +14,15 @@ window.addEventListener('message', (e) => {
     }
   } else if (e.data.type === 'lp-clip-ack') {
     acks.get(e.data.id)?.(true);
+  } else if (e.data.type === 'lp-lw-list') {
+    // Pages ouvertes depuis le Lanceur (Reddit, YouTube…) : l'app les montre à côté de sa loupe
+    chrome.runtime.sendMessage({ type: 'lp-launcher-list' })
+      .then((r) => window.postMessage({ type: 'lp-lw-list-res', tabs: r?.tabs || [] }, location.origin))
+      .catch(() => {});
+  } else if (e.data.type === 'lp-lw-focus') {
+    chrome.runtime.sendMessage({ type: 'lp-launcher-focus', tabId: e.data.tabId })
+      .then((r) => window.postMessage({ type: 'lp-lw-focus-res', tabId: e.data.tabId, ok: !!r?.ok }, location.origin))
+      .catch(() => {});
   }
 });
 
