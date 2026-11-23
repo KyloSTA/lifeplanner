@@ -1,9 +1,17 @@
 // ↩ Bouton « Life Planner » en haut des pages ouvertes depuis le Lanceur : ramène la fenêtre de Life Planner à l'avant.
 (async () => {
   if (window.top !== window || document.getElementById('lp-back-btn')) return;
+  // Ouvert depuis le Lanceur ? Même détection que le bouton « Cerveau » de Reddit :
+  // 1) déjà reconnu dans cet onglet ; 2) la fenêtre porte le nom « lp-… » donné par le Lanceur ;
+  // 3) site installé comme application (mode « App installée » du Lanceur) ; 4) l'extension a vu Life Planner l'ouvrir.
+  const FLAG = 'lp-from-launcher';
   let yes = false;
-  try { yes = (await chrome.runtime.sendMessage({ type: 'lp-is-launcher' }))?.yes; } catch { return; }
+  try { yes = !!sessionStorage.getItem(FLAG); } catch { /* ignore */ }
+  if (!yes) yes = /^lp-/.test(window.name || '');
+  if (!yes) yes = ['standalone', 'minimal-ui', 'window-controls-overlay'].some((m) => matchMedia(`(display-mode: ${m})`).matches);
+  if (!yes) { try { yes = !!(await chrome.runtime.sendMessage({ type: 'lp-is-launcher' }))?.yes; } catch { /* ignore */ } }
   if (!yes) return;
+  try { sessionStorage.setItem(FLAG, '1'); } catch { /* ignore */ } // garde l'info quand on navigue dans le site
   const b = document.createElement('button');
   b.id = 'lp-back-btn';
   b.type = 'button';
