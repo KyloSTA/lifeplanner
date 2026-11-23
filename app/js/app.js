@@ -1954,8 +1954,10 @@ async function renderDay(arg) {
           <span class="ev-title">${withTeamLogos(esc(e.title))}</span><span class="ev-time">${U.fmtTime(new Date(e.start))} – ${U.fmtTime(new Date(e.end))}</span></div>`;
       }).join('')
       + blocks.map((b) => {
-        const h = Math.max(top(b.e2) - top(b.s), 14), t = b.task; // missions courtes (ex. 3 dans une heure) : petits blocs qui ne se chevauchent pas
-        return `<div class="dayv-task ${t.done ? 'done' : ''} ${h < 40 ? 'short' : ''} ${h < 24 ? 'tiny' : ''}" data-tid="${t.id}" style="top:${top(b.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${b.col} / ${b.cols});width:calc((100% - 60px) / ${b.cols} - 4px)" title="Glisser pour changer l’heure · clic pour ouvrir">
+        // Mission courte : au moins 26 px pour que le titre se lise, sans déborder sur la mission suivante de la même colonne
+        const next = blocks.filter((o) => o !== b && o.col === b.col && o.s > b.s).reduce((m, o) => Math.min(m, top(o.s)), Infinity);
+        const h = Math.max(top(b.e2) - top(b.s), Math.min(26, next - top(b.s) - 1)), t = b.task;
+        return `<div class="dayv-task ${t.done ? 'done' : ''} ${h < 40 ? 'short' : ''} ${h < 28 ? 'tiny' : ''}" data-tid="${t.id}" style="top:${top(b.s)}px;height:${h - 2}px;left:calc(56px + (100% - 60px) * ${b.col} / ${b.cols});width:calc((100% - 60px) / ${b.cols} - 4px)" title="Glisser pour changer l’heure · clic pour ouvrir">
           <input type="checkbox" class="dvt-cb" ${t.done ? 'checked' : ''} aria-label="Mission accomplie : ${esc(t.title)}"><span class="ev-title">✅ ${esc(t.title)}</span><span class="ev-time">${esc(timeLabel(t))}</span><button type="button" class="dvt-x" aria-label="Retirer « ${esc(t.title)} » de l’horaire" title="Retirer de l’horaire (la mission reste dans la liste)">×</button></div>`;
       }).join('')
       + marks.map(({ t, s }) => `<a class="dayv-alarm" href="#/missions" style="top:${top(s) - 11}px" title="Alarme de mission">⏰ ${U.fmtTime(new Date(s))} · ${esc(t.title)}</a>`).join('')
