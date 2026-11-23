@@ -3607,3 +3607,11 @@ html:fullscreen #noel-garland { top: 0; }
 .qa-pic img { cursor: zoom-in; }
 .qa-annot { position: absolute; left: 4px; bottom: 4px; font-style: normal; font-size: 13px; padding: 1px 4px; border-radius: 6px; background: rgba(0,0,0,.55); pointer-events: none; }
 .qa-paste { font-size: 16px; }
+
+/* Fenêtres du Lanceur encore ouvertes : petites icônes rondes à côté de la loupe */
+#lw-dock { display: flex; gap: 8px; align-items: center; }
+#lw-dock[hidden] { display: none; }
+.lw-btn { width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.85); background: var(--c, var(--surface)); color: #fff; display: grid; place-items: center; overflow: hidden; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.35); transition: transform .15s; }
+.lw-btn:hover { transform: scale(1.08); }
+.lw-btn > * { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; }
+.lw-btn svg, .lw-btn img { width: 100%; height: 100%; }

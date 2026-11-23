@@ -3871,6 +3871,18 @@ game.init().catch(console.error).finally(async () => {
   addEventListener('lp-toast', (e) => toast(e.detail));
   spotify.start().catch(console.error);
   priobar.start();
+  // Fenêtres du Lanceur encore ouvertes : une icône à côté de la loupe pour y revenir
+  const drawLw = () => {
+    const box = $('#lw-dock');
+    if (!box) return;
+    const items = launcher.openWindows();
+    box.hidden = !items.length;
+    box.innerHTML = items.map((it) => `<button type="button" class="lw-btn" data-lw="${esc(it.id)}" title="Revenir à ${esc(it.name)}" aria-label="Revenir à ${esc(it.name)}" style="--c:${esc(launcher.colorOf(it))}">${launcher.iconHTML(it)}</button>`).join('');
+    box.querySelectorAll('[data-lw]').forEach((b) => (b.onclick = () => { if (!launcher.focusWindow(b.dataset.lw)) { toast('Cette fenêtre est fermée'); drawLw(); } }));
+  };
+  addEventListener('lp-launcher-windows', drawLw);
+  addEventListener('focus', drawLw);
+  setInterval(drawLw, 3000);
   // La fenêtre elle-même ne défile jamais (seul le contenu défile) : si elle glisse, on la remet en place
   addEventListener('scroll', () => { if (scrollY || scrollX) scrollTo(0, 0); }, { passive: true });
   // Idem pour le corps de la page et le cadre de l'app (ils ne doivent jamais défiler : seul le contenu défile)

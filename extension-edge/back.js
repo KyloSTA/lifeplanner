@@ -1,6 +1,6 @@
 // ↩ Bouton rond « Life Planner » (comme le ＋ de l'app) sur les pages ouvertes depuis le Lanceur :
-// un clic ramène la fenêtre de Life Planner à l'avant. Placé en bas à gauche, là où les sites mettent
-// rarement quelque chose ; on peut le glisser ailleurs, et sa place est gardée pour chaque site.
+// un clic ramène la fenêtre de Life Planner à l'avant. Placé en bas à droite (comme le ＋ de l'app) ;
+// on peut le glisser ailleurs, et sa place est gardée pour chaque site.
 (async () => {
   if (window.top !== window || document.getElementById('lp-back-fab')) return;
   // Ouvert depuis le Lanceur ? Même détection que le bouton « Cerveau » de Reddit
@@ -37,7 +37,7 @@
     b.style.left = Math.max(8, Math.min(mx, x)) + 'px';
     b.style.top = Math.max(8, Math.min(my, y)) + 'px';
   };
-  const restore = () => (saved ? place(saved.x * innerWidth, saved.y * innerHeight) : place(20, innerHeight - SIZE - 20));
+  const restore = () => (saved ? place(saved.x * innerWidth, saved.y * innerHeight) : place(innerWidth - SIZE - 24, innerHeight - SIZE - 24)); // par défaut : en bas à droite, comme le ＋ de l'app
   restore();
   addEventListener('resize', restore);
   b.onmouseenter = () => { b.style.opacity = '1'; b.style.transform = 'scale(1.08)'; };
