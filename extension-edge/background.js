@@ -144,4 +144,12 @@ async function focusLifePlanner() {
 chrome.action.onClicked.addListener(() => { focusLifePlanner().catch(() => {}); });
 // Raccourci clavier (Alt+L par défaut, modifiable dans edge://extensions/shortcuts) : marche aussi dans les
 // fenêtres ouvertes par le Lanceur, qui n'affichent pas les icônes d'extensions
-chrome.commands.onCommand.addListener((cmd) => { if (cmd === 'lp-back') focusLifePlanner().catch(() => {}); });
+chrome.commands.onCommand.addListener((cmd, tab) => {
+  if (cmd === 'lp-back') focusLifePlanner().catch(() => {});
+  else if (cmd === 'lp-fullscreen') toggleFullscreen(tab).catch(() => {});
+});
+// Plein écran de la fenêtre active (Alt+Maj+F par défaut) : Life Planner, pages du Lanceur ou toute autre fenêtre
+async function toggleFullscreen(tab) {
+  const w = tab?.windowId != null ? await chrome.windows.get(tab.windowId) : await chrome.windows.getLastFocused();
+  await chrome.windows.update(w.id, { state: w.state === 'fullscreen' ? 'maximized' : 'fullscreen' });
+}
