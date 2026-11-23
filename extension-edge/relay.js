@@ -22,6 +22,9 @@ window.addEventListener('message', (e) => {
   } else if (e.data.type === 'lp-lw-expect') {
     // Le Lanceur ouvre un site : l'extension le reconnaîtra comme page du Lanceur (même en app installée, plein écran)
     chrome.runtime.sendMessage({ type: 'lp-launcher-expect', url: e.data.url }).catch(() => {});
+  } else if (e.data.type === 'lp-win-state') {
+    // Bouton plein écran de l'app : sort la fenêtre du plein écran mis par l'extension
+    chrome.runtime.sendMessage({ type: 'lp-window-state', state: e.data.state }).catch(() => {});
   } else if (e.data.type === 'lp-lw-focus') {
     chrome.runtime.sendMessage({ type: 'lp-launcher-focus', tabId: e.data.tabId })
       .then((r) => window.postMessage({ type: 'lp-lw-focus-res', tabId: e.data.tabId, ok: !!r?.ok }, location.origin))

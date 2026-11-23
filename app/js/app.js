@@ -3757,8 +3757,10 @@ $('#rail-more').onclick = () => {
   const fsBtn = $('#brand-fs');
   const ICON_IN = '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
   const ICON_OUT = '<svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
+  // Plein écran de la page (bouton, F11) ou de la fenêtre (mis par l'extension Edge à l'ouverture)
+  const winFs = matchMedia('(display-mode: fullscreen)');
   const sync = () => {
-    const on = !!document.fullscreenElement;
+    const on = !!document.fullscreenElement || winFs.matches;
     fsBtn.innerHTML = on ? ICON_OUT : ICON_IN;
     fsBtn.title = on ? 'Quitter le plein écran (Échap)' : 'Plein écran (F11)';
     fsBtn.setAttribute('aria-label', on ? 'Quitter le plein écran' : 'Plein écran');
@@ -3766,9 +3768,14 @@ $('#rail-more').onclick = () => {
   };
   if (fsBtn && document.fullscreenEnabled) {
     fsBtn.hidden = false;
-    fsBtn.onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen({ navigationUI: 'hide' }))
-      .catch(() => toast('Le plein écran n’est pas permis ici (essaie F11)', 'err'));
+    fsBtn.onclick = () => {
+      // Fenêtre mise en plein écran par l'extension : seule l'extension peut l'en sortir
+      if (!document.fullscreenElement && winFs.matches) { postMessage({ type: 'lp-win-state', state: 'maximized' }, location.origin); return; }
+      (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen({ navigationUI: 'hide' }))
+        .catch(() => toast('Le plein écran n’est pas permis ici (essaie F11)', 'err'));
+    };
     document.addEventListener('fullscreenchange', sync);
+    winFs.addEventListener?.('change', sync);
     sync();
   }
 }

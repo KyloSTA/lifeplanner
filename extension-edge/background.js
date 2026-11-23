@@ -106,6 +106,9 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       // Les pages du Lanceur s'ouvrent en plein écran (une seule fois : F11 ou Échap en sort, et ça reste ainsi)
       if (!prev) await chrome.windows.update(sender.tab.windowId, { state: 'fullscreen' }).catch(() => {});
       reply({ ok: true });
+    } else if (msg?.type === 'lp-window-state' && sender.tab && isLP(sender.tab.url || sender.url) && ['fullscreen', 'maximized', 'normal'].includes(msg.state)) {
+      await chrome.windows.update(sender.tab.windowId, { state: msg.state }).catch(() => {});
+      reply({ ok: true });
     } else if (msg?.type === 'lp-launcher-list') {
       reply({ tabs: await launcherList() });
     } else if (msg?.type === 'lp-launcher-focus') {
@@ -136,7 +139,6 @@ async function focusLifePlanner() {
   if (!t) return false;
   await chrome.tabs.update(t.id, { active: true });
   await chrome.windows.update(t.windowId, { focused: true });
-  await chrome.windows.update(t.windowId, { state: 'fullscreen' }).catch(() => {}); // retour à Life Planner : en plein écran
   return true;
 }
 chrome.action.onClicked.addListener(() => { focusLifePlanner().catch(() => {}); });
