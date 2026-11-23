@@ -37,6 +37,8 @@ import * as digest from './digest.js';
 import { swipeable } from './swipe.js';
 import * as videodock from './videodock.js';
 import * as spotify from './spotify.js';
+import * as noel from './noel.js';
+import * as priobar from './priobar.js';
 import * as property from './property.js';
 import { bindCapture, brainState, captureForm, evoCard, renderBrain, renderNote } from './page-brain.js';
 
@@ -3056,8 +3058,9 @@ async function renderSettings() {
       <section class="card">
         <div class="card-head"><h2>Apparence</h2></div>
         <select id="theme" style="width:auto">
-          <option value="">Selon Windows</option><option value="light">Clair</option><option value="dark">Sombre</option>
+          <option value="">Selon Windows</option><option value="light">Clair</option><option value="dark">Sombre</option><option value="noel">🎄 Noël</option>
         </select>
+        <label class="check noel-snow-opt" ${(localStorage.getItem('lp.theme') || '') === 'noel' ? '' : 'hidden'}><input type="checkbox" id="noel-snow-cb" ${noel.snowOn() ? 'checked' : ''}> ❄ Neige qui tombe</label>
       </section>
 
       ${couple.ON ? `<section class="card" id="cp-card"><div class="card-head"><h2>👫 Vous deux</h2><button class="btn" id="cp-edit" type="button">Modifier</button></div>
@@ -3401,6 +3404,8 @@ async function renderSettings() {
     try { localStorage.setItem('lp.theme', e.target.value); } catch { /* ignore */ }
     applyTheme();
   };
+  $("#noel-snow-cb").onchange = (e) => noel.setSnow(e.target.checked);
+  $('#theme').addEventListener('change', (e) => { $('.noel-snow-opt').hidden = e.target.value !== 'noel'; });
 }
 
 /* ---------- Synchronisation entre appareils (Réglages) ---------- */
@@ -3769,6 +3774,7 @@ function applyTheme() {
   try { t = localStorage.getItem('lp.theme') || ''; } catch { /* ignore */ }
   if (t) document.documentElement.dataset.theme = t;
   else delete document.documentElement.dataset.theme;
+  noel.apply(); // décorations du thème Noël
 }
 
 /* =========================================================
@@ -3826,6 +3832,7 @@ game.init().catch(console.error).finally(async () => {
   reminders.start();
   addEventListener('lp-toast', (e) => toast(e.detail));
   spotify.start().catch(console.error);
+  priobar.start();
   // Rappels d'habitudes : après « Fait » depuis un rappel, on rafraîchit la vue concernée
   habits.start(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
