@@ -3337,7 +3337,7 @@ async function renderSettings() {
   const drawShots = async () => {
     const el = $('#shot-card');
     if (!el) return;
-    const st = await shots.dirStatus();
+    const st = await shots.dirStatus().catch(() => ({ on: false }));
     el.innerHTML = `<div class="card-head"><h2>📸 Captures → Cerveau</h2><span class="muted">Sur cet appareil</span></div>
       <p class="muted" style="margin-top:0">Quand tu reviens dans Life Planner après une capture d’écran (Win + Maj + S), elle t’est proposée : un toucher l’ajoute au Cerveau, dans « À classer ». Rien n’est ajouté sans ton accord.</p>
       <div class="shot-opts">

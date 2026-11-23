@@ -22,6 +22,11 @@ export const canWatchDir = () => typeof window.showDirectoryPicker === 'function
 export const canClip = () => !!navigator.clipboard?.read;
 export const clipOn = () => ls.get(CLIP_KEY) === '1';
 
+// Edge ne répond parfois jamais à une demande d'accès (dossier, presse-papiers) : on n'attend jamais plus de quelques secondes
+const within = (p, ms, fallback) => Promise.race([Promise.resolve(p).catch(() => fallback), new Promise((r) => setTimeout(() => r(fallback), ms))]);
+const isHandle = (h) => !!h && typeof h.queryPermission === 'function' && typeof h.values === 'function';
+const getDir = async () => { const h = await within(db.get('cache', DIR_KEY), 3000, null); return isHandle(h) ? h : null; };
+
 async function hashBlob(b) {
   const buf = await b.arrayBuffer();
   const d = await crypto.subtle.digest('SHA-256', buf);
@@ -42,10 +47,9 @@ export async function enableClip() {
 export function disableClip() { ls.set(CLIP_KEY, ''); }
 
 export async function dirStatus() {
-  const h = await db.get('cache', DIR_KEY).catch(() => null);
+  const h = await getDir();
   if (!h) return { on: false };
-  let perm = 'prompt';
-  try { perm = await h.queryPermission({ mode: 'read' }); } catch { /* ignore */ }
+  const perm = await within(h.queryPermission({ mode: 'read' }), 2500, 'prompt');
   return { on: true, name: h.name, perm };
 }
 export async function chooseDir() {
@@ -60,12 +64,13 @@ export async function stopDir() { await db.del('cache', DIR_KEY); await db.del('
 async function fromClipboard() {
   if (!clipOn() || !canClip() || !document.hasFocus()) return null;
   try {
-    const st = await navigator.permissions?.query({ name: 'clipboard-read' }).catch(() => null);
+    const st = await within(navigator.permissions?.query({ name: 'clipboard-read' }), 2000, null);
     if (st && st.state !== 'granted') return null; // jamais de demande de permission sans clic
-    for (const it of await navigator.clipboard.read()) {
+    for (const it of (await within(navigator.clipboard.read(), 3000, [])) || []) {
       const t = it.types.find((x) => x.startsWith('image/'));
       if (!t) continue;
-      const blob = await it.getType(t);
+      const blob = await within(it.getType(t), 3000, null);
+      if (!blob) continue;
       const hash = await hashBlob(blob);
       if (hash === ls.get(HASH_KEY)) return null;
       return { blob, hash };
@@ -75,12 +80,12 @@ async function fromClipboard() {
 }
 
 async function fromFolder({ ask = false } = {}) {
-  const h = await db.get('cache', DIR_KEY).catch(() => null);
+  const h = await getDir();
   if (!h) return { files: [] };
-  let perm = await h.queryPermission({ mode: 'read' }).catch(() => 'denied');
-  if (perm !== 'granted' && ask) perm = await h.requestPermission({ mode: 'read' }).catch(() => 'denied');
+  let perm = await within(h.queryPermission({ mode: 'read' }), 2500, 'prompt');
+  if (perm !== 'granted' && ask) perm = await within(h.requestPermission({ mode: 'read' }), 60000, 'denied');
   if (perm !== 'granted') return { files: [], needPermission: true, name: h.name };
-  const since = (await db.get('cache', SINCE_KEY)) || Date.now();
+  const since = (await within(db.get('cache', SINCE_KEY), 3000, 0)) || Date.now();
   const files = [];
   for await (const entry of h.values()) {
     if (entry.kind !== 'file' || !IMG_RE.test(entry.name)) continue;
@@ -144,7 +149,8 @@ export async function check({ ask = false, force = false } = {}) {
   if (document.querySelector('#shot-root .shot-card')) return; // une proposition est déjà affichée
   busy = true; lastRun = Date.now();
   try {
-    const [clip, dir] = await Promise.all([fromClipboard(), fromFolder({ ask })]);
+    // Le dossier ne bloque jamais le presse-papiers (et inversement) : chacun a son délai maximal
+    const [clip, dir] = await Promise.all([within(fromClipboard(), 8000, null), within(fromFolder({ ask }), ask ? 70000 : 15000, { files: [] })]);
     const list = dir.files.map((f) => ({ blob: f }));
     // La capture copiée est aussi dans le dossier : on garde le fichier (pas de doublon)
     if (clip && !list.length) list.push({ blob: clip.blob });
@@ -155,8 +161,7 @@ export async function check({ ask = false, force = false } = {}) {
     };
     if (list.length) show(list, { onDone });
     else if (dir.needPermission && ask === false && force) show([], { onDone, needPermission: true, dirName: dir.name });
-  } catch (err) { console.warn('Captures', err); }
-  busy = false;
+  } catch (err) { console.warn('Captures', err); } finally { busy = false; }
 }
 
 /** Démarre la surveillance : à l'ouverture et chaque fois que tu reviens dans l'app. */
