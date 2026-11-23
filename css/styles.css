@@ -3349,7 +3349,9 @@ body.an-open { overflow: hidden; }
   .tb-launch img { width: 24px; height: 24px; border-radius: 50%; }
   .tb-launch:hover, .tb-launch[aria-expanded="true"] { background: rgba(255,255,255,.14); }
   .tb-title { opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .app { margin-top: env(titlebar-area-height, 33px); height: calc(100% - env(titlebar-area-height, 33px)); }
+  /* Le corps laisse la place à la barre (padding, pas de marge qui dépasse : la page ne peut plus glisser sous la barre) */
+  body { box-sizing: border-box; padding-top: env(titlebar-area-height, 33px); }
+  .app { margin-top: 0; height: 100%; }
   /* Les fenêtres plein écran de l'app commencent sous la barre (sinon les boutons de Windows cachent leurs outils) */
   .alarm-back, .modal-back, .img-zoom, .fi-drop, .sx-player, .ink-shell.ink-full, .an-root { top: env(titlebar-area-height, 33px); }
   #habit-root { top: calc(env(titlebar-area-height, 33px) + 16px); }
@@ -3380,11 +3382,13 @@ html:fullscreen #brand-launch { display: grid; }
 /* Plein écran : pas de barre de titre maison, l'app reprend tout l'écran */
 html:fullscreen .titlebar { display: none !important; }
 html:fullscreen .app { margin-top: 0; height: 100%; }
+html:fullscreen body { padding-top: 0; }
 html:fullscreen :is(.alarm-back, .modal-back, .img-zoom, .fi-drop, .sx-player, .ink-shell.ink-full, .an-root) { top: 0; }
 html:fullscreen #habit-root { top: 16px; }
 @media (display-mode: fullscreen) {
   .titlebar { display: none !important; }
   .app { margin-top: 0; height: 100%; }
+  body { padding-top: 0; }
 }
 
 /* 📈 Bourse : valeurs suivies */
@@ -3587,3 +3591,13 @@ html:fullscreen #noel-garland { top: 0; }
 .pb-title:hover { color: var(--accent); }
 .pb-list small { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .pb-list small.pb-late { color: #ef4444; font-weight: 700; }
+
+/* Habitudes du jour : section « Terminées » repliée */
+.hb-done-fold { margin-top: 8px; }
+.hb-done-fold > summary { cursor: pointer; list-style: none; padding: 6px 10px; border-radius: 10px; color: var(--ok); font-weight: 700; font-size: 13.5px; }
+.hb-done-fold > summary::-webkit-details-marker { display: none; }
+.hb-done-fold > summary::after { content: ' ▾'; color: var(--muted); }
+.hb-done-fold[open] > summary::after { content: ' ▴'; }
+.hb-done-fold > summary:hover { background: var(--surface-2); }
+.hb-done-fold .hb-list { margin-top: 6px; }
+.hb-all-done { color: var(--ok); }

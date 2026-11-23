@@ -3833,6 +3833,8 @@ game.init().catch(console.error).finally(async () => {
   addEventListener('lp-toast', (e) => toast(e.detail));
   spotify.start().catch(console.error);
   priobar.start();
+  // La fenêtre elle-même ne défile jamais (seul le contenu défile) : si elle glisse, on la remet en place
+  addEventListener('scroll', () => { if (scrollY || scrollX) scrollTo(0, 0); }, { passive: true });
   // Rappels d'habitudes : après « Fait » depuis un rappel, on rafraîchit la vue concernée
   habits.start(() => {
     const route = location.hash.replace(/^#\/?/, '').split('/')[0] || 'today';
