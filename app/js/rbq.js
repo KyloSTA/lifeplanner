@@ -131,6 +131,7 @@ function review(ctx, cards, title, onEnd) {
    ========================================================= */
 export async function renderPage(ctx, moduleId) {
   await ensureSeed();
+  if (moduleId === 'feuille') return (await import('./rbq-sheet.js')).renderSheet(ctx);
   if (moduleId) return renderModule(ctx, moduleId);
   const { view, modal, toast } = ctx;
   const { modules, cards, conf, daysLeft, due, done } = await stats();
@@ -148,6 +149,7 @@ export async function renderPage(ctx, moduleId) {
       <div><p class="eyebrow">Préparation d’examen</p><h1>${esc(conf.name || 'Cours RBQ')}</h1></div>
       <div class="head-actions">
         ${conf.courseUrl ? '<button class="btn" id="rbq-course">📖 Ouvrir le cours</button>' : ''}
+        <a class="btn" href="#/rbq/feuille">📋 Feuille d’examen</a>
         <button class="btn" id="rbq-conf">⚙ Examen et cours</button>
       </div>
     </header>
