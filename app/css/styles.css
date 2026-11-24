@@ -3769,3 +3769,26 @@ html:fullscreen #noel-garland { top: 0; }
 }
 .mdn-table th, .mdn-table td { overflow-wrap: normal; word-break: normal; min-width: 4em; }
 .sh-txt .mdn-table th { white-space: normal; }
+
+/* =========================================================
+   ✨ Muse : bilans sur la page Aujourd'hui
+   ========================================================= */
+.t-muse { border-color: color-mix(in srgb, var(--gold) 40%, var(--border)); background: linear-gradient(160deg, color-mix(in srgb, var(--gold) 7%, var(--surface)), var(--surface) 55%); }
+.t-muse .card-head { flex-wrap: wrap; gap: 8px; }
+.muse-tabs button { white-space: nowrap; }
+.muse-body { margin-top: 6px; }
+.muse-text { font-size: 14.5px; line-height: 1.6; }
+.muse-text p { margin: 0 0 .7em; }
+.muse-text strong { color: var(--gold-text); }
+.muse-old { font-size: 12.5px; margin: 0 0 6px; }
+.muse-wait { animation: museP 1.4s ease-in-out infinite; }
+@keyframes museP { 50% { opacity: .45; } }
+.muse-foot { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.muse-foot small { margin-left: auto; font-size: 12px; }
+.as-msg.bot.mdn-body { font-size: 14px; line-height: 1.55; }
+.as-msg.bot.mdn-body p { margin: 0 0 .5em; }
+.as-msg.bot.mdn-body > :last-child { margin-bottom: 0; }
+#muse-card textarea { min-height: 140px; }
+@media (max-width: 600px) { .muse-tabs { width: 100%; } .muse-tabs button { flex: 1; padding: 6px 4px; font-size: 12.5px; } }
+.t-muse .card-head .muse-tabs { order: 3; width: 100%; }
+.t-muse .card-head .muse-tabs button { flex: 1; }
