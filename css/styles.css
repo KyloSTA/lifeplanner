@@ -3719,3 +3719,53 @@ html:fullscreen #noel-garland { top: 0; }
   .mdn-body h2 { font-size: 21px; }
   .mdn-table th, .mdn-table td { padding: 7px 9px; font-size: 13.5px; }
 }
+
+/* =========================================================
+   📋 Feuille d'examen (Cours RBQ)
+   ========================================================= */
+.sh-tools { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 16px; }
+.sh-tools label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.sh-tools input { width: 220px; max-width: 100%; }
+.sh-count { margin-left: auto; font-size: 13px; }
+.sh-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.sh-group { margin-bottom: 14px; }
+.sh-group h3 { font-size: 14px; margin: 0 0 6px; color: var(--gold-text); }
+.sh-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 6px; align-items: start; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-bottom: 6px; }
+.sh-item.off { opacity: .45; }
+.sh-chk input { width: 18px; height: 18px; margin-top: 2px; }
+.sh-txt { font-size: 14px; line-height: 1.5; }
+.sh-txt small { display: block; font-size: 11.5px; }
+.sh-txt .mdn-table { margin: 4px 0 0; }
+.sh-mv { display: flex; flex-direction: column; gap: 2px; }
+.sh-mv .btn { min-height: 26px; height: 26px; width: 30px; padding: 0; }
+.sh-preview-wrap { position: sticky; top: 0; }
+/* La feuille : papier blanc, police serrée, colonnes */
+.sh-paper { background: #fff; color: #111; border-radius: 6px; padding: 10mm 8mm; aspect-ratio: 8.5 / 11; overflow: auto; font-size: var(--fs, 8.5pt); line-height: 1.3; columns: var(--cols, 2); column-gap: 5mm; column-rule: 1px solid #ddd; box-shadow: var(--shadow); }
+.sh-paper h2 { column-span: all; font-size: 1.5em; margin: 0 0 .5em; padding-bottom: .25em; border-bottom: 2px solid #111; color: #111; }
+.sh-paper section { break-inside: auto; margin-bottom: .6em; }
+.sh-paper h4 { font-size: 1.05em; margin: .3em 0 .2em; color: #7a1020; break-after: avoid; }
+.sh-paper .sh-p-item { font-size: 1em; line-height: 1.3; margin: 0 0 .25em; padding-left: .7em; text-indent: -.7em; break-inside: avoid; color: #111; max-width: none; }
+.sh-paper .sh-p-item::before { content: "• "; color: #7a1020; }
+.sh-paper .sh-p-item:has(.mdn-table)::before { content: ""; }
+.sh-paper .sh-p-item:has(.mdn-table) { padding-left: 0; text-indent: 0; }
+.sh-paper .mdn-body strong, .sh-paper strong { color: #000; }
+.sh-paper mark { background: #ffe066; color: #000; padding: 0 .1em; }
+.sh-paper .mdn-table { border-color: #999; border-radius: 0; margin: .2em 0 .4em; overflow: visible; }
+.sh-paper .mdn-table table { font-size: 1em; }
+.sh-paper .mdn-table th, .sh-paper .mdn-table td { padding: .15em .35em; border-color: #bbb; color: #111; white-space: normal; }
+.sh-paper .mdn-table th { background: #eee; }
+.sh-paper .mdn-table tbody tr:nth-child(even) td { background: #f6f6f6; }
+.sh-paper p { margin: 0; }
+.sh-ex { padding: 10px 12px; margin: 8px 0 12px; }
+.sh-ex p { margin: 4px 0 0; }
+@media (max-width: 900px) { .sh-layout { grid-template-columns: 1fr; } .sh-preview-wrap { position: static; } .sh-count { margin-left: 0; width: 100%; } }
+#sh-print-root { display: none; }
+@media print {
+  @page { size: letter; margin: 8mm; }
+  body.sh-printing > *:not(#sh-print-root) { display: none !important; }
+  body.sh-printing { background: #fff !important; }
+  body.sh-printing #sh-print-root { display: block; }
+  body.sh-printing .sh-paper { aspect-ratio: auto; overflow: visible; box-shadow: none; padding: 0; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.mdn-table th, .mdn-table td { overflow-wrap: normal; word-break: normal; min-width: 4em; }
+.sh-txt .mdn-table th { white-space: normal; }

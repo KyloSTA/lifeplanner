@@ -47,7 +47,7 @@ export async function loadNote(file) {
 }
 
 /* ---------- Rendu Markdown (titres, listes, gras, tableaux, citations, code, <mark>) ---------- */
-function inline(s) {
+export function inline(s) {
   const codes = [];
   let t = esc(s).replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
   t = t
