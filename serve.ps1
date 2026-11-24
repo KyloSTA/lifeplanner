@@ -7,7 +7,7 @@ $mime = @{
   '.html' = 'text/html; charset=utf-8'; '.js' = 'text/javascript; charset=utf-8'
   '.css' = 'text/css; charset=utf-8'; '.json' = 'application/json; charset=utf-8'
   '.webmanifest' = 'application/manifest+json'; '.svg' = 'image/svg+xml'
-  '.png' = 'image/png'; '.ico' = 'image/x-icon'
+  '.png' = 'image/png'; '.ico' = 'image/x-icon'; '.md' = 'text/markdown; charset=utf-8'
 }
 
 $listener = New-Object System.Net.HttpListener
@@ -23,6 +23,17 @@ while ($listener.IsListening) {
   $res = $ctx.Response
   try {
     $path = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath)
+    $notesDir = Join-Path $appDir 'notes'
+    if ($path -eq '/notes/' -and -not (Test-Path -LiteralPath (Join-Path $notesDir 'index.html'))) {
+      # Liste des notes Markdown (en ligne, l'app la demande à l'API de GitHub)
+      $names = @(Get-ChildItem -LiteralPath $notesDir -Filter *.md -File -ErrorAction SilentlyContinue | ForEach-Object { '"' + ($_.Name -replace '\\', '\\' -replace '"', '\"') + '"' })
+      $res.ContentType = 'application/json; charset=utf-8'
+      $res.Headers.Add('Cache-Control', 'no-cache')
+      $bytes = [Text.Encoding]::UTF8.GetBytes('[' + ($names -join ',') + ']')
+      $res.ContentLength64 = $bytes.Length
+      $res.OutputStream.Write($bytes, 0, $bytes.Length)
+      continue
+    }
     if ($path.EndsWith('/')) { $path += 'index.html' } # dossier -> sa page (ex. /couple/)
     $file = [IO.Path]::GetFullPath((Join-Path $appDir $path.TrimStart('/')))
     if (-not $file.StartsWith($appDir) -or -not (Test-Path -LiteralPath $file -PathType Leaf)) {
