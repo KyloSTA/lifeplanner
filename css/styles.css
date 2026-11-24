@@ -3615,3 +3615,51 @@ html:fullscreen #noel-garland { top: 0; }
 .lw-btn:hover { transform: scale(1.08); }
 .lw-btn > * { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; }
 .lw-btn svg, .lw-btn img { width: 100%; height: 100%; }
+
+/* =========================================================
+   📱 Cellulaire à l'horizontale (écran bas) : menu fin, marges et boutons ronds compacts
+   ========================================================= */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --rail-w: 58px; }
+  .rail span, .brand span, .rail .hero-mini .hm-text { display: none; }
+  .rail a { justify-content: center; }
+  .brand { flex-direction: column; justify-content: center; }
+  .brand-tools, .rail-foot { flex-direction: column; align-items: center; }
+  .rail { padding: 6px 5px calc(6px + env(safe-area-inset-bottom)) calc(5px + env(safe-area-inset-left)); width: calc(var(--rail-w) + env(safe-area-inset-left)); gap: 2px; overflow-y: auto; scrollbar-width: none; }
+  .rail::-webkit-scrollbar { display: none; }
+  .brand { padding: 2px 0 6px; gap: 4px; }
+  .rail a.brand-logo, .rail a.brand-logo:has(img.round) { width: 36px; height: 36px; }
+  .rail a.brand-logo img, .rail a.brand-logo img.round { width: 34px; height: 34px; }
+  .brand-tools { gap: 4px; }
+  .rail .brand-tools .brand-ico { width: 34px; height: 34px; border-radius: 10px; }
+  .rail .brand-tools .brand-ico svg { width: 18px; height: 18px; }
+  .rail a { min-height: 38px; padding: 6px !important; border-radius: 10px; }
+  .rail a svg { width: 19px; height: 19px; }
+  .rail .hero-mini { margin: 2px 0 4px; padding: 2px !important; }
+  .rail-foot > a, .rail-foot > a[data-route="settings"] { width: 38px; height: 38px; }
+  main { padding: 12px calc(14px + env(safe-area-inset-right)) 28px 16px; }
+  h1 { font-size: 22px; }
+  .page-head { margin-bottom: 12px; gap: 10px; }
+  .card { padding: 14px; }
+  /* Boutons ronds plus petits, collés au coin */
+  #fab-dock { right: calc(12px + env(safe-area-inset-right)); bottom: calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
+  #qa-fab { width: 46px; height: 46px; }
+  #qa-fab svg { width: 22px; height: 22px; }
+  #gs-fab { width: 40px; height: 40px; }
+  #gs-fab svg { width: 19px; height: 19px; }
+  #to-top { left: auto; right: calc(16px + env(safe-area-inset-right)); bottom: calc(64px + env(safe-area-inset-bottom)); width: 38px; height: 38px; }
+  #to-top svg { width: 18px; height: 18px; }
+  body.has-timer #fab-dock { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  /* Fenêtres : presque toute la hauteur */
+  .modal { max-height: calc(100vh - 16px); padding: 16px; }
+  .modal-back { padding: 8px; }
+  .modal.gs-modal { max-height: calc(100vh - 16px); }
+  /* Guirlande de Noël plus discrète, à droite du menu */
+  #noel-garland { left: calc(var(--rail-w) + env(safe-area-inset-left)); height: 14px; }
+  /* Espace vidéo : sur le côté (comme à l'ordinateur) plutôt qu'en bas */
+  #vdock { position: static; width: min(44vw, 400px); max-height: none; padding: 8px; border-top: 0; border-left: 1px solid var(--border); box-shadow: none; }
+  .vd-frame { max-height: none; }
+  body.vdock-on:not(.vdock-min) main { padding-bottom: 28px !important; }
+  body.vdock-on #fab-dock, body.vdock-on.vdock-min #fab-dock { bottom: calc(10px + env(safe-area-inset-bottom)); right: calc(min(44vw, 400px) + 12px); }
+  body.vdock-on #to-top, body.vdock-on.vdock-min #to-top { bottom: calc(64px + env(safe-area-inset-bottom)); right: calc(min(44vw, 400px) + 16px); }
+}
