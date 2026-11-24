@@ -627,6 +627,7 @@ export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
       </details>
       <div class="modal-actions tm-actions">
         <button class="btn danger tm-del">🗑 Supprimer</button>
+        <button class="btn tm-claude" title="Copie la mission (titre, étapes, notes) et ouvre Claude : colle-la avec Ctrl + V dans Claude Code">🤖 Claude Code</button>
         <button class="btn primary tm-ok">Terminé</button>
       </div>`;
     const more = box.querySelector('.tm-more');
@@ -759,6 +760,7 @@ export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
     };
     box.querySelector('.tm-tostep').onclick = async () => { await flush(); pickParent(); };
     box.querySelector('.tm-toevent').onclick = async () => { await flush(); toEvent(); };
+    box.querySelector('.tm-claude').onclick = async () => { await flush(); sendToClaude(); };
     box.querySelector('.tm-ok').onclick = close;
     box.querySelector('.tm-close').onclick = close;
     if (focus) box.querySelector(focus)?.focus();
@@ -848,6 +850,23 @@ export async function openTaskEditor(id, onChange = () => {}, opts = {}) {
   };
 
   // 📅 En événement : crée un événement Google Agenda (titre, date, heure, notes et étapes en description)
+  // 🤖 Envoyer à Claude Code : la mission est copiée (prête à coller) et l'app Claude est ramenée à l'avant
+  const sendToClaude = async () => {
+    const me = await db.get('tasks', id);
+    if (!me) return;
+    const { toast } = await import('./app.js');
+    const subs = me.subtasks || [];
+    const meta = [me.prio ? '⭐ Prioritaire' : '', me.urgent ? '🔥 Urgente' : '', me.date ? `📅 ${me.date}${me.time ? ' ' + me.time : ''}` : ''].filter(Boolean).join(' · ');
+    const text = [`Mission : ${me.title}`, meta,
+      subs.length ? 'Étapes :\n' + subs.map((s) => `- [${s.done ? 'x' : ' '}] ${s.title}${(s.notes || '').trim() ? ` (${s.notes.trim()})` : ''}`).join('\n') : '',
+      (me.notes || '').trim() ? 'Notes :\n' + me.notes.trim() : ''].filter(Boolean).join('\n\n');
+    try { await navigator.clipboard.writeText(text); }
+    catch { toast('Impossible de copier la mission (presse-papiers refusé)', 'err'); return; }
+    toast('🤖 Mission copiée : colle-la avec Ctrl + V dans Claude Code');
+    // Ramène l'app Claude à l'avant (Edge peut demander « Ouvrir Claude ? » la première fois)
+    setTimeout(() => { location.href = 'claude://'; }, 300);
+  };
+
   const toEvent = async () => {
     const me = await db.get('tasks', id);
     if (!me) return close();
