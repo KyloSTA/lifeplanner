@@ -54,6 +54,9 @@ export class InkEditor {
     this.pan = null;
     this.lastPenHover = 0; // stylet détecté au-dessus de l'écran (sans contact)
     this.lastPenUp = 0; // fin du dernier contact du stylet
+    // Dernière activité du stylet (contact, survol, mouvement). Sur cellulaire (S Pen), le survol n'est détecté
+    // que très près de l'écran : la paume se pose souvent avant. Stylet utilisé récemment = mode écriture.
+    this.lastPenAny = 0;
     this.momentum = 0; // animation d'élan du défilement au doigt
 
     this.page = document.createElement('div');
@@ -71,7 +74,7 @@ export class InkEditor {
       pointermove: (e) => this.move(e),
       pointerup: (e) => this.up(e),
       pointercancel: (e) => this.up(e),
-      pointerleave: (e) => { if (e.pointerType === 'pen') this.lastPenHover = performance.now(); },
+      pointerleave: (e) => { if (e.pointerType === 'pen') this.lastPenHover = this.lastPenAny = performance.now(); },
       contextmenu: (e) => e.preventDefault(),
     };
     for (const [k, fn] of Object.entries(this._h)) c.addEventListener(k, fn);
@@ -289,6 +292,8 @@ export class InkEditor {
     // Appui long du doigt (sans bouger) : « clic droit » → menu Coller / Ajouter une image
     clearTimeout(this.lpTimer);
     const p = this.pan;
+    // Stylet utilisé récemment : une main posée immobile n'ouvre pas le menu
+    if (performance.now() - this.lastPenAny < 4000) return;
     this.lpTimer = setTimeout(() => {
       if (this.pan !== p || p.moved > 8 || this.pinch) return;
       this.pan = null;
@@ -493,7 +498,12 @@ export class InkEditor {
     const now = performance.now();
     this.lastPointer = e.pointerType; // pour savoir si un clic droit vient de la souris (menu) ou du stylet (gomme)
     if (e.pointerType === 'pen') {
-      // Le stylet touche l'écran : on arrête tout défilement en cours (la paume a pu le lancer)
+      this.lastPenAny = now;
+      // Le stylet touche l'écran : on arrête tout défilement en cours (la paume a pu le lancer).
+      // S'il vient de commencer (la paume s'est posée juste avant le stylet), la page revient où elle était.
+      const p = this.pan;
+      if (p && now - p.samples[0][0] < 700) { this.sc.scrollTop = p.top; this.sc.scrollLeft = p.left; }
+      clearTimeout(this.lpTimer);
       this.pan = null;
       cancelAnimationFrame(this.momentum);
     }
@@ -501,11 +511,23 @@ export class InkEditor {
       // Rejet de la paume :
       // - pendant un trait (ou juste après), tout toucher est ignoré ;
       // - quand le stylet survole l'écran, seule une grande surface de contact (une paume) est ignorée :
-      //   tu peux donc garder le stylet en main et faire défiler avec un doigt.
+      //   tu peux donc garder le stylet en main et faire défiler avec un doigt ;
+      // - stylet utilisé il y a moins de 2 s (cellulaire : survol mal détecté) : seuil de paume plus bas,
+      //   et un 2e point de contact est une paume (pas de zoom par pincement).
       const penBusy = this.active || this.erasing || now - this.lastPenUp < 350;
       const hovering = now - this.lastPenHover < 600;
-      const palm = Math.max(e.width || 0, e.height || 0) > 40;
-      if (penBusy || (hovering && palm)) { e.preventDefault(); return; }
+      const penRecent = now - this.lastPenAny < 2000;
+      const size = Math.max(e.width || 0, e.height || 0);
+      const palm = size > (penRecent ? 26 : 40);
+      if (penBusy || ((hovering || penRecent) && palm)) { e.preventDefault(); return; }
+      if (penRecent && this.touches?.size) {
+        // Plusieurs contacts juste après le stylet : c'est la main. On annule le défilement qu'elle a lancé.
+        const p = this.pan;
+        if (p && now - p.samples[0][0] < 700) { this.sc.scrollTop = p.top; this.sc.scrollLeft = p.left; }
+        if (p) { clearTimeout(this.lpTimer); this.pan = null; }
+        e.preventDefault();
+        return;
+      }
       // Deux doigts : pincer pour zoomer (remplace le défilement)
       (this.touches ||= new Map()).set(e.pointerId, [e.clientX, e.clientY]);
       if (this.touches.size === 2 && !this.active && !this.erasing) {
@@ -554,7 +576,10 @@ export class InkEditor {
   }
 
   move(e) {
-    if (e.pointerType === 'pen' && !this.active && !this.erasing) this.lastPenHover = performance.now();
+    if (e.pointerType === 'pen') {
+      this.lastPenAny = performance.now();
+      if (!this.active && !this.erasing) this.lastPenHover = this.lastPenAny;
+    }
     if (e.pointerType === 'touch' && this.touches?.has(e.pointerId)) {
       this.touches.set(e.pointerId, [e.clientX, e.clientY]);
       if (this.pinch) { e.preventDefault(); this.movePinch(); return; }
@@ -585,7 +610,7 @@ export class InkEditor {
   }
 
   up(e) {
-    if (e.pointerType === 'pen') this.lastPenUp = performance.now();
+    if (e.pointerType === 'pen') this.lastPenUp = this.lastPenAny = performance.now();
     if (e.pointerType === 'touch' && this.touches?.delete(e.pointerId) && this.pinch) { if (this.touches.size < 2) this.endPinch(); return; }
     if (this.pan && e.pointerId === this.pan.id) { this.endPan(); return; }
     if (this.drag && e.pointerId === this.drag.id) { this.boxUp(e); return; }
