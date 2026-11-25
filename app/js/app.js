@@ -3823,6 +3823,19 @@ $('#rail-more').onclick = () => {
     });
     sync();
   }
+  // Relancer l'app alors qu'elle est déjà ouverte (raccourci du stylet, icône de la barre des tâches) :
+  // le manifeste ramène la fenêtre existante (launch_handler focus-existing) et ce relancement bascule le plein écran.
+  if ('launchQueue' in window) {
+    window.launchQueue.setConsumer(() => {
+      if (performance.now() < 4000) return; // c'est l'ouverture de l'app elle-même
+      const on = !!document.fullscreenElement || winFs.matches;
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      // Fenêtre : c'est l'extension Edge qui la met en plein écran ou l'en sort (pas besoin d'un clic dans la page)
+      else postMessage({ type: 'lp-win-state', state: on ? 'maximized' : 'fullscreen' }, location.origin);
+      // Sans l'extension, essai du plein écran de la page (Edge peut le refuser sans clic)
+      if (!on) setTimeout(() => { if (!document.fullscreenElement && !winFs.matches) document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {}); }, 600);
+    });
+  }
 }
 
 // Lanceur rapide : petite icône à droite du logo -> menu de tes applications
