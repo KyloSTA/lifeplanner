@@ -41,6 +41,7 @@ import * as noel from './noel.js';
 import * as priobar from './priobar.js';
 import * as property from './property.js';
 import * as mdnotes from './mdnotes.js';
+import * as muse from './muse.js';
 import { bindCapture, brainState, captureForm, evoCard, renderBrain, renderNote } from './page-brain.js';
 
 const { esc, iso, cap } = U;
@@ -803,6 +804,7 @@ async function renderToday() {
       <section class="card capture-card" id="c-brain"></section>
       <div class="today-cols">
         <div class="today-col col-main">
+          <section class="card t-muse" id="c-muse" hidden></section>
           <section class="card t-tasks" id="c-tasks"></section>
           <section class="card t-goals" id="c-goals"></section>
         </div>
@@ -931,6 +933,7 @@ async function renderToday() {
   const lifeCards = () => Promise.all([habits.todayCard($('#c-habits')), workout.todayCard($('#c-workout')), rbq.todayCard($('#c-rbq'))]);
   refreshToday = () => Promise.all([taskCard($('#c-tasks'), today), lifeCards(), journal(), goals(), heroCard(), brainCard()]);
 
+  muse.todayCard($('#c-muse'), { openChat: openMuseChat, toast }).catch(console.error); // en parallèle (réseau)
   news.todayCard($('#c-news'), toast); // en parallèle (réseau) : ne retarde pas le reste de la page
   finance.todayCard($('#c-money')).catch(console.error);
   finance.shopCard($('#c-shop')).catch(console.error);
@@ -1097,6 +1100,14 @@ new MutationObserver(() => document.querySelectorAll('form.add-mission:not([hidd
    Assistant (boîte de dialogue qui modifie le planner)
    ========================================================= */
 const chat = { history: [], log: [], busy: false }; // conservé tant que l'app est ouverte
+muse.setEvents(getEvents); // Muse lit l'agenda (Google Agenda + cache)
+
+/** Répondre à un bilan de Muse : la conversation repart de ce bilan. */
+function openMuseChat(title, text) {
+  chat.history = [{ role: 'user', content: [{ type: 'text', text: `[${title} demandé depuis la page Aujourd’hui]` }] }, { role: 'assistant', content: [{ type: 'text', text }] }];
+  chat.log = [{ role: 'bot', text }];
+  openAssistant();
+}
 
 /** Ouvre l'assistant dans une fenêtre (bouton ✨ Assistant de la page Aujourd'hui). */
 function openAssistant() {
@@ -1131,7 +1142,8 @@ async function assistCard() {
   let showAll = false;
   const msgHTML = (m) => (m.role === 'action'
     ? `<div class="as-act">${m.icon} ${esc(m.text)}</div>`
-    : `<div class="as-msg ${m.role}">${esc(m.text).replace(/\n/g, '<br>')}</div>`);
+    : m.role === 'bot' ? `<div class="as-msg bot mdn-body">${mdnotes.renderMarkdown(m.text)}</div>`
+      : `<div class="as-msg ${m.role}">${esc(m.text).replace(/\n/g, '<br>')}</div>`);
   const draw = () => {
     // Par défaut : seulement le dernier échange (ta dernière demande et sa réponse)
     let from = 0;
@@ -3091,6 +3103,7 @@ async function renderSettings() {
   const cSecret = await db.get('settings', 'clientSecret');
   const aKey = await db.get('settings', 'anthropicKey');
   const aModel = (await db.get('settings', 'assistantModel')) || assistant.DEFAULT_MODEL;
+  const museCard = await muse.settingsHTML();
   if (couple.ON) await couple.people();
   view.innerHTML = `
     <header class="page-head"><div><p class="eyebrow">Configuration</p><h1>Réglages</h1></div></header>
@@ -3153,6 +3166,7 @@ async function renderSettings() {
         <p class="muted hint">La clé reste sur cet appareil : elle n’est envoyée qu’à api.anthropic.com et n’est jamais incluse dans les sauvegardes exportées.</p>
         </details>
       </section>
+      ${museCard}
 
       <section class="card">
         <div class="card-head"><h2>Sauvegarde</h2></div>
@@ -3209,6 +3223,7 @@ async function renderSettings() {
     renderSettings();
   };
   syncCard(clientId);
+  muse.bindSettings(view, toast);
 
   // Ordre des onglets
   const drawNav = async (focusKey, dir) => {

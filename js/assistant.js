@@ -128,6 +128,18 @@ Façon de travailler :
 
 Réponse : en français, en tutoyant, courte (1 à 3 phrases) et chaleureuse. Résume ce que tu as changé ; pas de liste d’identifiants. Tu peux aussi donner un conseil d’organisation ou un mot d’encouragement quand c’est utile.`;
 
+// Personnalité (Muse) et vue d'ensemble : fournies par muse.js, pour éviter une dépendance circulaire
+let persona = async () => '';
+let overview = null;
+export function setPersona(fn) { persona = fn; }
+export function setOverview(fn) { overview = fn; }
+TOOLS.push({
+  name: 'get_life_overview',
+  description: 'Vue d’ensemble de la vie de l’utilisateur : agenda (aujourd’hui, demain, 7 jours), habitudes et leur suivi sur 7 jours, humeur et journal des 7 derniers jours, workouts, finances (mois en cours, mois passé, paiements à venir), cours RBQ (examen, modules, cartes à revoir), notes récentes du Cerveau. À appeler pour un bilan, une suggestion ou toute question générale sur sa vie.',
+  input_schema: S({}),
+});
+const READ_TOOLS = ['get_planner', 'get_life_overview'];
+
 /* =========================================================
    Exécution des outils (partagée avec les commandes locales)
    ========================================================= */
@@ -182,6 +194,10 @@ async function runTool(name, input, ctx) {
   switch (name) {
     case 'get_planner':
       return snapshot(input);
+
+    case 'get_life_overview':
+      if (!overview) throw new ToolError('Vue d’ensemble indisponible.');
+      return overview();
 
     case 'add_mission': {
       if (input.goal_id) await need('goals', input.goal_id, 'Objectif');
@@ -312,10 +328,12 @@ function contextLine() {
   return `[Contexte automatique : nous sommes le ${DOW[now.getDay()]} ${U.iso(now)}, il est ${U.fmtTime(now)}. Google Agenda : ${gcal.isConnected() ? 'connecté' : 'non connecté'}.]`;
 }
 
-async function callClaude(key, model, messages) {
+async function callClaude(key, model, messages, { readOnly = false, effort = 'low' } = {}) {
+  const extra = await persona().catch(() => '');
   const body = {
-    model, max_tokens: 16000, system: SYSTEM, tools: TOOLS, messages,
-    output_config: { effort: 'low' }, // demandes courtes de planification : rapide et économique
+    model, max_tokens: 16000, system: extra ? `${SYSTEM}\n\n${extra}` : SYSTEM,
+    tools: readOnly ? TOOLS.filter((t) => READ_TOOLS.includes(t.name)) : TOOLS, messages,
+    output_config: { effort }, // demandes courtes de planification : rapide et économique (bilans : un peu plus)
     cache_control: { type: 'ephemeral' },
   };
   const headers = {
@@ -372,7 +390,7 @@ export async function send(history, userText, opts) {
   const texts = [];
   try {
     for (let i = 0; i < 10; i++) {
-      const msg = await callClaude(key, model, history);
+      const msg = await callClaude(key, model, history, opts);
       history.push({ role: 'assistant', content: msg.content }); // contenu complet (y compris la réflexion), tel quel
       for (const b of msg.content) if (b.type === 'text' && b.text.trim()) texts.push(b.text.trim());
       if (msg.stop_reason === 'refusal') { texts.push('Je ne peux pas aider avec cette demande.'); break; }
