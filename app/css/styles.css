@@ -3863,3 +3863,8 @@ html:fullscreen #noel-garland { top: 0; }
 .tag-chip .chip-btn { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 8px; }
 .tag-chip .tag-x { height: 100%; min-height: 32px; padding: 0 9px; border: 1px solid var(--border); border-left: 0; border-radius: 0 999px 999px 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; }
 .tag-chip .tag-x:hover { color: #ef4444; }
+/* Titre d'une note : affiché au complet, sur plusieurs lignes au besoin */
+textarea.note-title { display: block; resize: none; overflow: hidden; min-height: 0; line-height: 1.25; padding-top: 2px; padding-bottom: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-title-row { align-items: flex-start; }
+.note-title-row textarea.note-title { flex: 1 1 auto; width: 100%; field-sizing: content; }
+.note-title-row .note-nav { flex: none; margin-top: 2px; }

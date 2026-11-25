@@ -820,7 +820,7 @@ async function renderNote(id) {
     <header class="page-head note-head">
       <div class="grow"><a href="${esc(originLink().href)}" class="eyebrow">← ${esc(originLink().label)}</a>
         <div class="note-title-row">
-          <input id="n-title" class="note-title" value="${esc(n.title)}" placeholder="Titre de la note" maxlength="80" autocomplete="off">
+          <textarea id="n-title" class="note-title" rows="1" placeholder="Titre de la note" maxlength="200" autocomplete="off" spellcheck="true">${esc(n.title)}</textarea>
           ${brainState.order.length > 1 ? `<nav class="note-nav" aria-label="Autres éléments du Cerveau">
             <button class="btn" id="n-prev" ${prevId ? '' : 'disabled'} title="Élément précédent (Alt + ←)" aria-label="Élément précédent">‹</button>
             <small class="muted">${pos + 1}/${brainState.order.length}</small>
@@ -1185,7 +1185,8 @@ async function renderNote(id) {
     } catch (err) { toast(err.message, 'err'); }
   };
   ta.onblur = () => setTimeout(() => (sug.hidden = true), 150);
-  $('#n-title').oninput = (e) => { n.title = e.target.value; save(); };
+  // Le titre passe à la ligne à l'écran, mais reste une seule ligne de texte (un collage avec des retours devient des espaces)
+  $('#n-title').oninput = (e) => { if (/\n/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*\n\s*/g, ' '); n.title = e.target.value; save(); };
   $('#n-title').onchange = async () => {
     await flush();
     const count = await brain.renameRefs(origTitle, n.title);
