@@ -54,12 +54,30 @@ export async function createNote({ title = '', body = '', type = 'note', inbox =
   return n;
 }
 
-/** Capture rapide : 1re ligne = titre, le reste = contenu. */
+/** Petit titre tiré du texte : la 1re phrase si elle est courte, sinon les premiers mots (≤ 45 caractères). */
+export function shortTitle(text) {
+  const first = String(text).trim().split('\n').find((l) => l.trim()) || '';
+  const plain = first.replace(/\[\[([^\]]+)\]\]/g, '$1').replace(/https?:\/\/\S+/g, '').replace(/[*_`#>]+/g, '').replace(/\s{2,}/g, ' ').trim();
+  if (!plain) return '';
+  // « Idée : … », « Rappel : … » : l'étiquette courte avant les deux-points n'est pas le sujet
+  const lead = plain.match(/^([^:]{1,15}):\s*(\S.*)$/);
+  const core = lead ? lead[2] : plain;
+  const sentence = core.split(/(?<=[.!?;])\s/)[0].replace(/[.:;]+$/, '').trim();
+  let t = sentence;
+  if (t.length > 45) {
+    t = '';
+    for (const w of sentence.split(' ')) { if ((t + ' ' + w).trim().length > 42) break; t = (t + ' ' + w).trim(); }
+    t = (t || sentence.slice(0, 42)).replace(/[\s,–—-]+$/, '') + '…';
+  }
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Capture rapide : un petit titre + le texte au complet dans le contenu (rien n'est coupé). */
 export function capture(text) {
-  const lines = text.trim().split('\n');
-  let title = lines.shift().trim();
-  let body = lines.join('\n').trim();
-  if (title.length > 80) { body = (title + '\n' + body).trim(); title = title.slice(0, 60).trim() + '…'; }
+  const all = text.trim();
+  const title = shortTitle(all);
+  // Une note d'un seul mot ou d'une courte phrase est déjà son propre titre : pas besoin de la répéter
+  const body = all === title ? '' : all;
   return createNote({ title, body, type: 'idee', inbox: true });
 }
 

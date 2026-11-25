@@ -12,6 +12,7 @@ import { db } from './db.js';
 import * as U from './util.js';
 import * as gcal from './gcal.js';
 import { showUndo } from './tasks.js';
+import * as livre from './livre-or.js';
 
 const { esc } = U;
 
@@ -214,7 +215,7 @@ export async function importFiles(files) {
   for (const f of files) {
     const rows = parseCSV(await f.text());
     const type = detect(rows);
-    if (type === 'placements') { report.push({ name: f.name, type, rows: rows.length }); continue; }
+    if (type === 'placements') { const g = await livre.storeGambling(rows).catch(() => ({ stored: 0 })); report.push({ name: f.name, type, rows: rows.length, jeu: g }); continue; }
     if (!type) { report.push({ name: f.name, type: null }); continue; }
     const list = withIds(type === 'cheques' ? fromCheques(rows) : fromCredit(rows));
     let added = 0, updated = 0;
@@ -354,16 +355,16 @@ export function showTransactions(q, date) { txFilter = { q, cat: '' }; tab = 'tr
 
 export async function renderPage(ctx, arg) {
   const { view } = ctx;
-  if (arg && ['apercu', 'budget', 'transactions', 'avenir', 'abos', 'achats'].includes(arg)) tab = arg;
+  if (arg && ['apercu', 'budget', 'transactions', 'avenir', 'abos', 'achats', 'livre'].includes(arg)) tab = arg;
   const all = (await db.all('money')).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const budget = (await db.get('settings', 'budget')) || { cats: {}, savings: 0 };
   month ||= curMonth();
   const hasData = all.length > 0;
   const months = [...new Set(all.map((t) => ym(t.date)))].sort();
-  const shop = tab === 'achats' || tab === 'avenir' || tab === 'abos';
+  const shop = tab === 'achats' || tab === 'avenir' || tab === 'abos' || tab === 'livre';
   const weekly = (tab === 'apercu' && overView === 'semaine') || (tab === 'budget' && budgetView === 'semaine'); // la semaine a sa propre navigation // la liste d'achats et les paiements à venir ne dépendent pas des relevés
   // Sur cellulaire : icône + nom court sous l'icône (les 6 onglets tiennent sans défiler)
-  const tabsHTML = `<div class="seg fi-tabs" role="tablist">${[['apercu', '📊', 'Aperçu', 'Aperçu'], ['budget', '🎯', 'Budget', 'Budget'], ['transactions', '🧾', 'Transactions', 'Dépenses'], ['avenir', '📅', 'À venir', 'À venir'], ['abos', '🔁', 'Abonnements', 'Abos'], ['achats', '🛒', 'Achats', 'À acheter']].map(([k, e, l, s]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" aria-label="${l}"><span class="fi-tab-ico">${e}</span> <span class="fi-tab-l">${l}</span><span class="fi-tab-s">${s}</span></button>`).join('')}</div>`;
+  const tabsHTML = `<div class="seg fi-tabs" role="tablist">${[['apercu', '📊', 'Aperçu', 'Aperçu'], ['budget', '🎯', 'Budget', 'Budget'], ['transactions', '🧾', 'Transactions', 'Dépenses'], ['avenir', '📅', 'À venir', 'À venir'], ['abos', '🔁', 'Abonnements', 'Abos'], ['achats', '🛒', 'Achats', 'À acheter'], ['livre', '📖', 'Livre d’or', 'Livre']].map(([k, e, l, s]) => `<button role="tab" data-tab="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" aria-label="${l}"><span class="fi-tab-ico">${e}</span> <span class="fi-tab-l">${l}</span><span class="fi-tab-s">${s}</span></button>`).join('')}</div>`;
 
   view.innerHTML = `
     <header class="page-head">
@@ -425,6 +426,7 @@ export async function renderPage(ctx, arg) {
   const body = $('#fi-body');
   if (tab === 'avenir') return drawUpcoming(ctx, body, all);
   if (tab === 'abos') return drawSubs(ctx, body, all);
+  if (tab === 'livre') { body.addEventListener('lo-refresh', () => renderPage(ctx)); return livre.draw(ctx, body, all); }
   if (shop) return drawShopping(ctx, body);
   if (!hasData) return;
   $('#fi-prev')?.addEventListener('click', () => { month = monthsBack(month, 1); renderPage(ctx); });
@@ -1024,6 +1026,7 @@ async function autoSettings(ctx, onDone) {
 
 function importReport(ctx, rep) {
   const lines = rep.map((r) => {
+    if (r.type === 'placements' && r.jeu?.total) return `<li>📖 <b>${esc(r.name)}</b> : relevé de placements lu pour ton livre d’or. ${r.jeu.stored} nouveau${r.jeu.stored > 1 ? 'x' : ''} mouvement${r.jeu.stored > 1 ? 's' : ''} d’argent sur ${r.jeu.total}.</li>`;
     if (r.type === 'placements') return `<li>📈 <b>${esc(r.name)}</b> : relevé de placements reconnu. Rien à ajouter au budget : l’argent que tu y envoies est déjà compté dans ton compte chèques (« Vers tes placements »).</li>`;
     if (!r.type) return `<li>⚠ <b>${esc(r.name)}</b> : format non reconnu (il faut un relevé de compte chèques ou de carte de crédit).</li>`;
     if (!r.rows) return `<li>${r.type === 'credit' ? '💳' : '🏦'} <b>${esc(r.name)}</b> : aucune transaction dans ce fichier.</li>`;

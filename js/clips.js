@@ -113,4 +113,5 @@ export function start(onSaved = () => {}) {
   });
   // Signale à l'extension que l'app est prête : elle livre alors les posts en attente
   postMessage({ type: 'lp-hello' }, location.origin);
+  import('./launcher.js').then((l) => l.syncFullscreenPref()).catch(() => {}); // option plein écran du Lanceur -> extension
 }
