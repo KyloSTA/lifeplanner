@@ -1,4 +1,4 @@
-// 📋 Feuille d'examen (Cours RBQ) : rassemble ce qui est surligné (<mark> ou ==…==) dans les notes rbq-*.md
+// 📋 Feuille d'examen (Cours RBQ) : rassemble ce qui est surligné (<mark> ou ==…==) dans les notes .md du dossier notes
 // du dossier notes/, plus les points clés ⭐ des modules. On coche ce qui va sur la feuille, on change l'ordre,
 // puis on imprime une page compacte. En option : chaque élément devient une carte de révision.
 //
@@ -55,7 +55,7 @@ export function extract(md, file) {
 
 /** Tous les éléments disponibles, dans l'ordre choisi. */
 async function gather(c) {
-  const files = (await listNotes()).filter((f) => /^rbq[-_]/i.test(f));
+  const files = await listNotes(); // toutes les notes : seules les parties surlignées vont sur la feuille
   const notes = await Promise.all(files.map((f) => loadNote(f).then((md) => ({ f, md })).catch(() => ({ f, md: '' }))));
   let items = notes.flatMap(({ f, md }) => extract(md, f));
   // Points clés ⭐ des modules du cours
@@ -95,7 +95,7 @@ export async function renderSheet(ctx) {
       <span class="muted sh-count">${on.length}/${items.length} élément${items.length > 1 ? 's' : ''} sur la feuille · ${files.length} note${files.length > 1 ? 's' : ''} rbq</span>
     </section>
     ${items.length ? '' : `<div class="card empty-card"><p>Rien à mettre sur la feuille pour l’instant.</p>
-      <p class="muted">Dans le dossier <b>notes</b> du dépôt, crée des fichiers dont le nom commence par <code>rbq-</code> (ex. <code>rbq-volet2-cours01.md</code>) et entoure de <code>&lt;mark&gt;…&lt;/mark&gt;</code> ce qui doit aller sur ta feuille. Les points clés ⭐ de tes modules apparaissent aussi ici.</p></div>`}
+      <p class="muted">Dans le dossier <b>notes</b> du dépôt, ajoute tes notes de cours (fichiers <code>.md</code>) et entoure de <code>&lt;mark&gt;…&lt;/mark&gt;</code> ce qui doit aller sur ta feuille. Les points clés ⭐ de tes modules apparaissent aussi ici.</p></div>`}
     <div class="sh-layout">
       <div class="sh-pick">${groups(items).map((g) => `<div class="sh-group"><h3>${esc(g.k)}</h3>${g.items.map((it) => `
         <div class="sh-item ${c.off.includes(it.id) ? 'off' : ''}" data-id="${it.id}">
