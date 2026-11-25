@@ -792,7 +792,7 @@ addEventListener('hashchange', (e) => {
   if (to.startsWith('#/note/') && !from.startsWith('#/note/')) noteOrigin = from;
 });
 const ORIGIN_LABELS = { brain: 'Cerveau', projects: 'Projets', missions: 'Missions', goals: 'Objectifs', today: 'Aujourd’hui', week: 'Semaine', month: 'Mois', year: 'Année', day: 'Journée', journal: 'Journal',
-  news: 'Actualités', notebook: 'Carnet', page: 'Carnet', rbq: 'Cours RBQ', finance: 'Finances', propriete: 'Propriété', workout: 'Corps', habits: 'Habitudes', hero: 'Progression', notes: 'Notes', launcher: 'Lanceur', settings: 'Réglages' };
+  news: 'Actualités', notebook: 'Carnet', page: 'Carnet', rbq: 'Cours RBQ', finance: 'Finances', propriete: 'Propriété', epicerie: 'Épicerie', workout: 'Corps', habits: 'Habitudes', hero: 'Progression', notes: 'Notes', launcher: 'Lanceur', settings: 'Réglages' };
 function originLink() {
   const [name, sub] = noteOrigin.replace(/^#\/?/, '').split('/');
   const label = name === 'brain' && sub === 'inbox' ? 'À classer' : ORIGIN_LABELS[name] || 'Cerveau';

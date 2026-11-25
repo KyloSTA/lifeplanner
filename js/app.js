@@ -41,6 +41,7 @@ import * as noel from './noel.js';
 import * as priobar from './priobar.js';
 import * as property from './property.js';
 import * as mdnotes from './mdnotes.js';
+import * as epicerie from './epicerie.js';
 import * as muse from './muse.js';
 import { bindCapture, brainState, captureForm, evoCard, renderBrain, renderNote } from './page-brain.js';
 
@@ -239,7 +240,7 @@ const SEARCH_PAGES = [
   ['Cerveau', '#/brain', '🧠'], ['Actualités', '#/news', '📰'], ['Carnet', '#/notebook', '✏️'], ['Agenda (semaine)', '#/week', '📅'],
   ['Mois', '#/month', '🗓'], ['Année', '#/year', '🗓'], ['Journal', '#/journal', '📔'], ['Finances', '#/finance/apercu', '💰'],
   ['Budget', '#/finance/budget', '🎯'], ['Transactions', '#/finance/transactions', '🧾'], ['Paiements à venir', '#/finance/avenir', '📅'],
-  ['Abonnements', '#/finance/abos', '🔁'], ['Projet Propriété', '#/propriete', '🏡'], ['Liste d’achats', '#/finance/achats', '🛒'], ['Workout', '#/workout', '🏋️'],
+  ['Abonnements', '#/finance/abos', '🔁'], ['Projet Propriété', '#/propriete', '🏡'], ['Liste d’achats', '#/finance/achats', '🛒'], ['Épicerie (frigo, liste, menus)', '#/epicerie', '🥕'], ['Workout', '#/workout', '🏋️'],
   ['Étirements', '#/stretch', '🧘'], ['Habitudes', '#/habits', '🔁'], ['Cours RBQ', '#/rbq', '📘'], ['Notes (fichiers .md)', '#/notes', '📄'], ['Ton héros', '#/hero', '🦸'],
   ['Réglages', '#/settings', '⚙'], ['Historique des modifications', '#/changelog', '🕘'], ['Ton utilisation', '#/usage', '📊'],
 ];
@@ -446,6 +447,7 @@ const routes = {
   news: () => news.renderPage(pageCtx()),
   finance: (tab) => finance.renderPage(pageCtx(), tab),
   propriete: (tab) => property.renderPage(pageCtx(), tab),
+  epicerie: (tab) => epicerie.renderPage(pageCtx(), tab),
   usage: renderUsage,
   changelog: renderChangelog,
   activities: () => activities.renderPage(pageCtx(), { tabs: plannerTabs('activities'), addEvent: (day, pre) => eventModal(day, null, pre) }),
@@ -3582,7 +3584,7 @@ async function renderSetup(cid) {
 }
 
 /* ---------- Ordre des onglets du menu ---------- */
-const NAV_KEYS = ['today', 'week', 'missions', 'brain', 'finance', 'propriete', 'workout', 'rbq', 'notes']; // Objectifs : onglet de Missions · Actualités et Carnet : onglets du Cerveau · Habitudes : onglet de Corps // Aventure : dans la page du héros (Progression) // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
+const NAV_KEYS = ['today', 'week', 'missions', 'brain', 'finance', 'epicerie', 'propriete', 'workout', 'rbq', 'notes']; // Objectifs : onglet de Missions · Actualités et Carnet : onglets du Cerveau · Habitudes : onglet de Corps // Aventure : dans la page du héros (Progression) // Actualités : icône à côté du calendrier // Journal : dans le Planificateur (icône 📅 à côté du logo) // Habitudes : dans la page du héros // Semaine, Carnet et Lanceur : icônes à côté du logo
 async function navOrder() {
   const saved = ((await db.get('settings', 'navOrder')) || []).filter((k) => NAV_KEYS.includes(k));
   return [...saved, ...NAV_KEYS.filter((k) => !saved.includes(k))];

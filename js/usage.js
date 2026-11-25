@@ -16,7 +16,7 @@ const KEEP_DAYS = 60;
 const MAX_ACTIONS = 300; // boutons différents retenus par jour
 
 export const PAGES = {
-  today: 'Aujourd’hui', missions: 'Missions', brain: 'Cerveau', note: 'Note du Cerveau', goals: 'Objectifs', finance: 'Finances', propriete: 'Projet Propriété',
+  today: 'Aujourd’hui', missions: 'Missions', brain: 'Cerveau', note: 'Note du Cerveau', goals: 'Objectifs', finance: 'Finances', propriete: 'Projet Propriété', epicerie: 'Épicerie',
   quest: 'Aventure', workout: 'Workout', rbq: 'Cours RBQ', news: 'Actualités', week: 'Planificateur (semaine)', month: 'Planificateur (mois)',
   year: 'Planificateur (année)', journal: 'Journal', notebook: 'Carnet', page: 'Page manuscrite', hero: 'Héros et habitudes', habits: 'Habitudes',
   settings: 'Réglages', launcher: 'Lanceur', usage: 'Utilisation', setup: 'Configuration',
