@@ -1923,7 +1923,7 @@ a.assoc-chip { padding: 4px 11px; }
 .fi-ch-legend .l1 { background: var(--accent); } .fi-ch-legend .l2 { background: var(--muted); }
 .fi-alerts { border-left: 4px solid var(--warn); }
 .fi-alerts ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
-.fi-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.fi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 14px; align-items: start; } /* côte à côte seulement s'il y a la place pour les deux */
 .fi-grid > .card, .fi-side > .card { margin: 0; }
 .fi-side { display: grid; gap: 14px; }
 .fi-budget-card, .fi-setup, .fi-alerts { margin-bottom: 14px; }
@@ -3868,3 +3868,13 @@ textarea.note-title { display: block; resize: none; overflow: hidden; min-height
 .note-title-row { align-items: flex-start; }
 .note-title-row textarea.note-title { flex: 1 1 auto; width: 100%; field-sizing: content; }
 .note-title-row .note-nav { flex: none; margin-top: 2px; }
+/* Tableau « Par catégorie » : s'adapte à la largeur de sa carte (aucune colonne coupée) */
+.fi-grid > .card { container-type: inline-size; min-width: 0; }
+@container (max-width: 540px) {
+  .fi-cat-table thead th, .fi-cat-table tbody td, .fi-cat-table tfoot td { padding: 8px 6px; }
+  .fi-cat-table th:nth-child(5), .fi-cat-table td:nth-child(5) { display: none; }
+  .fi-cat-table .fi-tx-ico { width: 28px; height: 28px; font-size: 14px; }
+}
+@container (max-width: 400px) {
+  .fi-cat-table th:nth-child(3), .fi-cat-table td:nth-child(3) { display: none; }
+}
