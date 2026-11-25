@@ -915,7 +915,12 @@ async function renderNote(id) {
       <section class="card"><h3>↩︎ Rétroliens (${back.length})</h3>
         ${back.map((b) => `<a class="side-link" href="#/note/${b.id}">${brain.typeOf(b.type).icon} ${esc(b.title || 'Sans titre')}<small>${esc(brain.excerpt(b.body, 70))}</small></a>`).join('')
         || '<p class="empty-sm">Aucune note ne pointe encore ici.</p>'}</section>
-      ${(me.tags || []).length ? `<section class="card"><h3># Étiquettes</h3><div class="filters">${me.tags.map((t) => `<button class="chip-btn" data-gotag="${esc(t)}">#${esc(t)}</button>`).join('')}</div></section>` : ''}
+      <section class="card tags-card"><div class="card-head"><h3># Étiquettes</h3><button type="button" class="btn sm-text" id="n-tag-add" title="Ajouter une étiquette à cette note">＋ Ajouter</button></div>
+        <form class="tag-add" id="n-tag-form" hidden><input name="t" placeholder="nouvelle-étiquette" autocomplete="off" list="n-tag-list" maxlength="30" aria-label="Nouvelle étiquette">
+          <datalist id="n-tag-list">${[...new Set(all.flatMap((x) => x.tags || []))].filter((t) => !(me.tags || []).includes(t)).sort().map((t) => `<option value="${esc(t)}">`).join('')}</datalist>
+          <button class="btn primary sm-text">Ajouter</button></form>
+        ${(me.tags || []).length ? `<div class="filters">${me.tags.map((t) => `<span class="tag-chip"><button class="chip-btn" data-gotag="${esc(t)}" title="Voir les notes #${esc(t)}">#${esc(t)}</button><button type="button" class="tag-x" data-untag="${esc(t)}" aria-label="Retirer l’étiquette ${esc(t)}" title="Retirer">×</button></span>`).join('')}</div>`
+          : '<p class="empty-sm">Aucune étiquette. Ajoute-en pour retrouver cette note plus vite.</p>'}</section>
       ${related.length ? `<section class="card"><h3>✨ À relier ?</h3><p class="empty-sm" style="padding-top:0">Ces notes partagent une étiquette.</p>
         ${related.map((r) => `<div class="side-rel"><a href="#/note/${r.id}">${brain.typeOf(r.type).icon} ${esc(r.title)}</a><button class="btn" data-relate="${esc(r.title)}">Relier +${game.XP.link}</button></div>`).join('')}</section>` : ''}
       <section class="card note-info muted">
@@ -1237,6 +1242,27 @@ async function renderNote(id) {
     if (!t) { t = await brain.createNote({ title }); toast(`Note « ${title} » créée`); }
     location.hash = '#/note/' + t.id;
   };
+  // Change le contenu de la note depuis le panneau (étiquettes) : éditeur, sauvegarde et lecture à jour
+  async function setBody(body) {
+    n.body = body;
+    ta.value = body;
+    save();
+    await flush();
+    if (!$('#n-read').hidden) $('#n-read').innerHTML = brain.renderBody(n.body, await brain.allNotes());
+  }
+  view.onsubmit = async (e) => { // une seule fois, même si la page de note est redessinée
+    if (e.target.id !== 'n-tag-form') return;
+    e.preventDefault();
+    const t = e.target.t.value.trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 30);
+    if (!/^\p{L}[\p{L}\p{N}_-]{1,29}$/u.test(t)) { toast('Une étiquette commence par une lettre et a au moins 2 caractères', 'err'); return; }
+    if ((n.tags || []).includes(t) || new RegExp(`(^|[\\s(,;])#${t}(?![\\p{L}\\p{N}_-])`, 'iu').test(n.body)) { toast(`#${t} est déjà sur cette note`); return; }
+    // Les étiquettes vont sur la dernière ligne de la note (ajoutées à celles qui y sont déjà)
+    const lines = n.body.trimEnd().split('\n');
+    const last = lines[lines.length - 1] || '';
+    const tagLine = /^\s*(#\p{L}[\p{L}\p{N}_-]*\s*)+$/u.test(last);
+    await setBody(tagLine ? [...lines.slice(0, -1), `${last.trimEnd()} #${t}`].join('\n') : `${n.body.trimEnd()}${n.body.trim() ? '\n\n' : ''}#${t}`);
+    toast(`🏷 #${t} ajoutée`);
+  };
   view.onclick = async (e) => {
     // Associations (projet, cours RBQ, objectif, mission)
     if (e.target.closest('#n-assoc')) { await flush(); assoc.picker(modal, n, () => drawSide()); return; }
@@ -1250,6 +1276,15 @@ async function renderNote(id) {
     if (ul) { await brain.setGoalProject(ul.dataset.unlink, null); toast('Objectif retiré du projet (il est gardé dans Objectifs)'); drawProject(); return; }
     const wl = e.target.closest('.wl, [data-create]');
     if (wl) { e.preventDefault(); return openLink(wl.dataset.link || wl.dataset.create); }
+    // Étiquettes : ＋ Ajouter (champ avec les étiquettes déjà utilisées) et × pour retirer
+    if (e.target.closest('#n-tag-add')) { const f = $('#n-tag-form'); f.hidden = !f.hidden; if (!f.hidden) f.t.focus(); return; }
+    const untag = e.target.closest('[data-untag]');
+    if (untag) {
+      const t = untag.dataset.untag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      setBody(n.body.replace(new RegExp(`(^|[\\s(,;])#${t}(?![\\p{L}\\p{N}_-])[ \\t]?`, 'giu'), '$1').replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trimEnd());
+      toast(`Étiquette #${untag.dataset.untag} retirée`);
+      return;
+    }
     const tag = e.target.closest('[data-gotag], .note-read .tag');
     if (tag) { brainState.tag = tag.dataset.gotag || tag.dataset.tag; brainState.f = 'all'; brainState.q = ''; location.hash = '#/brain'; return; }
     const rel = e.target.closest('[data-relate]');
