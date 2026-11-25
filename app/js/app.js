@@ -212,11 +212,11 @@ function openQuickAdd(prefill = '', type = null) {
           msg = `✅ Mission « ${p.title} » ajoutée${ph} (${fmtDay(p.date, p.word)})`; route = ['today', 'missions', 'week', 'month'];
         } else if (p.type === 'note') {
           if (pics.length) {
-            // 1re ligne = titre (sinon « Photo du … »), le reste + les photos = contenu
-            const [first = '', ...rest] = p.text.split('\n');
-            const title = first.trim() || `Photo du ${U.fmtShort(new Date())}`;
-            const body = [rest.join('\n').trim(), ...pics.map(images.refLine)].filter(Boolean).join('\n');
-            await brain.createNote({ title: title.slice(0, 80), body, type: 'idee', inbox: true });
+            // Petit titre (sinon « Photo du … ») ; le texte au complet + les photos = contenu
+            const txt = p.text.trim();
+            const title = brain.shortTitle(txt) || `Photo du ${U.fmtShort(new Date())}`;
+            const body = [txt === title ? '' : txt, ...pics.map(images.refLine)].filter(Boolean).join('\n');
+            await brain.createNote({ title, body, type: 'idee', inbox: true });
           } else await brain.capture(p.text);
           msg = `🧠 Note ajoutée au Cerveau${ph} (À classer)`; route = ['brain'];
         }
