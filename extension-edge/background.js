@@ -103,11 +103,15 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       info[sender.tab.id] = { url: String(msg.url || '').slice(0, 500), title: String(msg.title || '').slice(0, 160), icon: String(msg.icon || '').slice(0, 500), at: prev?.at || Date.now() };
       await chrome.storage.session.set({ launcherInfo: info });
       await markLauncherTab(sender.tab.id);
-      // Les pages du Lanceur s'ouvrent en plein écran (une seule fois : F11 ou Échap en sort, et ça reste ainsi)
-      if (!prev) await chrome.windows.update(sender.tab.windowId, { state: 'fullscreen' }).catch(() => {});
+      // Option « plein écran » du Lanceur (réglée dans Life Planner, désactivée par défaut) : une seule fois par page
+      const { launcherFullscreen = false } = await chrome.storage.local.get('launcherFullscreen');
+      if (!prev && launcherFullscreen) await chrome.windows.update(sender.tab.windowId, { state: 'fullscreen' }).catch(() => {});
       reply({ ok: true });
     } else if (msg?.type === 'lp-window-state' && sender.tab && isLP(sender.tab.url || sender.url) && ['fullscreen', 'maximized', 'normal'].includes(msg.state)) {
       await chrome.windows.update(sender.tab.windowId, { state: msg.state }).catch(() => {});
+      reply({ ok: true });
+    } else if (msg?.type === 'lp-set-pref' && isLP(sender.tab?.url || sender.url)) {
+      await chrome.storage.local.set({ launcherFullscreen: !!msg.launcherFullscreen });
       reply({ ok: true });
     } else if (msg?.type === 'lp-launcher-list') {
       reply({ tabs: await launcherList() });

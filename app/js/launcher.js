@@ -206,3 +206,11 @@ export function focusWindow(id) {
   if (!o) return false;
   try { if (o.win.closed) { openWins.delete(id); return false; } o.win.focus(); return true; } catch { return false; }
 }
+
+/* ---------- Plein écran des pages du Lanceur (option, désactivée par défaut) ---------- */
+// L'extension Edge passe une page ouverte depuis le Lanceur en plein écran seulement si l'option est cochée.
+const FS_KEY = 'launcherFullscreen';
+export async function fullscreenPref() { return !!(await db.get('settings', FS_KEY)); }
+/** Transmet l'option à l'extension (par relay.js). Sans extension, le message est simplement ignoré. */
+export async function syncFullscreenPref() { postMessage({ type: 'lp-fs-pref', on: await fullscreenPref() }, location.origin); }
+export async function setFullscreenPref(on) { await db.put('settings', !!on, FS_KEY); await syncFullscreenPref(); }

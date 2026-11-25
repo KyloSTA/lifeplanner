@@ -456,29 +456,48 @@ const routes = {
   notes: (file) => mdnotes.renderPage(pageCtx(), file),
 };
 const NAV_PARENT = {
-  page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', projects: 'missions', habits: 'workout', stretch: 'workout',
+  page: 'brain', note: 'brain', news: 'brain', notebook: 'brain', goals: 'missions', projects: 'brain', habits: 'workout', stretch: 'workout',
   setup: 'settings', usage: 'settings', changelog: 'settings', activities: 'week', quest: 'hero', day: 'week', month: 'week', year: 'week', journal: 'week',
 };
 // Onglets en haut des sections qui regroupent plusieurs pages (le menu n'a qu'une entrée par section)
 const SECTION_TABS = {
   missions: [['missions', '✅ Missions'], ['goals', '🎯 Objectifs'], ['projects', '🚀 Projets']],
-  brain: [['brain', '🧠 Notes'], ['news', '📰 Actualités'], ['notebook', '✏️ Carnet']],
+  // Le Cerveau : sous-menu avec icône, nom et compteur (À classer, Projets)
+  brain: [['brain', '🧠', 'Notes'], ['brain/inbox', '📥', 'À classer'], ['projects', '🚀', 'Projets'], ['news', '📰', 'Actualités'], ['notebook', '✏️', 'Carnet']],
   workout: [['workout', '🏋️ Workout'], ['stretch', '🧘 Étirements'], ['habits', '🔁 Habitudes']],
   settings: [['settings', '⚙ Réglages'], ['changelog', '🕘 Historique']],
 };
 let tabsWatch = null;
 function sectionTabs(name) {
-  const tabs = SECTION_TABS[NAV_PARENT[name] || name];
-  if (!tabs || !tabs.some(([k]) => k === name)) return;
+  const sec = NAV_PARENT[name] || name; // Projets fait maintenant partie du Cerveau (lien gardé dans Missions)
+  const tabs = SECTION_TABS[sec];
+  if (!tabs || !tabs.some(([k]) => k.split('/')[0] === name)) return;
   // Une page qui se redessine (cocher une habitude, filtrer) efface les onglets : on les remet
   tabsWatch ||= new MutationObserver(() => {
     const cur = (location.hash.replace(/^#\/?/, '') || 'today').split('/')[0];
     if (!view.querySelector(':scope > .section-tabs')) sectionTabs(cur);
   });
   tabsWatch.observe(view, { childList: true });
+  if (sec === 'brain') return brainTabs(name, tabs);
   view.querySelector(':scope > .section-tabs')?.remove();
   view.insertAdjacentHTML('afterbegin', `<nav class="seg section-tabs" aria-label="Pages de la section">${tabs.map(([k, l]) =>
     `<a href="#/${k}" class="${k === name ? 'on' : ''}" ${k === name ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`);
+}
+/** Sous-menu du Cerveau : icône + nom, et un compteur pour « À classer » et « Projets ». */
+function brainTabs(name, tabs) {
+  const cur = (location.hash.replace(/^#\/?/, '') || 'today').split('/').slice(0, 2).join('/');
+  const active = tabs.some(([k]) => k === cur) ? cur : name;
+  view.querySelector(':scope > .section-tabs')?.remove();
+  view.insertAdjacentHTML('afterbegin', `<nav class="seg section-tabs brain-tabs" aria-label="Sous-menu du Cerveau">${tabs.map(([k, ico, l]) =>
+    `<a href="#/${k}" class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} data-bt="${k}"><span class="bt-ico">${ico}</span><span class="bt-l">${l}</span><small class="bt-n" hidden></small></a>`).join('')}</nav>`);
+  brain.allNotes().then((all) => {
+    const live = all.filter((n) => !n.archived);
+    const n = { 'brain/inbox': live.filter((x) => x.inbox).length, projects: live.filter((x) => x.type === 'projet').length };
+    view.querySelectorAll('.brain-tabs [data-bt]').forEach((a) => {
+      const c = n[a.dataset.bt], b = a.querySelector('.bt-n');
+      if (c) { b.textContent = c; b.hidden = false; }
+    });
+  }).catch(() => {});
 }
 // Outils d'interface passés aux modules des onglets Habitudes, Cours RBQ et Workout
 const pageCtx = () => ({ view, modal, toast, confirmBox, setCleanup: (fn) => { cleanup = fn; } });
@@ -1582,10 +1601,12 @@ async function renderLauncher() {
       <p class="hint muted"><b>App Windows</b> : ouvre directement l’app du menu Démarrer qui porte le même nom que la tuile (ex. NHL installée depuis Edge, ou une app du Microsoft Store), sans passer par une page web. À faire une seule fois sur ce PC : double-clique <code>Installer apps Windows.bat</code> dans le dossier Life Planner. Sur cellulaire, la tuile ouvre le site.</p>
       <p class="hint muted"><b>App installée</b> : ouvre le site sans barre d’adresse. Installe-le d’abord dans Edge (sur le site : ⋯ → Applications → Installer ce site en tant qu’application), puis dans <code>edge://apps</code>, ouvre les détails de l’app et autorise-la à ouvrir les liens pris en charge.</p>
       <button class="btn" id="ln-reset" type="button">Rétablir les raccourcis par défaut</button>
-    </section>` : `<p class="hint muted">Les sites s’ouvrent chacun dans leur propre fenêtre (un 2e clic ramène la même). Edge et Spotify s’ouvrent comme applications Windows ; 🌐 ouvre la version web. Si rien ne s’ouvre, autorise les fenêtres pop-up pour Life Planner dans Edge.</p>
+    </section>` : `<label class="check ln-fs"><input type="checkbox" id="ln-fs" ${await launcher.fullscreenPref() ? 'checked' : ''}> Ouvrir les sites du Lanceur en plein écran <small class="muted">(extension Edge 1.14+ ; Échap ou F11 pour en sortir)</small></label>
+    <p class="hint muted">Les sites s’ouvrent chacun dans leur propre fenêtre (un 2e clic ramène la même). Edge et Spotify s’ouvrent comme applications Windows ; 🌐 ouvre la version web. Si rien ne s’ouvre, autorise les fenêtres pop-up pour Life Planner dans Edge.</p>
     <p class="hint muted">🧠 Pour enregistrer des posts Reddit et des vidéos YouTube dans ton Cerveau, installe l’extension du dossier <b>extension-edge</b> (voir le README).</p>`}`;
 
   $('#ln-edit').onclick = () => { launcherEdit = !launcherEdit; renderLauncher(); };
+  $('#ln-fs')?.addEventListener('change', async (e) => { await launcher.setFullscreenPref(e.target.checked); toast(e.target.checked ? '⛶ Les sites du Lanceur s’ouvriront en plein écran' : 'Les sites du Lanceur s’ouvriront en fenêtre normale'); });
   $$('[data-open]').forEach((b) => (b.onclick = () => {
     if (launcherEdit) return;
     const it = items[Number(b.dataset.open)];

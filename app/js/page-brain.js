@@ -504,7 +504,14 @@ async function quickTriage(onDone = () => {}) {
 let brainKeepSel = null; // après une action groupée : rester en mode sélection avec ces éléments
 const brainView = () => { try { return ['list', 'grid', 'cards'].includes(localStorage.getItem('lp.brainView')) ? localStorage.getItem('lp.brainView') : 'cards'; } catch { return 'cards'; } };
 
+let lastBrainSub = ''; // onglet « À classer » (#/brain/inbox) : le filtre suit l'onglet choisi dans le sous-menu
 async function renderBrain() {
+  const sub = location.hash.startsWith('#/brain') ? (location.hash.replace(/^#\/?/, '').split('/')[1] || '') : lastBrainSub;
+  if (sub !== lastBrainSub) {
+    if (sub === 'inbox') brainState.f = 'inbox';
+    else if (lastBrainSub === 'inbox' && brainState.f === 'inbox') brainState.f = 'all';
+    lastBrainSub = sub;
+  }
   let everything = await brain.allNotes();
   if (await news.recoverImages(everything).catch(() => 0)) everything = await brain.allNotes(); // images des articles déjà gardés
   fixOldLinks(everything, () => { if (location.hash.startsWith('#/brain')) renderBrain(); }).catch(() => {}); // liens capturés avant : titre et vignette
@@ -528,24 +535,12 @@ async function renderBrain() {
   view.innerHTML = `
     <header class="page-head"><div><p class="eyebrow">Second cerveau</p><h1>Cerveau</h1></div>
       <div class="head-actions">${inbox && !brainState.arch ? `<button class="btn" id="qt-open" title="Classer les éléments « À classer » un par un">⚡ Tri rapide <small>${inbox}</small></button>` : ''}<button class="btn primary" id="new-note">+ Nouvelle note</button></div></header>
-    <div class="brain-top">
-      <section class="card capture-card brain-cap"><div class="card-head"><h2>💡 Capture rapide</h2><span class="muted cap-stats">${inbox ? `📥 ${inbox} à classer` : ''}</span></div>${captureForm('cap')}</section>
-      <div class="brain-aside">
-        <section class="card" id="c-redisc"></section>
-      </div>
-    </div>
-    ${!brainState.arch && projects.length ? `<section class="brain-projects">
-      <div class="bp-head"><h2>🚀 Projets</h2><span class="muted">${projects.length} actif${projects.length > 1 ? 's' : ''}</span></div>
-      <div class="bp-grid">${projects.map((p) => {
-        const st = projStats(p);
-        const rel = notes.filter((x) => (x.rel?.projects || []).includes(p.id)).length;
-        return `<a class="card bp-card" href="#/note/${p.id}">
-          <div class="bp-top"><b>${esc(p.title || 'Projet sans titre')}</b><span class="bp-pct">${st.pct}%</span></div>
-          <div class="bar"><i style="width:${st.pct}%"></i></div>
-          <small class="muted">🎯 ${st.goals.length} objectif${st.goals.length > 1 ? 's' : ''} · ✅ ${st.done}/${st.missions} missions${rel ? ` · 🧠 ${rel} élément${rel > 1 ? 's' : ''}` : ''}</small>
-        </a>`;
-      }).join('')}</div>
-    </section>` : ''}
+    ${!brainState.arch ? `<div class="brain-strips">
+      ${projects.length ? `<div class="brain-strip" aria-label="Projets"><a class="bs-label" href="#/projects" title="Tous les projets">🚀 Projets</a>
+        <div class="bs-row">${projects.map((p) => { const st = projStats(p); return `<a class="bs-chip" href="#/note/${p.id}" title="${esc(p.title || 'Projet')} · ${st.done}/${st.missions} missions"><span>${esc(p.title || 'Projet sans titre')}</span><b style="--p:${st.pct}%">${st.pct}%</b></a>`; }).join('')}</div>
+        <a class="bs-more" href="#/projects">Tout voir →</a></div>` : ''}
+      <div class="brain-strip" id="c-recent" aria-label="Consultés récemment" hidden></div>
+    </div>` : ''}
     <div class="brain-bar">
       <div class="brain-search-row">
         <label class="brain-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -720,6 +715,13 @@ async function renderBrain() {
   $$('[data-f]').forEach((b) => (b.onclick = () => {
     brainState.f = b.dataset.f;
     $$('[data-f]').forEach((x) => x.classList.toggle('on', x === b));
+    // Le sous-menu suit le filtre : « À classer » ou « Notes »
+    const want = brainState.f === 'inbox' ? '#/brain/inbox' : '#/brain';
+    if (location.hash !== want) {
+      history.replaceState(null, '', want);
+      lastBrainSub = brainState.f === 'inbox' ? 'inbox' : '';
+      $$('.section-tabs a').forEach((a) => { const on = a.getAttribute('href') === want; a.classList.toggle('on', on); on ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'); });
+    }
     drawList();
   }));
   $$('[data-tag]').forEach((b) => (b.onclick = () => {
@@ -732,39 +734,13 @@ async function renderBrain() {
     const n = await brain.createNote({ type: 'note' });
     location.hash = '#/note/' + n.id;
   };
-  bindCapture($('#cap'), () => renderBrain());
-
-  // Consultés récemment : les dernières notes ouvertes, une à la fois, avec ‹ › de chaque côté
-  const recentAll = await brain.allNotes();
-  const recent = recentNoteIds().map((id) => recentAll.find((x) => x.id === id)).filter(Boolean);
-  const redisc = async () => {
-    const el = $('#c-redisc');
-    if (!el) return;
-    if (!recent.length) {
-      el.innerHTML = '<div class="card-head"><h2>🕘 Consultés récemment</h2></div><p class="empty-sm">Les éléments du Cerveau que tu ouvres apparaîtront ici, pour y revenir en un clic.</p>';
-      return;
-    }
-    recentIdx = Math.min(Math.max(recentIdx, 0), recent.length - 1);
-    const n = recent[recentIdx];
-    const v = youtubeVideos(n.body)[0];
-    const pic = images.refsIn(n.body)[0];
-    // Miniature : image de l'élément (Amazon, actualité, Reddit, Facebook), photo de la note ou vidéo YouTube
-    const thumb = n.source?.img ? `<img class="rc-thumb ${n.source.kind === 'amazon' ? 'contain' : ''}" src="${esc(n.source.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
-      : pic ? `<img class="rc-thumb" data-img="${pic}" alt="">`
-      : v ? `<img class="rc-thumb" src="https://i.ytimg.com/vi/${v.id}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">` : '';
-    el.innerHTML = `<div class="card-head"><h2>🕘 Consultés récemment</h2><span class="muted">${recentIdx + 1}/${recent.length}</span></div>
-      <div class="rc-row">
-        <button class="rc-arrow" id="rc-prev" ${recentIdx === 0 ? 'disabled' : ''} aria-label="Élément plus récent" title="Plus récent">‹</button>
-        <a class="redisc" href="#/note/${n.id}">
-          ${thumb}
-          <b>${brain.typeOf(n.type).icon} ${esc(n.title || 'Sans titre')}</b>
-          <p>${esc(brain.excerpt(cardText(n.body), 140)) || '<span class="muted">Note vide</span>'}</p></a>
-        <button class="rc-arrow" id="rc-next" ${recentIdx === recent.length - 1 ? 'disabled' : ''} aria-label="Élément consulté avant" title="Consulté avant">›</button>
-      </div>`;
-    $('#rc-prev').onclick = () => { recentIdx--; redisc(); };
-    $('#rc-next').onclick = () => { recentIdx++; redisc(); };
-  };
-  await Promise.all([evoCard(), redisc()]);
+  // Consultés récemment : une seule rangée compacte des derniers éléments ouverts
+  const recent = recentNoteIds().map((id) => everything.find((x) => x.id === id && !x.archived)).filter(Boolean).slice(0, 10);
+  const rc = $('#c-recent');
+  if (rc && recent.length) {
+    rc.hidden = false;
+    rc.innerHTML = `<span class="bs-label">🕘 Récents</span><div class="bs-row">${recent.map((n) => `<a class="bs-chip" href="#/note/${n.id}"><span>${brain.typeOf(n.type).icon} ${esc(n.title || 'Sans titre')}</span></a>`).join('')}</div>`;
+  }
 }
 
 // Objectifs d'un projet dont les missions sont dépliées (sur cet appareil)
