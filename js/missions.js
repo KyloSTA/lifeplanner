@@ -1,10 +1,11 @@
 // Page « Missions » : toutes les missions au même endroit, avec filtres, recherche,
-// regroupement par date ou par objectif, ajout rapide et nettoyage des missions terminées.
+// regroupement par date, par objectif ou par projet, ajout rapide et nettoyage des missions terminées.
 
 import { db } from './db.js';
 import * as U from './util.js';
 import { taskHTML, prioRank, bindTaskList, addTask, loadGoals, deleteTask, trashList, restoreTask, purgeTasks } from './tasks.js';
 import * as couple from './couple.js';
+import * as brain from './brain.js';
 
 const { esc, iso } = U;
 const FILTERS = [
@@ -33,6 +34,7 @@ export async function renderPage(ctx) {
   const { view, toast, confirmBox } = ctx;
   const goals = await loadGoals();
   const all = await db.all('tasks');
+  const projects = brain.projectsOf(await brain.allNotes()).sort((a, b) => (b.pinned - a.pinned) || (a.title || '').localeCompare(b.title || ''));
   const now = new Date();
   const today = iso(now), tomorrow = iso(U.addDays(now, 1));
   const weekEnd = iso(U.addDays(U.startOfWeek(now), 6));
@@ -74,7 +76,7 @@ export async function renderPage(ctx) {
       <div class="ms-right">
         <input type="search" id="ms-q" placeholder="🔍 Rechercher…" value="${q}" autocomplete="off">
         ${couple.ON ? `<select id="ms-who" aria-label="Missions de qui"><option value="">👫 Tout le monde</option><option value="me" ${state.who === 'me' ? 'selected' : ''}>🙋 Mes missions</option>${['a', 'b'].map((k) => `<option value="${k}" ${state.who === k ? 'selected' : ''}>👤 ${esc(couple.nameOf(k))}</option>`).join('')}<option value="both" ${state.who === 'both' ? 'selected' : ''}>👫 Communes</option></select>` : ''}
-        <select id="ms-by" aria-label="Regrouper par"><option value="date" ${state.by === 'date' ? 'selected' : ''}>Par date</option><option value="goal" ${state.by === 'goal' ? 'selected' : ''}>Par objectif</option></select>
+        <select id="ms-by" aria-label="Regrouper par"><option value="date" ${state.by === 'date' ? 'selected' : ''}>Par date</option><option value="goal" ${state.by === 'goal' ? 'selected' : ''}>Par objectif</option><option value="project" ${state.by === 'project' ? 'selected' : ''}>Par projet</option></select>
       </div>
     </div>
     <div id="ms-list"></div>`;
@@ -141,6 +143,12 @@ export async function renderPage(ctx) {
       for (const g of goals) groups.set(g.id, { label: `🎯 ${g.title}`, items: [] });
       groups.set('', { label: 'Sans objectif', items: [] });
       for (const t of list) (groups.get(t.goalId || '') || groups.get('')).items.push(t);
+    } else if (state.by === 'project') {
+      // Projet d'une mission : rattachée directement, ou par son objectif
+      const projOf = (t) => t.projectId || goals.find((g) => g.id === t.goalId)?.projectId || '';
+      for (const p of projects) groups.set(p.id, { label: `🚀 ${p.title || 'Projet sans titre'}`, href: `#/note/${p.id}`, items: [] });
+      groups.set('', { label: 'Sans projet', items: [] });
+      for (const t of list) (groups.get(projOf(t)) || groups.get('')).items.push(t);
     } else {
       for (const k of ORDER) groups.set(k, { label: '', items: [] });
       for (const t of list) {
@@ -156,8 +164,8 @@ export async function renderPage(ctx) {
     const cleanable = list.filter((t) => t.done && !t.goalId);
     const filled = [...groups.entries()].filter(([, g]) => g.items.length);
     el.innerHTML = filled.length ? filled.map(([k, g]) => `<section class="card ms-group ${k === 'late' ? 'is-late' : ''}">
-        <div class="card-head"><h2>${esc(g.label)}</h2><span class="muted">${g.items.length}</span></div>
-        <ul class="tasks">${g.items.map((t) => taskHTML(t, today, { showDate: true, hideGoal: state.by === 'goal' })).join('')}</ul>
+        <div class="card-head"><h2>${g.href ? `<a href="${g.href}" class="ms-proj-link" title="Ouvrir le projet">${esc(g.label)}</a>` : esc(g.label)}</h2><span class="muted">${g.items.length}</span></div>
+        <ul class="tasks">${g.items.map((t) => taskHTML(t, today, { showDate: true, hideGoal: state.by === 'goal', hideProject: state.by === 'project' })).join('')}</ul>
       </section>`).join('')
       + (state.f === 'done' && cleanable.length ? `<p class="ms-clean"><button class="btn danger" id="ms-clean">🧹 Supprimer ${cleanable.length} mission${cleanable.length > 1 ? 's' : ''} terminée${cleanable.length > 1 ? 's' : ''} sans objectif</button></p>` : '')
       : `<div class="card empty-card"><p>${nq ? 'Aucune mission ne correspond à ta recherche.' : state.f === 'late' ? '🎉 Aucune mission en retard.' : state.f === 'done' ? 'Aucune mission terminée pour l’instant.' : 'Rien ici. Ajoute une mission ci-dessus.'}</p></div>`;

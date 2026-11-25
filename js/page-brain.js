@@ -784,6 +784,21 @@ function youtubeVideos(text = '') {
   return [...out.values()];
 }
 
+// Page d'où on a ouvert la note (ou le projet) : le lien « ← » y ramène. Passer d'une note à une autre
+// (‹ ›, [[liens]]) garde la page d'origine.
+let noteOrigin = '#/brain';
+addEventListener('hashchange', (e) => {
+  const from = new URL(e.oldURL).hash || '#/today', to = new URL(e.newURL).hash;
+  if (to.startsWith('#/note/') && !from.startsWith('#/note/')) noteOrigin = from;
+});
+const ORIGIN_LABELS = { brain: 'Cerveau', projects: 'Projets', missions: 'Missions', goals: 'Objectifs', today: 'Aujourd’hui', week: 'Semaine', month: 'Mois', year: 'Année', day: 'Journée', journal: 'Journal',
+  news: 'Actualités', notebook: 'Carnet', page: 'Carnet', rbq: 'Cours RBQ', finance: 'Finances', propriete: 'Propriété', workout: 'Corps', habits: 'Habitudes', hero: 'Progression', notes: 'Notes', launcher: 'Lanceur', settings: 'Réglages' };
+function originLink() {
+  const [name, sub] = noteOrigin.replace(/^#\/?/, '').split('/');
+  const label = name === 'brain' && sub === 'inbox' ? 'À classer' : ORIGIN_LABELS[name] || 'Cerveau';
+  return { href: ORIGIN_LABELS[name] ? noteOrigin : '#/brain', label };
+}
+
 async function renderNote(id) {
   const n = await db.get('notes', id);
   if (!n) { view.innerHTML = '<div class="empty">Note introuvable. <a href="#/brain">Retour au Cerveau</a></div>'; return; }
@@ -803,7 +818,7 @@ async function renderNote(id) {
 
   view.innerHTML = `
     <header class="page-head note-head">
-      <div class="grow"><a href="#/brain" class="eyebrow">← Cerveau</a>
+      <div class="grow"><a href="${esc(originLink().href)}" class="eyebrow">← ${esc(originLink().label)}</a>
         <div class="note-title-row">
           <input id="n-title" class="note-title" value="${esc(n.title)}" placeholder="Titre de la note" maxlength="80" autocomplete="off">
           ${brainState.order.length > 1 ? `<nav class="note-nav" aria-label="Autres éléments du Cerveau">
