@@ -3854,3 +3854,12 @@ html:fullscreen #noel-garland { top: 0; }
 .brain-strip .bs-more { flex: none; font-size: 13px; color: var(--muted); text-decoration: none; white-space: nowrap; }
 .brain-strip .bs-more:hover { color: var(--text); }
 @media (max-width: 700px) { .brain-strip .bs-label { min-width: 0; } .brain-strip .bs-more { display: none; } }
+/* Étiquettes d'une note : ajout et retrait */
+.tags-card .card-head { margin-bottom: 8px; }
+.tag-add { display: flex; gap: 6px; margin-bottom: 10px; }
+.tag-add[hidden] { display: none; }
+.tag-add input { flex: 1; min-width: 0; }
+.tag-chip { display: inline-flex; align-items: center; }
+.tag-chip .chip-btn { border-top-right-radius: 0; border-bottom-right-radius: 0; padding-right: 8px; }
+.tag-chip .tag-x { height: 100%; min-height: 32px; padding: 0 9px; border: 1px solid var(--border); border-left: 0; border-radius: 0 999px 999px 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; }
+.tag-chip .tag-x:hover { color: #ef4444; }
