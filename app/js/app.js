@@ -412,6 +412,13 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   openQuickAdd();
 });
+// Touche L : ouvre le Lanceur (mêmes exceptions que la touche N)
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || (e.key !== 'l' && e.key !== 'L')) return;
+  if (e.target.closest?.('input, textarea, select, [contenteditable], canvas') || document.body.classList.contains('ink-mode') || $('#modal-root').children.length) return;
+  e.preventDefault();
+  location.hash = '#/launcher';
+});
 
 function greeting() {
   const h = new Date().getHours();
